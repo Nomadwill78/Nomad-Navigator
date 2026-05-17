@@ -1,0 +1,99 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    function getMember(orgId) {
+      return get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data;
+    }
+
+    function isOrgMember(orgId) {
+      return isSignedIn() && exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+    }
+
+    function hasRole(orgId, roles) {
+      return isOrgMember(orgId) && getMember(orgId).role in roles;
+    }
+
+    // --- Entity Validators ---
+    function isValidOrganization(data) {
+      return data.keys().hasAll(['name', 'creatorId', 'createdAt', 'memberCount']) &&
+             data.keys().size() == 4 &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 256 &&
+             data.creatorId == request.auth.uid &&
+             data.memberCount is int && data.memberCount >= 0 && data.memberCount <= 8;
+    }
+
+    function isValidOrgMember(data) {
+      return data.keys().hasAll(['userId', 'email', 'role', 'joinedAt']) &&
+             data.keys().size() == 4 &&
+             data.userId is string && data.userId.size() >= 0 &&
+             data.email is string && data.email.size() > 0 &&
+             data.role in ['admin', 'grant_coordinator', 'impact_analyst', 'compliance_officer', 'data_entry', 'viewer'];
+    }
+
+    function isValidGrant(data) {
+      return data.name is string && data.name.size() > 0 &&
+             data.funder is string && data.funder.size() > 0 &&
+             data.amount is number && data.amount >= 0;
+    }
+
+    // --- Matches ---
+
+    match /organizations/{orgId} {
+      allow get: if isOrgMember(orgId);
+      allow create: if isSignedIn() && isValidOrganization(incoming()) && isValidId(orgId);
+      allow update: if hasRole(orgId, ['admin']) && 
+                      isValidOrganization(incoming()) &&
+                      incoming().creatorId == existing().creatorId; // Immutable creator
+      
+      match /members/{userId} {
+        allow read: if isOrgMember(orgId);
+        allow create: if (
+          (isSignedIn() && userId == request.auth.uid && get(/databases/$(database)/documents/organizations/$(orgId)).data.creatorId == request.auth.uid) ||
+          (hasRole(orgId, ['admin']))
+        ) && isValidOrgMember(incoming()) && 
+          getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.memberCount <= 8;
+        
+        allow update: if hasRole(orgId, ['admin']) && isValidOrgMember(incoming()) &&
+                      incoming().userId == existing().userId;
+        
+        allow delete: if hasRole(orgId, ['admin']) && userId != request.auth.uid;
+      }
+
+      match /grants/{grantId} {
+        allow list: if isOrgMember(orgId);
+        allow get: if isOrgMember(orgId);
+        allow create: if hasRole(orgId, ['admin', 'grant_coordinator']) && isValidGrant(incoming());
+        allow update: if hasRole(orgId, ['admin', 'grant_coordinator']) && isValidGrant(incoming());
+        allow delete: if hasRole(orgId, ['admin']);
+      }
+
+      // Metrics subcollection (if any)
+      match /metrics/{metricId} {
+        allow read: if isOrgMember(orgId);
+        allow write: if hasRole(orgId, ['admin', 'impact_analyst', 'data_entry']);
+      }
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && userId == request.auth.uid;
+    }
+  }
+}

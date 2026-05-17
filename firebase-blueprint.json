@@ -1,0 +1,67 @@
+{
+  "entities": {
+    "Organization": {
+      "title": "Organization",
+      "description": "A group representing a nonprofit or foundation using the platform.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "creatorId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "creatorId"]
+    },
+    "OrgMember": {
+      "title": "Organization Member",
+      "description": "A user's role and membership within an organization.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "editor", "viewer", "uploader"] },
+        "invitedBy": { "type": "string" }
+      },
+      "required": ["userId", "email", "role"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User account information.",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "currentOrgId": { "type": "string" }
+      }
+    },
+    "Grant": {
+      "title": "Grant",
+      "description": "Financial grant tracking data.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "funder": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "pending", "completed"] },
+        "kpis": { "type": "array" }
+      }
+    }
+  },
+  "firestore": {
+    "organizations/{orgId}": {
+      "schema": "Organization",
+      "description": "Top-level organization data."
+    },
+    "organizations/{orgId}/members/{userId}": {
+      "schema": "OrgMember",
+      "description": "Membership list for the organization."
+    },
+    "organizations/{orgId}/grants/{grantId}": {
+      "schema": "Grant",
+      "description": "List of grants managed by the organization."
+    },
+    "users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User meta-data and link to current organization."
+    }
+  }
+}

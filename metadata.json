@@ -1,0 +1,5 @@
+{
+  "name": "Nomad Compass",
+  "description": "A modern analytics dashboard for nonprofits to track program impact, financial costs, and ROI per beneficiary.",
+  "requestFramePermissions": []
+}
