@@ -1,4 +1,4 @@
-name: CI / Build & Deploy
+name: CI
 
 on:
   push:
@@ -6,40 +6,32 @@ on:
   pull_request:
     branches: [main]
 
+# Vercel auto-deploys to production on every push to main via GitHub Integration.
+# This workflow handles code quality checks only.
+
 jobs:
   ci:
     name: Type-check · Lint · Test · Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - run: npm install --legacy-peer-deps
-      - run: npx tsc --noEmit
-      - run: npm run lint --if-present
-        continue-on-error: true
-      - run: npm test -- --run --passWithNoTests
-      - run: npm run build
 
-  deploy:
-    name: Deploy to Vercel
-    runs-on: ubuntu-latest
-    needs: ci
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    steps:
-      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
-      - name: Link and deploy to Vercel
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: |
-          vercel pull --yes --environment=production --token=$VERCEL_TOKEN
-          vercel build --prod --token=$VERCEL_TOKEN
-          vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: TypeScript type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint --if-present
+        continue-on-error: true
+
+      - name: Run tests
+        run: npm test -- --run --passWithNoTests
+
+      - name: Build verification
+        run: npm run build
