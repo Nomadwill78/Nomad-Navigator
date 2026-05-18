@@ -1,4 +1,5 @@
-import { defineConfig, loadEnv } from 'vitest/config';
+import { defineConfig } from 'vitest/config';
+import { loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
 // https://vitejs.dev/config/
