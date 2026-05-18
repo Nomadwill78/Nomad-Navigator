@@ -11,14 +11,14 @@
   },
   "dependencies": {
     "@google/genai": "^1.37.0",
-    "@tailwindcss/vite": "^4.1.5",
+    "@tailwindcss/vite": "^4.0.0-alpha.25",
     "firebase": "^12.12.1",
     "lucide-react": "^0.562.0",
     "motion": "^12.38.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "recharts": "^3.6.0",
-    "tailwindcss": "^4.1.5"
+    "tailwindcss": "^4.0.0-alpha.25"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

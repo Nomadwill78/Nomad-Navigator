@@ -276,6 +276,12 @@ const DEMO_STATS: DashboardStats = {
 const SPARK_IMPACT = MOCK_PROGRAMS.map(p => ({ value: p.peopleServed }));
 const SPARK_COST = MOCK_PROGRAMS.map(p => ({ value: p.totalCost }));
 const SPARK_ROI = MOCK_PROGRAMS.map(p => ({ value: p.costPerPerson }));
+const SPARK_FINANCIALS_SPENDING = [
+  { value: 45000 }, { value: 52000 }, { value: 48000 }, { value: 61000 }, { value: 55000 }, { value: 67000 }
+];
+const SPARK_FINANCIALS_SOURCES = [
+  { value: 38000 }, { value: 42000 }, { value: 55000 }, { value: 51000 }, { value: 59000 }, { value: 63000 }
+];
 
 const App: React.FC = () => {
   const { user, profile, organization, role, loading, login, logout, createOrg } = useAuth();
@@ -878,6 +884,150 @@ const App: React.FC = () => {
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
+                </div>
+
+                {/* Financial Health Section */}
+                <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300 animate-in fade-in slide-in-from-bottom-7 duration-700 delay-400">
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                        <DollarSign size={20} className="text-emerald-500" />
+                        Financial Health
+                      </h3>
+                      <p className="text-sm text-slate-500">Resource Allocation & Funding Diversity</p>
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-wider rounded-full border border-emerald-100 shadow-sm">
+                      Reserve: {stats.financials.operatingReserveMonths} mo.
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Spending Breakdown */}
+                    <div className="space-y-4">
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Spending Breakdown</h4>
+                      <div className="h-40 relative">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie 
+                              data={stats.financials.spending} 
+                              dataKey="value" 
+                              nameKey="name" 
+                              cx="50%" 
+                              cy="50%" 
+                              innerRadius={45} 
+                              outerRadius={65}
+                              paddingAngle={5}
+                            >
+                              {stats.financials.spending.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS.green[index % COLORS.green.length]} stroke="none" />
+                              ))}
+                            </Pie>
+                            <Tooltip 
+                              contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} 
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                           <span className="text-lg font-bold text-slate-800">{stats.financials.spending[0].value}%</span>
+                        </div>
+                      </div>
+                      
+                      {/* Historical Sparkline */}
+                      <div className="h-10 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={SPARK_FINANCIALS_SPENDING}>
+                            <Area 
+                              type="monotone" 
+                              dataKey="value" 
+                              stroke="#10b981" 
+                              fill="#10b981" 
+                              fillOpacity={0.1}
+                              strokeWidth={2}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight text-center mt-1">Total Spending Trend</p>
+                      </div>
+                    </div>
+
+                    {/* Funding Sources */}
+                    <div className="space-y-4">
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Funding Diversity</h4>
+                      <div className="h-40 relative">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie 
+                              data={stats.financials.sources} 
+                              dataKey="value" 
+                              nameKey="name" 
+                              cx="50%" 
+                              cy="50%" 
+                              innerRadius={45} 
+                              outerRadius={65}
+                              paddingAngle={5}
+                            >
+                              {stats.financials.sources.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS.orange[index % COLORS.orange.length]} stroke="none" />
+                              ))}
+                            </Pie>
+                            <Tooltip 
+                              contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} 
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                           <span className="text-lg font-bold text-slate-800">{stats.financials.sources[0].value}%</span>
+                        </div>
+                      </div>
+
+                      {/* Historical Sparkline */}
+                      <div className="h-10 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={SPARK_FINANCIALS_SOURCES}>
+                            <Area 
+                              type="monotone" 
+                              dataKey="value" 
+                              stroke="#f97316" 
+                              fill="#f97316" 
+                              fillOpacity={0.1}
+                              strokeWidth={2}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight text-center mt-1">New Funding Trend</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Geographic Reach */}
+                <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300 animate-in fade-in slide-in-from-bottom-7 duration-700 delay-500">
+                    <div className="flex items-center justify-between mb-8">
+                        <div>
+                            <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                              <MapPin size={20} className="text-brand-500" /> 
+                              Service Areas
+                            </h3>
+                            <p className="text-sm text-slate-500">Regional Outreach Breakdown</p>
+                        </div>
+                        <div className="text-xs text-slate-400 font-medium">89% Urban Focus</div>
+                    </div>
+                    <div className="space-y-6">
+                        {stats.geographic.neighborhoods.map((area, i) => (
+                            <div key={i} className="group">
+                                <div className="flex justify-between text-sm mb-1.5">
+                                    <span className="text-slate-600 font-medium">{area.name}</span>
+                                    <span className="text-slate-900 font-bold">{area.value}%</span>
+                                </div>
+                                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                    <div 
+                                      className="h-full bg-gradient-to-r from-brand-400 to-brand-600 rounded-full transition-all duration-[1500ms]" 
+                                      style={{ width: `${area.value}%` }}
+                                    ></div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
               </div>
             </>

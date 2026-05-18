@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, AlertTriangle, TrendingUp, CheckCircle2, BrainCircuit } from 'lucide-react';
+import { Sparkles, AlertTriangle, TrendingUp, CheckCircle2, BrainCircuit, Check, ArrowRight } from 'lucide-react';
 import { AIAnalysisData } from '../types';
 
 interface AIInsightsPanelProps {
@@ -45,9 +45,9 @@ export const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ data, isLoadin
           </div>
           <ul className="space-y-3">
             {data.keyFindings.map((finding, idx) => (
-              <li key={idx} className="text-sm text-slate-600 leading-snug flex gap-2">
-                <span className="text-blue-400 mt-0.5">•</span>
-                {finding}
+              <li key={idx} className="text-sm text-slate-600 leading-snug flex gap-2.5 items-start">
+                <Check size={14} className="text-blue-500 mt-1 shrink-0" />
+                <span>{finding}</span>
               </li>
             ))}
           </ul>
@@ -59,11 +59,11 @@ export const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ data, isLoadin
           <div className="flex items-center gap-2 mb-3 text-green-700 font-semibold">
             <Sparkles size={18} /> Strategic Steps
           </div>
-          <ul className="space-y-3">
+          <ul className="space-y-4">
             {data.recommendations.map((rec, idx) => (
-              <li key={idx} className="text-sm text-slate-600 leading-snug flex gap-2">
-                <span className="text-green-400 mt-0.5">→</span>
-                {rec}
+              <li key={idx} className="text-sm text-slate-600 leading-snug flex gap-2.5 items-start">
+                <ArrowRight size={14} className="text-green-500 mt-1 shrink-0" />
+                <span>{rec}</span>
               </li>
             ))}
           </ul>
@@ -91,9 +91,11 @@ export const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ data, isLoadin
           <div className="flex items-center gap-2 mb-3 font-semibold text-purple-200">
             <TrendingUp size={18} /> Trend Analysis
           </div>
-          <p className="text-sm text-slate-300 leading-relaxed">
-            {data.trendAnalysis}
-          </p>
+          <div className="bg-white/5 border-l-2 border-purple-500/50 p-4 rounded-r-lg">
+            <p className="text-sm text-slate-300 leading-relaxed italic">
+              "{data.trendAnalysis}"
+            </p>
+          </div>
           <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center text-xs text-slate-400">
             <span>Based on Q1-Q2 Data</span>
             <button onClick={onRefresh} className="hover:text-white transition-colors flex items-center gap-1">

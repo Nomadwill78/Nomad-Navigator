@@ -339,7 +339,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                        type="number" 
                                        value={kpi.current}
                                        onChange={(e) => handleUpdateKPI(selectedGrant.id, kpi.id, { current: parseInt(e.target.value) || 0 })}
-                                       className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-brand-400"
+                                       className="w-full bg-transparent border-b border-slate-100 hover:border-slate-200 focus:border-brand-400 focus:bg-white px-2 py-1 text-sm font-bold text-slate-700 outline-none transition-all"
                                      />
                                    </div>
                                  </div>
@@ -350,13 +350,13 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                        type="number" 
                                        value={kpi.target}
                                        onChange={(e) => handleUpdateKPI(selectedGrant.id, kpi.id, { target: parseInt(e.target.value) || 1 })}
-                                       className="w-24 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-brand-400"
+                                       className="w-24 bg-transparent border-b border-slate-100 hover:border-slate-200 focus:border-brand-400 focus:bg-white px-2 py-1 text-sm font-bold text-slate-700 outline-none transition-all"
                                      />
                                      <input 
                                        type="text" 
                                        value={kpi.unit}
                                        onChange={(e) => handleUpdateKPI(selectedGrant.id, kpi.id, { unit: e.target.value })}
-                                       className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-brand-400"
+                                       className="flex-1 bg-transparent border-b border-slate-100 hover:border-slate-200 focus:border-brand-400 focus:bg-white px-2 py-1 text-sm font-bold text-slate-700 outline-none transition-all"
                                      />
                                    </div>
                                  </div>
@@ -487,7 +487,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                             type="number" 
                                             value={kpi.current}
                                             onChange={(e) => handleUpdateSubgranteeKPI(selectedGrant.id, sub.id, kpi.id, { current: parseInt(e.target.value) || 0 })}
-                                            className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs font-medium outline-none focus:ring-1 focus:ring-indigo-400"
+                                            className="w-full bg-transparent border-b border-slate-100 hover:border-slate-200 focus:border-indigo-400 focus:bg-white px-2 py-1 text-xs font-semibold outline-none transition-all"
                                           />
                                         </div>
                                         <div>
@@ -497,13 +497,13 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                               type="number" 
                                               value={kpi.target}
                                               onChange={(e) => handleUpdateSubgranteeKPI(selectedGrant.id, sub.id, kpi.id, { target: parseInt(e.target.value) || 1 })}
-                                              className="w-16 bg-white border border-slate-200 rounded px-2 py-1 text-xs font-medium outline-none focus:ring-1 focus:ring-indigo-400"
+                                              className="w-16 bg-transparent border-b border-slate-100 hover:border-slate-200 focus:border-indigo-400 focus:bg-white px-2 py-1 text-xs font-semibold outline-none transition-all"
                                             />
                                             <input 
                                               type="text" 
                                               value={kpi.unit}
                                               onChange={(e) => handleUpdateSubgranteeKPI(selectedGrant.id, sub.id, kpi.id, { unit: e.target.value })}
-                                              className="flex-1 bg-white border border-slate-200 rounded px-2 py-1 text-xs font-medium outline-none focus:ring-1 focus:ring-indigo-400"
+                                              className="flex-1 bg-transparent border-b border-slate-100 hover:border-slate-200 focus:border-indigo-400 focus:bg-white px-2 py-1 text-xs font-semibold outline-none transition-all"
                                               placeholder="Unit"
                                             />
                                           </div>
