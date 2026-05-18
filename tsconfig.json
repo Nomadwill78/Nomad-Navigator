@@ -21,6 +21,6 @@
     "noEmit": true,
     "isolatedModules": true
   },
-  "include": ["src", "vite.config.ts", "index.tsx", "components", "services"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src", "vite.config.ts", "index.tsx", "services"],
+  "exclude": ["node_modules", "dist", "components"]
 }
