@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Activity, ShieldCheck, Zap, Globe, Sparkles, Mail, Lock, LogIn, UserPlus, AlertCircle } from 'lucide-react';
 import { useAuth } from '../src/contexts/AuthContext';
+import { BrandLogo } from './BrandLogo';
 
 export const LoginView: React.FC = () => {
   const { login, loginWithEmail, registerWithEmail } = useAuth();
@@ -29,20 +30,17 @@ export const LoginView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 relative overflow-hidden">
       {/* Background elements */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-brand-500/20 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/2"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-500/20 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/2"></div>
+      <div className="absolute top-0 right-0 w-96 h-96 bg-brand-500/10 rounded-full blur-[125px] -translate-y-1/2 translate-x-1/2"></div>
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-500/10 rounded-full blur-[125px] translate-y-1/2 -translate-x-1/2"></div>
       
       <div className="max-w-md w-full relative z-10 text-center text-slate-100">
-        <div className="flex justify-center mb-8">
-           <div className="bg-gradient-to-br from-brand-500 to-purple-600 p-4 rounded-3xl shadow-2xl shadow-brand-500/40">
-              <Activity size={48} className="text-white" />
-           </div>
+        <div className="flex flex-col items-center justify-center mb-10">
+          <BrandLogo size={64} showText={true} textPosition="bottom" variant="light" className="mb-2" />
+          <h1 className="text-3xl font-extrabold text-white mt-4 mb-2 tracking-tight">Compass</h1>
+          <p className="text-slate-400 text-sm max-w-sm">The AI-powered impact intelligence platform for modern nonprofits.</p>
         </div>
-        
-        <h1 className="text-4xl font-black text-white mb-4 tracking-tight">Nomad Compass</h1>
-        <p className="text-slate-400 text-lg mb-12">The AI-powered impact intelligence platform for modern nonprofits.</p>
         
         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
           {error && (

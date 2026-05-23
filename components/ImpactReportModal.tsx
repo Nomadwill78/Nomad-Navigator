@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, Download, Copy, FileText, ChevronRight, Calendar } from 'lucide-react';
+import { X, Download, Copy, Check, FileText, ChevronRight, Calendar } from 'lucide-react';
 import { ReportFrequency } from '../types';
+import { jsPDF } from 'jspdf';
 
 interface ImpactReportModalProps {
   isOpen: boolean;
@@ -18,6 +19,188 @@ export const ImpactReportModal: React.FC<ImpactReportModalProps> = ({
   isLoading 
 }) => {
   const [selectedFreq, setSelectedFreq] = useState<ReportFrequency>('quarterly');
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(reportContent);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  };
+
+  const handleExportPDF = () => {
+    if (!reportContent) return;
+
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const pageHeight = doc.internal.pageSize.height;
+    const pageWidth = doc.internal.pageSize.width;
+    const margin = 20;
+    const maxLineWidth = pageWidth - (margin * 2);
+    let y = 30;
+
+    const ensureSpace = (heightNeeded: number) => {
+      if (y + heightNeeded > pageHeight - margin) {
+        doc.addPage();
+        y = margin + 10;
+      }
+    };
+
+    const lines = reportContent.split('\n');
+
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        y += 4;
+        return;
+      }
+
+      if (trimmed.startsWith('# ')) {
+        const text = trimmed.replace('# ', '');
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(22);
+        doc.setTextColor(15, 23, 42);
+
+        const wrapped = doc.splitTextToSize(text, maxLineWidth);
+        const needed = wrapped.length * 8 + 6;
+        ensureSpace(needed);
+
+        doc.setDrawColor(14, 165, 233);
+        doc.setLineWidth(1.5);
+        doc.line(margin - 4, y - 5, margin - 4, y + (wrapped.length * 8) - 4);
+
+        wrapped.forEach((wLine: string) => {
+          doc.text(wLine, margin, y);
+          y += 8;
+        });
+        y += 4;
+      } else if (trimmed.startsWith('## ')) {
+        const text = trimmed.replace('## ', '');
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.setTextColor(30, 41, 59);
+
+        const wrapped = doc.splitTextToSize(text, maxLineWidth);
+        const needed = wrapped.length * 6 + 4;
+        ensureSpace(needed + 5);
+
+        y += 4;
+        wrapped.forEach((wLine: string) => {
+          doc.text(wLine, margin, y);
+          y += 6;
+        });
+        y += 3;
+      } else if (trimmed.startsWith('### ')) {
+        const text = trimmed.replace('### ', '');
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(71, 85, 105);
+
+        const wrapped = doc.splitTextToSize(text, maxLineWidth);
+        const needed = wrapped.length * 5 + 3;
+        ensureSpace(needed + 3);
+
+        y += 3;
+        wrapped.forEach((wLine: string) => {
+          doc.text(wLine, margin, y);
+          y += 5;
+        });
+        y += 2;
+      } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        const text = trimmed.replace(/^[-*]\s+/, '');
+        const cleanedText = text.replace(/\*\*/g, '');
+
+        doc.setFont('Helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(51, 65, 85);
+
+        const listTextWidth = maxLineWidth - 6;
+        const wrapped = doc.splitTextToSize(cleanedText, listTextWidth);
+        const needed = wrapped.length * 5;
+        ensureSpace(needed);
+
+        doc.setFillColor(14, 165, 233);
+        doc.circle(margin + 2, y - 1.2, 0.8, 'F');
+
+        wrapped.forEach((wLine: string) => {
+          doc.text(wLine, margin + 6, y);
+          y += 5;
+        });
+        y += 1;
+      } else if (/^\d+\./.test(trimmed)) {
+        const numMatch = trimmed.match(/^(\d+\.)\s+(.*)/);
+        const indexStr = numMatch ? numMatch[1] : '1.';
+        const restText = numMatch ? numMatch[2] : trimmed;
+        const cleanedText = restText.replace(/\*\*/g, '');
+
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(14, 165, 233);
+
+        ensureSpace(5);
+        doc.text(indexStr, margin, y);
+
+        doc.setFont('Helvetica', 'normal');
+        doc.setTextColor(51, 65, 85);
+
+        const listTextWidth = maxLineWidth - 8;
+        const wrapped = doc.splitTextToSize(cleanedText, listTextWidth);
+        wrapped.forEach((wLine: string, idx: number) => {
+          if (idx > 0) {
+            ensureSpace(5);
+          }
+          doc.text(wLine, margin + 8, y);
+          y += 5;
+        });
+        y += 1;
+      } else {
+        const cleanedText = trimmed.replace(/\*\*/g, '');
+        doc.setFont('Helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(51, 65, 85);
+
+        const wrapped = doc.splitTextToSize(cleanedText, maxLineWidth);
+        const needed = wrapped.length * 5;
+        ensureSpace(needed);
+
+        wrapped.forEach((wLine: string) => {
+          doc.text(wLine, margin, y);
+          y += 5;
+        });
+        y += 2.5;
+      }
+    });
+
+    const totalPages = doc.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      
+      doc.setDrawColor(241, 245, 249);
+      doc.setLineWidth(0.5);
+      doc.line(margin, 15, pageWidth - margin, 15);
+
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text('Nomad Compass AI Impact Report', margin, 12);
+
+      doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
+      doc.text('Generated via Nomad Compass Dashboard', margin, pageHeight - 10);
+      
+      const pageStr = `Page ${i} of ${totalPages}`;
+      const pageStrWidth = doc.getTextWidth(pageStr);
+      doc.text(pageStr, pageWidth - margin - pageStrWidth, pageHeight - 10);
+    }
+
+    doc.save(`nomad-compass-impact-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+  };
 
   if (!isOpen) return null;
 
@@ -136,11 +319,19 @@ export const ImpactReportModal: React.FC<ImpactReportModalProps> = ({
         {/* Footer */}
         {reportContent && !isLoading && (
           <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
-            <button className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">
-              <Copy size={16} />
-              Copy Text
+            <button 
+              onClick={handleCopy}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+                copied ? 'text-emerald-600 font-bold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {copied ? <Check size={16} /> : <Copy size={16} />}
+              {copied ? 'Copied!' : 'Copy Text'}
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors shadow-sm text-sm font-medium">
+            <button 
+              onClick={handleExportPDF}
+              className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors shadow-sm text-sm font-medium animate-pulse hover:animate-none"
+            >
               <Download size={16} />
               Export PDF
             </button>

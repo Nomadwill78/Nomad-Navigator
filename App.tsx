@@ -47,6 +47,7 @@ import { TeamManagementView } from './components/TeamManagementView';
 import { LoginView } from './components/LoginView';
 import { OnboardingView } from './components/OnboardingView';
 import { DemoModeBanner, DemoHint } from './components/DemoTour';
+import { BrandLogo } from './components/BrandLogo';
 import { useAuth } from './src/contexts/AuthContext';
 import { generateImpactReport, generateDashboardInsights } from './services/geminiService';
 import { DashboardStats, ProgramMetric, AIAnalysisData, Grant, Opportunity, ROLE_PERMISSIONS } from './types';
@@ -288,25 +289,126 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeView, setActiveView] = useState<'dashboard' | 'data' | 'grants' | 'analysis' | 'discovery' | 'team'>('dashboard');
   const [isDemoMode, setIsDemoMode] = useState(false);
-  const [stats, setStats] = useState<DashboardStats>(AGGREGATED_STATS);
-  const [grants, setGrants] = useState<Grant[]>(MOCK_GRANTS);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  // Initialize from cache or fallback to active starting constants
+  const [stats, setStats] = useState<DashboardStats>(() => {
+    try {
+      const cached = localStorage.getItem('nomad_compass_stats');
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (e) {
+      console.error('Failed to parse cached stats:', e);
+    }
+    return AGGREGATED_STATS;
+  });
+
+  const [grants, setGrants] = useState<Grant[]>(() => {
+    try {
+      const cached = localStorage.getItem('nomad_compass_grants');
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (e) {
+      console.error('Failed to parse cached grants:', e);
+    }
+    return MOCK_GRANTS;
+  });
+
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [reportContent, setReportContent] = useState<string>("");
   
-  // AI Insights State
+  // AI Insights State with Offline Cache Fallback
   const [showInsights, setShowInsights] = useState(true);
-  const [insights, setInsights] = useState<AIAnalysisData | null>(null);
+  const [insights, setInsights] = useState<AIAnalysisData | null>(() => {
+    try {
+      const cached = localStorage.getItem('nomad_compass_insights');
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (e) {
+      console.error('Failed to parse cached insights:', e);
+    }
+    return null;
+  });
   const [isLoadingInsights, setIsLoadingInsights] = useState(false);
 
-  // Toggle Demo Mode
+  // Connectivity Listeners to track network changes
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Sync state variables to local storage for persistent data access
+  useEffect(() => {
+    if (!isDemoMode) {
+      try {
+        localStorage.setItem('nomad_compass_stats', JSON.stringify(stats));
+      } catch (e) {
+        console.error('Failed to write stats to localStorage:', e);
+      }
+    }
+  }, [stats, isDemoMode]);
+
+  useEffect(() => {
+    if (!isDemoMode) {
+      try {
+        localStorage.setItem('nomad_compass_grants', JSON.stringify(grants));
+      } catch (e) {
+        console.error('Failed to write grants to localStorage:', e);
+      }
+    }
+  }, [grants, isDemoMode]);
+
+  // Stripe Payment Handler
+  const handleStripePayment = async (amount: number = 2500) => {
+    try {
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ amount }),
+      });
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        console.error('Failed to create checkout session:', data.error);
+        alert('Payment failed to initialize. Please try again.');
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      alert('An error occurred. Please check your connection.');
+    }
+  };
+
+  // Toggle Demo Mode (Loads clean demo metrics of different size, doesn't rewrite persistent cache)
   useEffect(() => {
     if (isDemoMode) {
       setStats(DEMO_STATS);
       setGrants(DEMO_GRANTS);
     } else {
-      setStats(AGGREGATED_STATS);
-      setGrants(MOCK_GRANTS);
+      // Revert to primary cached values or standard ones if no cache is saved yet
+      try {
+        const cachedStats = localStorage.getItem('nomad_compass_stats');
+        const cachedGrants = localStorage.getItem('nomad_compass_grants');
+        setStats(cachedStats ? JSON.parse(cachedStats) : AGGREGATED_STATS);
+        setGrants(cachedGrants ? JSON.parse(cachedGrants) : MOCK_GRANTS);
+      } catch (e) {
+        setStats(AGGREGATED_STATS);
+        setGrants(MOCK_GRANTS);
+      }
     }
   }, [isDemoMode]);
 
@@ -315,8 +417,14 @@ const App: React.FC = () => {
     try {
       const data = await generateDashboardInsights(stats);
       setInsights(data);
+      // Cache insights in localStorage
+      localStorage.setItem('nomad_compass_insights', JSON.stringify(data));
     } catch (e) {
-      console.error(e);
+      console.error('Network analysis error, attempting to serve offline fallback:', e);
+      const cached = localStorage.getItem('nomad_compass_insights');
+      if (cached) {
+        setInsights(JSON.parse(cached));
+      }
     } finally {
       setIsLoadingInsights(false);
     }
@@ -326,6 +434,19 @@ const App: React.FC = () => {
   useEffect(() => {
     fetchInsights();
   }, [stats]);
+
+  // Handle Payment Success/Cancel Notifications
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('payment') === 'success') {
+      alert('Thank you for your donation!');
+      // Clear the param
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (params.get('payment') === 'cancel') {
+      alert('Payment was cancelled.');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   if (loading) {
     return (
@@ -375,13 +496,8 @@ const App: React.FC = () => {
           isSidebarOpen ? 'w-64' : 'w-20'
         } bg-slate-900 text-white transition-all duration-300 ease-in-out fixed h-full z-20 flex flex-col shadow-2xl`}
       >
-        <div className="h-20 flex items-center justify-center border-b border-slate-800/50">
-          <div className="flex items-center gap-2 font-bold text-xl tracking-tight">
-            <div className="bg-gradient-to-br from-brand-500 to-purple-600 p-2 rounded-xl shadow-lg shadow-brand-500/20">
-              <Activity size={22} className="text-white" />
-            </div>
-            {isSidebarOpen && <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">Nomad Compass</span>}
-          </div>
+        <div className="h-20 flex items-center justify-start px-5 border-b border-slate-800/50">
+          <BrandLogo size={32} showText={isSidebarOpen} variant="light" />
         </div>
 
         <nav className="flex-1 py-6 px-3 space-y-2">
@@ -512,6 +628,21 @@ const App: React.FC = () => {
           )}
           <NavItem icon={<MapPin size={20} />} label="Geographic Reach" isOpen={isSidebarOpen} />
           <NavItem icon={<DollarSign size={20} />} label="Financials" isOpen={isSidebarOpen} />
+          
+          <div className="px-3 pt-4 border-t border-slate-800/30 mt-4">
+            <button 
+              onClick={() => handleStripePayment(5000)}
+              className={`w-full group flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-widest transition-all duration-300 ${
+                isSidebarOpen 
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 shadow-lg shadow-emerald-900/40 text-white' 
+                  : 'bg-emerald-600/20 text-emerald-500 hover:bg-emerald-600/30'
+              }`}
+              title="Support Project"
+            >
+              <DollarSign size={18} className="shrink-0" />
+              {isSidebarOpen && <span>Support Project</span>}
+            </button>
+          </div>
         </nav>
 
         <div className="p-3 border-t border-slate-800/50 bg-slate-900">
@@ -543,6 +674,18 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex gap-3">
+            {isOnline ? (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-200 shadow-sm">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                <span>Online</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 text-xs font-semibold rounded-full border border-amber-200 shadow-sm">
+                <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
+                <span>Working Offline (Cached)</span>
+              </div>
+            )}
+
             {isDemoMode ? (
               <DemoHint text="Verified by AI" position="bottom">
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 text-xs font-semibold rounded-full border border-green-200 shadow-sm">

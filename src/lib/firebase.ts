@@ -2,7 +2,8 @@ import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
   GoogleAuthProvider, 
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword
 } from 'firebase/auth';
@@ -14,8 +15,8 @@ export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId)
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
-export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
-export { signInWithEmailAndPassword, createUserWithEmailAndPassword };
+export const signInWithGoogle = () => signInWithRedirect(auth, googleProvider);
+export { getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword };
 
 async function testConnection() {
   try {

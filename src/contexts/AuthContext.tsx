@@ -11,7 +11,7 @@ import {
   runTransaction,
   serverTimestamp 
 } from 'firebase/firestore';
-import { auth, db, signInWithGoogle } from '../lib/firebase';
+import { auth, db, signInWithGoogle, getRedirectResult } from '../lib/firebase';
 import { UserProfile, Organization, OrgMember, UserRole } from '../../types';
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 
@@ -38,52 +38,88 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let profileUnsubscribe: (() => void) | undefined;
+    let orgUnsubscribe: (() => void) | undefined;
+    let memberUnsubscribe: (() => void) | undefined;
+
+    // Handle redirected sign-in results
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result) {
+          console.log("Successfully signed in via Google redirect", result.user);
+        }
+      })
+      .catch((error) => {
+        console.error("Firebase Google redirect sign-in error:", error);
+      });
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
+      
+      // Cleanup previous observers
+      if (profileUnsubscribe) profileUnsubscribe();
+      if (orgUnsubscribe) orgUnsubscribe();
+      if (memberUnsubscribe) memberUnsubscribe();
+
       if (user) {
-        // 1. Sync Profile
+        setLoading(true);
         const profileRef = doc(db, 'users', user.uid);
-        let profileSnap = await getDoc(profileRef);
         
-        if (!profileSnap.exists()) {
-          const newProfile: UserProfile = {
-            uid: user.uid,
-            email: user.email || '',
-            displayName: user.displayName || user.email?.split('@')[0] || 'New User',
-          };
-          await setDoc(profileRef, newProfile);
-          setProfile(newProfile);
-        } else {
-          setProfile(profileSnap.data() as UserProfile);
-        }
+        profileUnsubscribe = onSnapshot(profileRef, async (snap) => {
+          if (!snap.exists()) {
+            const newProfile: UserProfile = {
+              uid: user.uid,
+              email: user.email || '',
+              displayName: user.displayName || user.email?.split('@')[0] || 'New User',
+            };
+            await setDoc(profileRef, newProfile);
+            setProfile(newProfile);
+          } else {
+            const profileData = snap.data() as UserProfile;
+            setProfile(profileData);
 
-        // 2. Fetch Org & Role
-        // For simplicity, we find the first org they are a member of
-        const membersQuery = query(collection(db, 'organizations'), where('members', 'array-contains', user.uid));
-        // Wait, our schema uses organizations/{orgId}/members/{userId}. We need a collection group query or just check currentOrgId.
-        
-        // Let's use currentOrgId from profile
-        const currentOrgId = (profileSnap.data() as UserProfile | undefined)?.currentOrgId;
-        if (currentOrgId) {
-          const orgRef = doc(db, 'organizations', currentOrgId);
-          onSnapshot(orgRef, (snap) => {
-            if (snap.exists()) setOrganization({ id: snap.id, ...snap.data() } as Organization);
-          });
+            // Handle Org/Role syncing reactively
+            if (profileData.currentOrgId) {
+              if (orgUnsubscribe) orgUnsubscribe();
+              if (memberUnsubscribe) memberUnsubscribe();
 
-          const memberRef = doc(db, `organizations/${currentOrgId}/members`, user.uid);
-          onSnapshot(memberRef, (snap) => {
-            if (snap.exists()) setRole((snap.data() as OrgMember).role);
-          });
-        }
+              const orgRef = doc(db, 'organizations', profileData.currentOrgId);
+              orgUnsubscribe = onSnapshot(orgRef, (osnap) => {
+                if (osnap.exists()) {
+                  setOrganization({ id: osnap.id, ...osnap.data() } as Organization);
+                }
+              });
+
+              const memberRef = doc(db, `organizations/${profileData.currentOrgId}/members`, user.uid);
+              memberUnsubscribe = onSnapshot(memberRef, (msnap) => {
+                if (msnap.exists()) {
+                  setRole((msnap.data() as OrgMember).role);
+                }
+              });
+            } else {
+              setOrganization(null);
+              setRole(null);
+            }
+          }
+          setLoading(false);
+        }, (error) => {
+          console.error("Profile sync error:", error);
+          setLoading(false);
+        });
       } else {
         setProfile(null);
         setOrganization(null);
         setRole(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      if (profileUnsubscribe) profileUnsubscribe();
+      if (orgUnsubscribe) orgUnsubscribe();
+      if (memberUnsubscribe) memberUnsubscribe();
+    };
   }, []);
 
   const login = async () => {

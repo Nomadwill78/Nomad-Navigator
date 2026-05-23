@@ -11,16 +11,19 @@
     ],
     "skipLibCheck": true,
     "types": [
-      "node",
-      "vite/client",
-      "vitest/globals"
+      "node"
     ],
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "allowJs": true,
     "jsx": "react-jsx",
-    "noEmit": true,
-    "isolatedModules": true
-  },
-  "include": ["src", "vite.config.ts", "index.tsx", "services"],
-  "exclude": ["node_modules", "dist", "components"]
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  }
 }

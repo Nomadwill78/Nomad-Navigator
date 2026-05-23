@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Building2, ArrowRight, CheckCircle2, LayoutDashboard } from 'lucide-react';
+import { Building2, ArrowRight, CheckCircle2, LayoutDashboard, Activity } from 'lucide-react';
 
 interface OnboardingViewProps {
   onCreateOrg: (name: string) => void;
@@ -8,6 +8,18 @@ interface OnboardingViewProps {
 
 export const OnboardingView: React.FC<OnboardingViewProps> = ({ onCreateOrg, userEmail }) => {
   const [orgName, setOrgName] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!orgName.trim()) return;
+    setIsSubmitting(true);
+    try {
+      await onCreateOrg(orgName);
+    } catch (error) {
+      console.error(error);
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
@@ -30,8 +42,9 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onCreateOrg, use
                     type="text" 
                     value={orgName}
                     onChange={(e) => setOrgName(e.target.value)}
+                    disabled={isSubmitting}
                     placeholder="e.g., Global Health Partners"
-                    className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all font-medium"
+                    className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all font-medium disabled:opacity-50"
                   />
                 </div>
               </div>
@@ -57,11 +70,20 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onCreateOrg, use
               </div>
 
               <button 
-                onClick={() => onCreateOrg(orgName)}
-                disabled={!orgName.trim()}
+                onClick={handleSubmit}
+                disabled={!orgName.trim() || isSubmitting}
                 className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-lg hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Launch Dashboard <ArrowRight size={20} />
+                {isSubmitting ? (
+                  <>
+                    <Activity className="animate-spin" size={20} />
+                    Preparing Workspace...
+                  </>
+                ) : (
+                  <>
+                    Launch Dashboard <ArrowRight size={20} />
+                  </>
+                )}
               </button>
            </div>
         </div>
