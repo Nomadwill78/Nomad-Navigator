@@ -9,10 +9,60 @@ import {
   Target, 
   ShieldCheck,
   TrendingUp,
-  MapPin
+  MapPin,
+  Download,
+  Upload,
+  FileSpreadsheet,
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react';
-import { DashboardStats, ROLE_PERMISSIONS } from '../types';
+import { DashboardStats, ProgramMetric, ROLE_PERMISSIONS } from '../types';
 import { useAuth } from '../src/contexts/AuthContext';
+import { exportToCSV, exportToJSON } from '../src/lib/exportUtils';
+
+// Robust client-side CSV parser that correctly handles quoted values, escaped quotes, and newlines.
+function parseCSV(text: string): string[][] {
+  const lines: string[][] = [];
+  let row: string[] = [];
+  let inQuotes = false;
+  let currentVal = '';
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const nextChar = text[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        currentVal += '"';
+        i++; // skip next quote
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      row.push(currentVal.trim());
+      currentVal = '';
+    } else if ((char === '\r' || char === '\n') && !inQuotes) {
+      if (char === '\r' && nextChar === '\n') {
+        i++;
+      }
+      row.push(currentVal.trim());
+      if (row.length > 1 || row[0] !== '') {
+        lines.push(row);
+      }
+      row = [];
+      currentVal = '';
+    } else {
+      currentVal += char;
+    }
+  }
+  if (row.length > 0 || currentVal !== '') {
+    row.push(currentVal.trim());
+    if (row.length > 1 || row[0] !== '') {
+      lines.push(row);
+    }
+  }
+  return lines;
+}
 
 interface DataManagementViewProps {
   stats: DashboardStats;
@@ -22,6 +72,223 @@ interface DataManagementViewProps {
 export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, onUpdate }) => {
   const { role } = useAuth();
   const permissions = role ? ROLE_PERMISSIONS[role] : null;
+
+  // CSV Import States
+  const [dragActive, setDragActive] = React.useState(false);
+  const [headers, setHeaders] = React.useState<string[]>([]);
+  const [csvRows, setCsvRows] = React.useState<string[][]>([]);
+  const [mapping, setMapping] = React.useState({
+    name: '',
+    month: '',
+    peopleServed: '',
+    totalCost: '',
+    costPerPerson: ''
+  });
+  const [parsedPreview, setParsedPreview] = React.useState<ProgramMetric[]>([]);
+  const [importMode, setImportMode] = React.useState<'append' | 'replace'>('append');
+  const [uploadError, setUploadError] = React.useState<string | null>(null);
+  const [showMappingUI, setShowMappingUI] = React.useState(false);
+  const [selectedFileName, setSelectedFileName] = React.useState<string>('');
+  const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const droppedFile = e.dataTransfer.files[0];
+      if (droppedFile.name.endsWith('.csv')) {
+        processFile(droppedFile);
+      } else {
+        setUploadError("Invalid file type. Please select a .csv file.");
+      }
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      processFile(e.target.files[0]);
+    }
+  };
+
+  const processFile = (selectedFile: File) => {
+    setSelectedFileName(selectedFile.name);
+    setSuccessMessage(null);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (text) {
+        handleCSVText(text);
+      }
+    };
+    reader.onerror = () => {
+      setUploadError("Error reading file.");
+    };
+    reader.readAsText(selectedFile);
+  };
+
+  const handleCSVText = (text: string) => {
+    try {
+      const parsedLines = parseCSV(text);
+      if (parsedLines.length < 2) {
+        throw new Error("CSV file must have a header row and at least one data row.");
+      }
+
+      const fileHeaders = parsedLines[0].map(h => h.trim());
+      setHeaders(fileHeaders);
+      setCsvRows(parsedLines.slice(1));
+
+      // Attempt fuzzy auto-mapping
+      const newMapping = {
+        name: '',
+        month: '',
+        peopleServed: '',
+        totalCost: '',
+        costPerPerson: ''
+      };
+
+      fileHeaders.forEach(header => {
+        const lower = header.toLowerCase();
+        if (!newMapping.name && (lower.includes('name') || lower.includes('program') || lower.includes('title') || lower.includes('project') || lower.includes('label'))) {
+          newMapping.name = header;
+        } else if (!newMapping.month && (lower.includes('month') || lower.includes('date') || lower.includes('period') || lower.includes('time') || lower.includes('jan') || lower.includes('feb'))) {
+          newMapping.month = header;
+        } else if (!newMapping.peopleServed && (lower.includes('people') || lower.includes('served') || lower.includes('beneficiaries') || lower.includes('count') || lower.includes('reach') || lower.includes('population') || lower.includes('outcomes'))) {
+          newMapping.peopleServed = header;
+        } else if (!newMapping.totalCost && (lower.includes('cost') || lower.includes('budget') || lower.includes('spent') || lower.includes('expense') || lower.includes('financial') || lower.includes('amount'))) {
+          if (!lower.includes('per')) {
+            newMapping.totalCost = header;
+          }
+        } else if (!newMapping.costPerPerson && (lower.includes('per') || lower.includes('capita') || lower.includes('roi') || lower.includes('each') || lower.includes('unit') || lower.includes('ratio') || lower.includes('efficiency'))) {
+          newMapping.costPerPerson = header;
+        }
+      });
+
+      // fallback defaults if no match found
+      if (!newMapping.name && fileHeaders.length > 0) newMapping.name = fileHeaders[0];
+      if (!newMapping.month && fileHeaders.length > 1) newMapping.month = fileHeaders[1];
+      if (!newMapping.peopleServed && fileHeaders.length > 2) newMapping.peopleServed = fileHeaders[2];
+      if (!newMapping.totalCost && fileHeaders.length > 3) newMapping.totalCost = fileHeaders[3];
+
+      setMapping(newMapping);
+      setUploadError(null);
+      setShowMappingUI(true);
+    } catch (err: any) {
+      setUploadError(err.message || "Failed to parse CSV file.");
+    }
+  };
+
+  React.useEffect(() => {
+    if (!showMappingUI || csvRows.length === 0) return;
+
+    const nameIdx = headers.indexOf(mapping.name);
+    const monthIdx = headers.indexOf(mapping.month);
+    const servedIdx = headers.indexOf(mapping.peopleServed);
+    const costIdx = headers.indexOf(mapping.totalCost);
+    const perPersonIdx = headers.indexOf(mapping.costPerPerson);
+
+    const tempMetrics: ProgramMetric[] = csvRows.map((row, idx) => {
+      const name = nameIdx !== -1 && row[nameIdx] ? row[nameIdx] : `Program ${idx + 1}`;
+      const month = monthIdx !== -1 && row[monthIdx] ? row[monthIdx] : 'N/A';
+      
+      const rawServed = servedIdx !== -1 ? row[servedIdx] : '';
+      const peopleServed = parseInt(rawServed.replace(/[^0-9.-]/g, '')) || 0;
+
+      const rawCost = costIdx !== -1 ? row[costIdx] : '';
+      const totalCost = parseFloat(rawCost.replace(/[^0-9.-]/g, '')) || 0;
+
+      let costPerPerson = 0;
+      if (perPersonIdx !== -1 && row[perPersonIdx]) {
+        const rawPer = row[perPersonIdx];
+        costPerPerson = parseFloat(rawPer.replace(/[^0-9.-]/g, '')) || 0;
+      } else if (peopleServed > 0) {
+        costPerPerson = parseFloat((totalCost / peopleServed).toFixed(2));
+      }
+
+      return {
+        id: `csv-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`,
+        name,
+        month,
+        peopleServed,
+        totalCost,
+        costPerPerson
+      };
+    });
+
+    setParsedPreview(tempMetrics);
+  }, [mapping, csvRows, headers, showMappingUI]);
+
+  const handleImport = () => {
+    if (parsedPreview.length === 0) return;
+
+    const existingPrograms = stats.programs || [];
+    let updatedPrograms = [];
+
+    if (importMode === 'append') {
+      updatedPrograms = [...existingPrograms, ...parsedPreview];
+    } else {
+      updatedPrograms = [...parsedPreview];
+    }
+
+    const updatedStats = {
+      ...stats,
+      programs: updatedPrograms
+    };
+
+    onUpdate(updatedStats);
+    setSuccessMessage(`Successfully imported ${parsedPreview.length} program metrics!`);
+    resetImporter();
+  };
+
+  const resetImporter = () => {
+    setHeaders([]);
+    setCsvRows([]);
+    setMapping({
+      name: '',
+      month: '',
+      peopleServed: '',
+      totalCost: '',
+      costPerPerson: ''
+    });
+    setParsedPreview([]);
+    setShowMappingUI(false);
+    setSelectedFileName('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const downloadSampleCSV = () => {
+    const sampleData = [
+      ["Program Name", "Month", "Beneficiaries Served", "Total Budget Spent", "Cost Per Capita"],
+      ["Community Clean Water", "Jan", "1500", "18000", "12.0"],
+      ["Sanitation Training", "Feb", "1200", "14000", "11.66"],
+      ["Hygiene Education Outreach", "Mar", "2000", "19500", "9.75"],
+      ["Village Well Refurbishment", "Apr", "800", "12000", "15.0"]
+    ];
+    const csvContent = sampleData.map(row => row.map(val => `"${val}"`).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'nomad-compass-sample-metrics.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const handleChange = (path: string, value: any) => {
     if (!permissions?.canEditMetrics) return;
@@ -87,18 +354,280 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Manage Metrics</h2>
           <p className="text-slate-500">Update your nonprofit's core impact and financial data.</p>
         </div>
-        {permissions?.canEditMetrics && (
-          <button className="flex items-center gap-2 bg-brand-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/20 hover:bg-brand-700 transition-all">
-            <Save size={18} />
-            Save Changes
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {permissions?.canExportData && (
+            <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
+              <button 
+                onClick={() => exportToCSV(stats, 'nomad-compass-metrics')}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 hover:text-brand-600 hover:bg-slate-50 rounded-lg transition-all"
+                title="Export metrics as CSV"
+              >
+                <Download size={14} />
+                CSV
+              </button>
+              <button 
+                onClick={() => exportToJSON(stats, 'nomad-compass-metrics')}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 hover:text-brand-600 hover:bg-slate-50 rounded-lg transition-all"
+                title="Export metrics as JSON"
+              >
+                <Download size={14} />
+                JSON
+              </button>
+            </div>
+          )}
+          {permissions?.canEditMetrics && (
+            <button className="flex items-center gap-2 bg-brand-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/20 hover:bg-brand-700 transition-all">
+              <Save size={18} />
+              Save Changes
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* CSV Import Section */}
+      {permissions?.canEditMetrics && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6">
+          <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white rounded-lg shadow-sm text-indigo-600">
+                <Upload size={18} />
+              </div>
+              <div>
+                <h4 className="font-bold text-slate-800">CSV Data Stream Integration</h4>
+                <p className="text-xs text-slate-500">Import program metrics from any database or CSV report</p>
+              </div>
+            </div>
+            <button 
+              onClick={downloadSampleCSV}
+              className="flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100/80 px-2.5 py-1.5 rounded-lg transition-all"
+            >
+              <Download size={13} />
+              Sample CSV
+            </button>
+          </div>
+
+          <div className="p-6">
+            {successMessage && (
+              <div className="mb-6 p-4 bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm rounded-xl flex items-center gap-3 animate-in fade-in duration-300">
+                <CheckCircle size={18} className="text-emerald-500 shrink-0" />
+                <span className="font-medium">{successMessage}</span>
+              </div>
+            )}
+
+            {uploadError && (
+              <div className="mb-6 p-4 bg-rose-50 border border-rose-100 text-rose-800 text-sm rounded-xl flex items-center gap-3 animate-in fade-in duration-300">
+                <AlertCircle size={18} className="text-rose-500 shrink-0" />
+                <span className="font-medium">{uploadError}</span>
+              </div>
+            )}
+
+            {!showMappingUI ? (
+              <div 
+                onDragEnter={handleDrag}
+                onDragOver={handleDrag}
+                onDragLeave={handleDrag}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all duration-300 ${
+                  dragActive 
+                    ? 'border-indigo-500 bg-indigo-50/50 scale-[0.99]' 
+                    : 'border-slate-200 hover:border-indigo-400 hover:bg-slate-50/40'
+                }`}
+              >
+                <input 
+                  type="file" 
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept=".csv"
+                  className="hidden"
+                />
+                <div className="p-4 bg-slate-50 rounded-full text-slate-400 group-hover:scale-110 transition-transform">
+                  <FileSpreadsheet size={32} className="text-indigo-500" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-bold text-slate-700">Drag & drop your CSV file here</p>
+                  <p className="text-xs text-slate-400 mt-1">or click to browse from your device</p>
+                </div>
+                <div className="text-[10px] bg-slate-100 text-slate-500 px-2.5 py-1 rounded-md font-semibold uppercase tracking-wider">
+                  Supports UTF-8 CSV
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6 animate-in fade-in duration-400">
+                {/* Mapping Controls */}
+                <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200/60 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                    <div>
+                      <h5 className="font-bold text-slate-800 text-sm">Header Mapping Configuration</h5>
+                      <p className="text-xs text-slate-500 mt-0.5">We found headers. Match them to the required Program Metric fields.</p>
+                    </div>
+                    <div className="text-xs font-semibold bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-lg border border-indigo-100">
+                      File: {selectedFileName}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {/* Name mapping */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                        Name Field <span className="text-rose-500">*</span>
+                      </label>
+                      <select 
+                        value={mapping.name}
+                        onChange={(e) => setMapping({ ...mapping, name: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                      >
+                        <option value="">-- Choose CSV Column --</option>
+                        {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
+
+                    {/* Month mapping */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                        Month / Timeline Field
+                      </label>
+                      <select 
+                        value={mapping.month}
+                        onChange={(e) => setMapping({ ...mapping, month: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                      >
+                        <option value="">-- Choose CSV Column --</option>
+                        {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
+
+                    {/* People Served mapping */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                        People Served <span className="text-rose-500">*</span>
+                      </label>
+                      <select 
+                        value={mapping.peopleServed}
+                        onChange={(e) => setMapping({ ...mapping, peopleServed: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                      >
+                        <option value="">-- Choose CSV Column --</option>
+                        {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
+
+                    {/* Total Cost mapping */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                        Total Cost Spent <span className="text-rose-500">*</span>
+                      </label>
+                      <select 
+                        value={mapping.totalCost}
+                        onChange={(e) => setMapping({ ...mapping, totalCost: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                      >
+                        <option value="">-- Choose CSV Column --</option>
+                        {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
+
+                    {/* Cost Per Person mapping */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                        Cost Per Person (ROI)
+                      </label>
+                      <select 
+                        value={mapping.costPerPerson}
+                        onChange={(e) => setMapping({ ...mapping, costPerPerson: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                      >
+                        <option value="">-- Auto-calculate from cost/people --</option>
+                        {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
+
+                    {/* Import mode */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                        Import Strategy
+                      </label>
+                      <div className="flex bg-white rounded-xl border border-slate-200 p-0.5 w-full">
+                        <button 
+                          type="button"
+                          onClick={() => setImportMode('append')}
+                          className={`flex-1 py-1 px-3 text-xs font-bold rounded-lg transition-all ${importMode === 'append' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
+                        >
+                          Append
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setImportMode('replace')}
+                          className={`flex-1 py-1 px-3 text-xs font-bold rounded-lg transition-all ${importMode === 'replace' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
+                        >
+                          Overwrite
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Grid Preview */}
+                {parsedPreview.length > 0 && (
+                  <div className="space-y-2">
+                    <h5 className="font-bold text-slate-800 text-xs uppercase tracking-wider">Mapped Stream Preview ({parsedPreview.length} records)</h5>
+                    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm max-h-60 overflow-y-auto">
+                      <table className="w-full border-collapse text-left text-xs">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-100 font-bold text-slate-600">
+                            <th className="px-4 py-2.5">Name</th>
+                            <th className="px-4 py-2.5">Month</th>
+                            <th className="px-4 py-2.5 text-right">Beneficiaries Served</th>
+                            <th className="px-4 py-2.5 text-right">Total Cost Spent</th>
+                            <th className="px-4 py-2.5 text-right">Cost Per Person</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                          {parsedPreview.slice(0, 10).map((m, i) => (
+                            <tr key={i} className="hover:bg-slate-50/50">
+                              <td className="px-4 py-2.5 font-bold text-slate-800">{m.name}</td>
+                              <td className="px-4 py-2.5 text-slate-500">{m.month}</td>
+                              <td className="px-4 py-2.5 text-right">{m.peopleServed.toLocaleString()}</td>
+                              <td className="px-4 py-2.5 text-right">${m.totalCost.toLocaleString()}</td>
+                              <td className="px-4 py-2.5 text-right font-bold text-indigo-600">${m.costPerPerson.toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Import Action Buttons */}
+                <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
+                  <button 
+                    onClick={resetImporter}
+                    className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all"
+                  >
+                    Cancel / Discard
+                  </button>
+                  <button 
+                    onClick={handleImport}
+                    disabled={!mapping.name || !mapping.peopleServed || !mapping.totalCost}
+                    className={`flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold text-white shadow-md shadow-brand-500/10 transition-all ${
+                      (!mapping.name || !mapping.peopleServed || !mapping.totalCost)
+                        ? 'bg-slate-300 cursor-not-allowed shadow-none'
+                        : 'bg-indigo-600 hover:bg-indigo-700 hover:scale-[1.01] active:scale-[0.99]'
+                    }`}
+                  >
+                    Confirm & Stream Data
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <FieldGroup icon={<Target />} title="Theory of Change & Impact">
         <InputField 
@@ -204,6 +733,68 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
           path="dataQuality.lastUpdated" 
           tooltip="The date when this data was last verified"
         />
+      </FieldGroup>
+
+      <FieldGroup icon={<TrendingUp />} title="Key Performance Indicators (SaaS KPIs)">
+        {(stats.saasKpis || []).map((kpi, idx) => (
+          <div key={kpi.id} className="p-5 rounded-2xl border border-slate-100 bg-slate-50/50 space-y-4 col-span-1 md:col-span-2 lg:col-span-3">
+            <h5 className="font-bold text-slate-800 text-sm border-b border-slate-200/60 pb-2 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-brand-500"></span>
+              {kpi.name}
+            </h5>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Current Value</label>
+                <input
+                  type="text"
+                  disabled={!permissions?.canEditMetrics}
+                  value={kpi.value}
+                  onChange={(e) => {
+                    const newStats = { ...stats };
+                    const newKpis = [...(newStats.saasKpis || [])];
+                    newKpis[idx] = { ...newKpis[idx], value: e.target.value };
+                    newStats.saasKpis = newKpis;
+                    onUpdate(newStats);
+                  }}
+                  className={`w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Percentage Change (%)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  disabled={!permissions?.canEditMetrics}
+                  value={kpi.changePercent}
+                  onChange={(e) => {
+                    const newStats = { ...stats };
+                    const newKpis = [...(newStats.saasKpis || [])];
+                    newKpis[idx] = { ...newKpis[idx], changePercent: parseFloat(e.target.value) || 0 };
+                    newStats.saasKpis = newKpis;
+                    onUpdate(newStats);
+                  }}
+                  className={`w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Brief Explanation</label>
+                <input
+                  type="text"
+                  disabled={!permissions?.canEditMetrics}
+                  value={kpi.explanation}
+                  onChange={(e) => {
+                    const newStats = { ...stats };
+                    const newKpis = [...(newStats.saasKpis || [])];
+                    newKpis[idx] = { ...newKpis[idx], explanation: e.target.value };
+                    newStats.saasKpis = newKpis;
+                    onUpdate(newStats);
+                  }}
+                  className={`w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
+                />
+              </div>
+            </div>
+          </div>
+        ))}
       </FieldGroup>
 
       <div className="bg-blue-50 border border-blue-100 rounded-2xl p-6 flex gap-4">

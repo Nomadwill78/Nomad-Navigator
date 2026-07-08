@@ -18,8 +18,10 @@ import {
   ArrowRight,
   BrainCircuit,
   ChevronDown,
-  Database
+  Database,
+  Download
 } from 'lucide-react';
+import { exportDashboardPDF } from './src/lib/exportUtils';
 import { 
   AreaChart, 
   Area, 
@@ -48,6 +50,7 @@ import { LoginView } from './components/LoginView';
 import { OnboardingView } from './components/OnboardingView';
 import { DemoModeBanner, DemoHint } from './components/DemoTour';
 import { BrandLogo } from './components/BrandLogo';
+import { KpiSidebar } from './components/KpiSidebar';
 import { useAuth } from './src/contexts/AuthContext';
 import { generateImpactReport, generateDashboardInsights } from './services/geminiService';
 import { DashboardStats, ProgramMetric, AIAnalysisData, Grant, Opportunity, ROLE_PERMISSIONS } from './types';
@@ -68,6 +71,7 @@ const MOCK_GRANTS: Grant[] = [
     name: 'Clean Water Initiative - Phase II',
     funder: 'Bill & Melinda Gates Foundation',
     amount: 250000,
+    spentAmount: 185000,
     startDate: '2025-01-01',
     endDate: '2025-12-31',
     status: 'active',
@@ -102,6 +106,7 @@ const MOCK_GRANTS: Grant[] = [
     name: 'Rural Sanitation Program',
     funder: 'World Bank Group',
     amount: 125000,
+    spentAmount: 112500,
     startDate: '2024-06-01',
     endDate: '2025-05-31',
     status: 'active',
@@ -128,6 +133,7 @@ const DEMO_GRANTS: Grant[] = [
     name: 'National Solar Expansion',
     funder: 'UNDP',
     amount: 1500000,
+    spentAmount: 980000,
     startDate: '2025-01-01',
     endDate: '2026-12-31',
     status: 'active',
@@ -153,6 +159,7 @@ const DEMO_GRANTS: Grant[] = [
     name: 'West African Water Initiative',
     funder: 'USAID',
     amount: 500000,
+    spentAmount: 420000,
     startDate: '2025-03-01',
     endDate: '2026-03-01',
     status: 'active',
@@ -255,7 +262,45 @@ const AGGREGATED_STATS: DashboardStats = {
     lastUpdated: "June 30, 2025"
   },
   sroi: 4.50,
-  benchmarkComparison: "32% below sector avg"
+  benchmarkComparison: "32% below sector avg",
+  saasKpis: [
+    {
+      id: 'kpi_active_users',
+      name: 'Active Users',
+      value: '4,250',
+      explanation: 'SaaS platform accounts actively logging impact metrics and program updates weekly.',
+      changePercent: 14.8,
+      trend: 'up',
+      sparkline: [3100, 3400, 3800, 4100, 4250]
+    },
+    {
+      id: 'kpi_donations',
+      name: 'Donations Processed',
+      value: '$145,200',
+      explanation: 'Direct fundraising and grant payments processed securely via Stripe Integration.',
+      changePercent: 22.4,
+      trend: 'up',
+      sparkline: [110000, 118000, 130000, 135000, 145200]
+    },
+    {
+      id: 'kpi_volunteer_hours',
+      name: 'Volunteer Hours Logged',
+      value: '1,840 hrs',
+      explanation: 'Verified hours contributed by field agents and community workshop leads.',
+      changePercent: 8.3,
+      trend: 'up',
+      sparkline: [1500, 1600, 1680, 1720, 1840]
+    },
+    {
+      id: 'kpi_completions',
+      name: 'Successful Program Completions',
+      value: '94.2%',
+      explanation: 'Successful delivery rate of water purification and health education campaigns.',
+      changePercent: 3.1,
+      trend: 'up',
+      sparkline: [90.5, 91.2, 92.0, 93.5, 94.2]
+    }
+  ]
 };
 
 const DEMO_STATS: DashboardStats = {
@@ -270,13 +315,49 @@ const DEMO_STATS: DashboardStats = {
     outputs: "54,200 People Empowered",
     outcomes: "62% Improvement in Public Health",
     impact: "Regional Economic Stability"
-  }
+  },
+  saasKpis: [
+    {
+      id: 'kpi_active_users',
+      name: 'Active Users',
+      value: '12,400',
+      explanation: 'SaaS platform accounts actively logging impact metrics and program updates weekly.',
+      changePercent: 35.2,
+      trend: 'up',
+      sparkline: [8000, 9200, 10500, 11400, 12400]
+    },
+    {
+      id: 'kpi_donations',
+      name: 'Donations Processed',
+      value: '$485,000',
+      explanation: 'Direct fundraising and grant payments processed securely via Stripe Integration.',
+      changePercent: 48.6,
+      trend: 'up',
+      sparkline: [300000, 350000, 390000, 440000, 485000]
+    },
+    {
+      id: 'kpi_volunteer_hours',
+      name: 'Volunteer Hours Logged',
+      value: '5,120 hrs',
+      explanation: 'Verified hours contributed by field agents and community workshop leads.',
+      changePercent: 18.5,
+      trend: 'up',
+      sparkline: [4100, 4300, 4600, 4900, 5120]
+    },
+    {
+      id: 'kpi_completions',
+      name: 'Successful Program Completions',
+      value: '98.7%',
+      explanation: 'Successful delivery rate of water purification and health education campaigns.',
+      changePercent: 4.8,
+      trend: 'up',
+      sparkline: [93.2, 95.0, 96.8, 97.9, 98.7]
+    }
+  ]
 };
 
 // Transform data for sparklines
-const SPARK_IMPACT = MOCK_PROGRAMS.map(p => ({ value: p.peopleServed }));
 const SPARK_COST = MOCK_PROGRAMS.map(p => ({ value: p.totalCost }));
-const SPARK_ROI = MOCK_PROGRAMS.map(p => ({ value: p.costPerPerson }));
 const SPARK_FINANCIALS_SPENDING = [
   { value: 45000 }, { value: 52000 }, { value: 48000 }, { value: 61000 }, { value: 55000 }, { value: 67000 }
 ];
@@ -286,6 +367,7 @@ const SPARK_FINANCIALS_SOURCES = [
 
 const App: React.FC = () => {
   const { user, profile, organization, role, loading, login, logout, createOrg } = useAuth();
+  const permissions = role ? ROLE_PERMISSIONS[role] : null;
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeView, setActiveView] = useState<'dashboard' | 'data' | 'grants' | 'analysis' | 'discovery' | 'team'>('dashboard');
   const [isDemoMode, setIsDemoMode] = useState(false);
@@ -296,7 +378,11 @@ const App: React.FC = () => {
     try {
       const cached = localStorage.getItem('nomad_compass_stats');
       if (cached) {
-        return JSON.parse(cached);
+        const parsed = JSON.parse(cached);
+        if (!parsed.saasKpis) {
+          parsed.saasKpis = AGGREGATED_STATS.saasKpis;
+        }
+        return parsed;
       }
     } catch (e) {
       console.error('Failed to parse cached stats:', e);
@@ -315,6 +401,9 @@ const App: React.FC = () => {
     }
     return MOCK_GRANTS;
   });
+
+  const sparkImpact = (stats.programs || []).map(p => ({ value: p.peopleServed }));
+  const sparkRoi = (stats.programs || []).map(p => ({ value: p.costPerPerson }));
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
@@ -487,6 +576,8 @@ const App: React.FC = () => {
     }
   };
 
+  const isQualityAlert = isDataQualityLow(stats.dataQuality?.level);
+
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900">
       
@@ -575,6 +666,7 @@ const App: React.FC = () => {
                 active={activeView === 'data'} 
                 isOpen={isSidebarOpen} 
                 onClick={() => setActiveView('data')}
+                alert={isQualityAlert}
               />
             </DemoHint>
           ) : (
@@ -584,6 +676,7 @@ const App: React.FC = () => {
               active={activeView === 'data'} 
               isOpen={isSidebarOpen} 
               onClick={() => setActiveView('data')}
+              alert={isQualityAlert}
             />
           )}
           <div className="pt-4 pb-2 px-3">
@@ -743,7 +836,18 @@ const App: React.FC = () => {
                     FY 2025 • Q1-Q2 Analysis <span className="w-1 h-1 rounded-full bg-slate-300"></span> Last updated today
                   </p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  {permissions?.canExportData && (
+                    <button 
+                      onClick={() => exportDashboardPDF(stats, grants)}
+                      className="flex items-center gap-2 bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 px-4 py-2.5 rounded-xl shadow-sm font-medium transition-all hover:scale-[1.02] active:scale-95 animate-in fade-in"
+                      title="Export complete dashboard analytics as a PDF report"
+                    >
+                      <Download size={18} className="text-slate-500" />
+                      Export PDF
+                    </button>
+                  )}
+
                   {isDemoMode ? (
                     <DemoHint text="AI-Driven Strategy" position="bottom">
                       <button 
@@ -843,7 +947,7 @@ const App: React.FC = () => {
                   icon={<Target />}
                   gradientFrom="from-blue-500"
                   gradientTo="to-indigo-600"
-                  sparklineData={SPARK_IMPACT}
+                  sparklineData={sparkImpact}
                 />
 
                 <StatCard 
@@ -856,7 +960,7 @@ const App: React.FC = () => {
                   icon={<Scale />}
                   gradientFrom="from-emerald-500"
                   gradientTo="to-teal-600"
-                  sparklineData={SPARK_ROI}
+                  sparklineData={sparkRoi}
                 />
 
                 <StatCard 
@@ -872,8 +976,11 @@ const App: React.FC = () => {
                 />
               </div>
 
-              {/* Charts Section */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-300">
+              {/* Dashboard Grid Layout (Charts & Key Performance Indicators Sidebar) */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start animate-in fade-in slide-in-from-bottom-6 duration-700 delay-300">
+                
+                {/* Core Charts Section (Spans 2 columns on desktop) */}
+                <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8">
                 
                 {/* Demographics Section */}
                 <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300">
@@ -986,7 +1093,7 @@ const App: React.FC = () => {
                   </div>
                   <div className="h-72 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={MOCK_PROGRAMS} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <AreaChart data={stats.programs || MOCK_PROGRAMS} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                         <defs>
                           <linearGradient id="colorServed" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2}/>
@@ -1172,7 +1279,14 @@ const App: React.FC = () => {
                         ))}
                     </div>
                 </div>
-              </div>
+                </div> {/* Closes inner core charts grid */}
+
+                {/* KPI Sidebar Column (Spans 1 column on desktop) */}
+                <div className="lg:col-span-1 lg:sticky lg:top-24">
+                  <KpiSidebar kpis={stats.saasKpis || AGGREGATED_STATS.saasKpis} />
+                </div>
+
+              </div> {/* Closes outer dashboard grid */}
             </>
           )}
         </div>
@@ -1194,6 +1308,27 @@ const App: React.FC = () => {
   );
 };
 
+// Helper function to check if the current Data Quality level drops below acceptable thresholds
+const isDataQualityLow = (levelStr: string): boolean => {
+  if (!levelStr) return false;
+  const cleanLevel = levelStr.trim().toLowerCase();
+
+  // 1. Direct word-based checks
+  if (['low', 'poor', 'warning', 'bad', 'critical', 'fail'].includes(cleanLevel)) {
+    return true;
+  }
+
+  // 2. Parse percentage check (e.g. "85%", "78.5", "92%")
+  const percentMatch = cleanLevel.match(/(\d+(?:\.\d+)?)\s*%?/);
+  if (percentMatch) {
+    const value = parseFloat(percentMatch[1]);
+    // If the string represents a percentage or numeric score, alert if below 90%
+    return value < 90;
+  }
+
+  return false;
+};
+
 // Helper for Sidebar items
 const NavItem: React.FC<{ 
   icon: React.ReactNode; 
@@ -1201,18 +1336,33 @@ const NavItem: React.FC<{
   active?: boolean; 
   isOpen: boolean;
   onClick?: () => void;
-}> = ({ icon, label, active, isOpen, onClick }) => {
+  alert?: boolean;
+}> = ({ icon, label, active, isOpen, onClick, alert }) => {
   return (
     <button 
       onClick={onClick}
-      className={`flex items-center gap-3 w-full p-3 rounded-xl transition-all duration-200 group ${
+      className={`relative flex items-center gap-3 w-full p-3 rounded-xl transition-all duration-200 group ${
       active 
         ? 'bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-lg shadow-brand-500/30' 
         : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
     }`}>
-      <span className={`${active ? 'text-white' : 'text-slate-400 group-hover:text-white transition-colors'}`}>{icon}</span>
+      <span className="relative">
+        <span className={`${active ? 'text-white' : 'text-slate-400 group-hover:text-white transition-colors'}`}>{icon}</span>
+        {/* Subtle dot on the icon itself if sidebar is collapsed */}
+        {alert && !isOpen && (
+          <span className="absolute -top-1 -right-1 flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+          </span>
+        )}
+      </span>
       {isOpen && <span className="font-medium text-sm whitespace-nowrap">{label}</span>}
-      {isOpen && !active && <ArrowRight size={14} className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />}
+      {isOpen && alert && (
+        <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold bg-rose-500 text-white rounded-md uppercase tracking-wide animate-pulse">
+          Alert
+        </span>
+      )}
+      {isOpen && !active && !alert && <ArrowRight size={14} className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />}
     </button>
   );
 };

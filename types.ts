@@ -44,6 +44,16 @@ export interface DataQuality {
   lastUpdated: string;
 }
 
+export interface SaasKPI {
+  id: string;
+  name: string;
+  value: string | number;
+  explanation: string;
+  changePercent: number;
+  trend: 'up' | 'down' | 'neutral';
+  sparkline: number[];
+}
+
 export interface DashboardStats {
   totalPeopleServed: number; 
   totalBudgetSpent: number;
@@ -59,6 +69,7 @@ export interface DashboardStats {
   dataQuality: DataQuality;
   sroi: number; 
   benchmarkComparison: string;
+  saasKpis: SaasKPI[];
 }
 
 export interface GeneratedReport {
@@ -197,6 +208,7 @@ export interface Grant {
   status: 'active' | 'pending' | 'completed';
   kpis: GrantKPI[];
   subgrantees?: Subgrantee[];
+  spentAmount?: number;
 }
 
 // New Types for AI Analysis

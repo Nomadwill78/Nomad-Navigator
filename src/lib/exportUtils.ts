@@ -1,0 +1,473 @@
+import { jsPDF } from 'jspdf';
+import { DashboardStats, Grant } from '../../types';
+
+// Helper to flatten nested objects for CSV export
+function flattenObject(ob: any, prefix = ''): any {
+  const toReturn: any = {};
+  for (const i in ob) {
+    if (!ob.hasOwnProperty(i)) continue;
+    if (typeof ob[i] === 'object' && ob[i] !== null) {
+      if (Array.isArray(ob[i])) {
+        toReturn[prefix + i] = JSON.stringify(ob[i]);
+      } else {
+        const flatObject = flattenObject(ob[i], prefix + i + '_');
+        for (const x in flatObject) {
+          if (!flatObject.hasOwnProperty(x)) continue;
+          toReturn[x] = flatObject[x];
+        }
+      }
+    } else {
+      toReturn[prefix + i] = ob[i];
+    }
+  }
+  return toReturn;
+}
+
+// Convert data to CSV format and trigger download
+export function exportToCSV(data: any[] | any, filename: string) {
+  let arrayToProcess: any[] = [];
+  
+  if (Array.isArray(data)) {
+    arrayToProcess = data.map(item => flattenObject(item));
+  } else if (typeof data === 'object' && data !== null) {
+    // If it's a single object (like stats), we can represent its key-value pairs as rows
+    const flat = flattenObject(data);
+    arrayToProcess = Object.entries(flat).map(([key, value]) => ({ Metric: key, Value: value }));
+  }
+
+  if (arrayToProcess.length === 0) return;
+
+  const headers = Object.keys(arrayToProcess[0]);
+  const csvRows = [
+    headers.join(','), // Header row
+    ...arrayToProcess.map(row => 
+      headers.map(fieldName => {
+        const value = row[fieldName];
+        const stringValue = value === null || value === undefined ? '' : String(value);
+        // Escape quotes and wrap in quotes if there are commas or quotes
+        const escaped = stringValue.replace(/"/g, '""');
+        return (escaped.includes(',') || escaped.includes('"') || escaped.includes('\n')) 
+          ? `"${escaped}"` 
+          : escaped;
+      }).join(',')
+    )
+  ];
+
+  const csvContent = csvRows.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `${filename}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+// Convert data to JSON format and trigger download
+export function exportToJSON(data: any, filename: string) {
+  const jsonString = JSON.stringify(data, null, 2);
+  const blob = new Blob([jsonString], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `${filename}.json`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+// Export a beautifully formatted Multi-page PDF Report of the Dashboard Core Metrics
+export function exportDashboardPDF(stats: DashboardStats, grants: Grant[]) {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const pageHeight = doc.internal.pageSize.height;
+  const pageWidth = doc.internal.pageSize.width;
+  const margin = 20;
+  const maxLineWidth = pageWidth - (margin * 2);
+  let y = 30;
+
+  const ensureSpace = (heightNeeded: number) => {
+    if (y + heightNeeded > pageHeight - margin) {
+      doc.addPage();
+      // Draw running header on new pages
+      drawPageDecorations(doc, pageWidth, pageHeight, margin);
+      y = margin + 15;
+    }
+  };
+
+  const drawPageDecorations = (pdf: jsPDF, w: number, h: number, m: number) => {
+    // Header line
+    pdf.setDrawColor(226, 232, 240);
+    pdf.setLineWidth(0.3);
+    pdf.line(m, 15, w - m, 15);
+
+    pdf.setFont('Helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.setTextColor(148, 163, 184);
+    pdf.text('Nomad Compass • Core Performance Report', m, 11);
+
+    // Footer
+    pdf.line(m, h - 15, w - m, h - 15);
+    pdf.text(`Generated on ${new Date().toLocaleDateString()}`, m, h - 10);
+    const pageStr = `Page ${pdf.getNumberOfPages()}`;
+    pdf.text(pageStr, w - m - pdf.getTextWidth(pageStr), h - 10);
+  };
+
+  // --- COVER PAGE / TITLE ---
+  // Large visual accent
+  doc.setFillColor(14, 165, 233); // brand color blue
+  doc.rect(margin, 25, 4, 18, 'F');
+
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(26);
+  doc.setTextColor(15, 23, 42); // slate-900
+  doc.text('Nomad Compass', margin + 8, 33);
+  
+  doc.setFont('Helvetica', 'normal');
+  doc.setFontSize(14);
+  doc.setTextColor(100, 116, 139); // slate-500
+  doc.text('Impact and Performance Audit Report', margin + 8, 41);
+
+  doc.setFont('Helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Reporting Period: Fiscal Year 2025 • Q1-Q2`, margin, 55);
+  doc.text(`Generated By: Nomad Compass AI Service`, margin, 61);
+
+  // Divider line
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.5);
+  doc.line(margin, 68, pageWidth - margin, 68);
+
+  y = 78;
+
+  // Key Financial & Impact Metrics Table
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(30, 41, 59);
+  doc.text('1. Executive Impact Overview', margin, y);
+  y += 8;
+
+  // Stat boxes
+  const statsList = [
+    { label: 'Total People Served', val: stats.totalPeopleServed.toLocaleString() + ' beneficiaries' },
+    { label: 'Total Budget Spent', val: `$${stats.totalBudgetSpent.toLocaleString()}` },
+    { label: 'Average Cost Per Person', val: `$${stats.avgCostPerPerson.toFixed(2)}` },
+    { label: 'Social SROI Ratio', val: `$${stats.sroi} generated per $1` },
+    { label: 'Sector Benchmark', val: stats.benchmarkComparison }
+  ];
+
+  statsList.forEach(s => {
+    ensureSpace(12);
+    doc.setFillColor(248, 250, 252); // slate-50
+    doc.roundedRect(margin, y, maxLineWidth, 10, 2, 2, 'F');
+    
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.text(s.label, margin + 4, y + 6);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(15, 23, 42);
+    doc.text(s.val, margin + 80, y + 6);
+    y += 12;
+  });
+
+  y += 4;
+
+  // Theory of Change Section
+  ensureSpace(40);
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(30, 41, 59);
+  doc.text('2. Theory of Change Pathway', margin, y);
+  y += 8;
+
+  const tocList = [
+    { step: 'INPUT', desc: `Resources and budgets deployed: $${stats.totalBudgetSpent.toLocaleString()} total spent.` },
+    { step: 'ACTIVITIES', desc: stats.theoryOfChange.activities },
+    { step: 'OUTPUTS', desc: stats.theoryOfChange.outputs },
+    { step: 'OUTCOMES', desc: stats.theoryOfChange.outcomes },
+    { step: 'IMPACT', desc: stats.theoryOfChange.impact }
+  ];
+
+  tocList.forEach(t => {
+    ensureSpace(16);
+    doc.setFillColor(241, 245, 249);
+    doc.rect(margin, y, 28, 10, 'F');
+    
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(30, 41, 59);
+    doc.text(t.step, margin + 3, y + 6.5);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(51, 65, 85);
+    
+    const lines = doc.splitTextToSize(t.desc, maxLineWidth - 32);
+    lines.forEach((l: string, idx: number) => {
+      doc.text(l, margin + 32, y + 5 + (idx * 4.5));
+    });
+    
+    y += Math.max(12, 5 + (lines.length * 4.5));
+  });
+
+  // Demographics and Outcomes Section on next page
+  y = pageHeight - margin; // force new page
+  ensureSpace(20);
+
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(30, 41, 59);
+  doc.text('3. Beneficiary Demographics & Metrics', margin, y);
+  y += 8;
+
+  const urbanRuralDetails = stats.geographic.urbanRural.map(ur => `${ur.name}: ${ur.value}%`).join(', ');
+
+  const demoList = [
+    { label: 'Disability Representation', val: `${stats.demographics.disabilityPercent}% of served population` },
+    { label: 'Geographic Segments', val: urbanRuralDetails || 'N/A' },
+    { label: 'Water Access Success', val: `${stats.outcomesDetails.householdsWaterAccess.toLocaleString()} households` },
+    { label: 'Documented Health Improvements', val: `${stats.outcomesDetails.healthImprovements.toLocaleString()} cases` }
+  ];
+
+  demoList.forEach(d => {
+    ensureSpace(12);
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(margin, y, maxLineWidth, 10, 2, 2, 'F');
+    
+    doc.setFont('Helvetica', 'semibold');
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.text(d.label, margin + 4, y + 6);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(15, 23, 42);
+    doc.text(d.val, margin + 80, y + 6);
+    y += 12;
+  });
+
+  y += 4;
+
+  // Active Grants Portfolio
+  ensureSpace(40);
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(30, 41, 59);
+  doc.text('4. Core Grant Portfolios & Timeline Spend', margin, y);
+  y += 8;
+
+  grants.forEach((g) => {
+    ensureSpace(32);
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(margin, y, maxLineWidth, 24, 2, 2, 'D');
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(14, 165, 233); // brand blue
+    doc.text(g.name, margin + 4, y + 6);
+
+    doc.setFont('Helvetica', 'semibold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Funder: ${g.funder}  |  Timeline: ${g.startDate} to ${g.endDate}`, margin + 4, y + 11);
+
+    const spent = g.spentAmount ?? 0;
+    const pct = g.amount > 0 ? ((spent / g.amount) * 100).toFixed(1) : '0';
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Budget Total: $${g.amount.toLocaleString()}   |   Spent: $${spent.toLocaleString()} (${pct}%)`, margin + 4, y + 17);
+
+    // Mini spent progress bar
+    doc.setFillColor(241, 245, 249);
+    doc.rect(margin + 4, y + 20, maxLineWidth - 8, 1.5, 'F');
+    doc.setFillColor(14, 165, 233);
+    const barWidth = (maxLineWidth - 8) * (Math.min(spent, g.amount) / Math.max(1, g.amount));
+    doc.rect(margin + 4, y + 20, barWidth, 1.5, 'F');
+
+    y += 28;
+  });
+
+  // Draw headers/footers on all pages
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    drawPageDecorations(doc, pageWidth, pageHeight, margin);
+  }
+
+  doc.save(`nomad-compass-core-metrics-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+// Export a beautifully formatted PDF summarizing the grant portfolio
+export function exportGrantPortfolioPDF(grants: Grant[]) {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const pageHeight = doc.internal.pageSize.height;
+  const pageWidth = doc.internal.pageSize.width;
+  const margin = 20;
+  const maxLineWidth = pageWidth - (margin * 2);
+  let y = 30;
+
+  const ensureSpace = (heightNeeded: number) => {
+    if (y + heightNeeded > pageHeight - margin) {
+      doc.addPage();
+      drawPageDecorations(doc, pageWidth, pageHeight, margin);
+      y = margin + 15;
+    }
+  };
+
+  const drawPageDecorations = (pdf: jsPDF, w: number, h: number, m: number) => {
+    pdf.setDrawColor(226, 232, 240);
+    pdf.setLineWidth(0.3);
+    pdf.line(m, 15, w - m, 15);
+
+    pdf.setFont('Helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.setTextColor(148, 163, 184);
+    pdf.text('Nomad Compass • Grant Portfolio Audit', m, 11);
+
+    pdf.line(m, h - 15, w - m, h - 15);
+    pdf.text(`Generated on ${new Date().toLocaleDateString()}`, m, h - 10);
+    const pageStr = `Page ${pdf.getNumberOfPages()}`;
+    pdf.text(pageStr, w - m - pdf.getTextWidth(pageStr), h - 10);
+  };
+
+  doc.setFillColor(99, 102, 241); // indigo color
+  doc.rect(margin, 25, 4, 18, 'F');
+
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(22);
+  doc.setTextColor(15, 23, 42);
+  doc.text('Grant Portfolio Summary', margin + 8, 32);
+  
+  doc.setFont('Helvetica', 'normal');
+  doc.setFontSize(12);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Financial & Compliance Review Report', margin + 8, 40);
+
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.5);
+  doc.line(margin, 48, pageWidth - margin, 48);
+
+  y = 58;
+
+  // Overall financial tally
+  const totalFunding = grants.reduce((sum, g) => sum + g.amount, 0);
+  const totalSpent = grants.reduce((sum, g) => sum + (g.spentAmount ?? 0), 0);
+  const aggregatePercent = totalFunding > 0 ? (totalSpent / totalFunding) * 100 : 0;
+
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(margin, y, maxLineWidth, 22, 3, 3, 'F');
+
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(71, 85, 105);
+  doc.text('AGGREGATE PORTFOLIO TALLY', margin + 6, y + 6);
+
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`$${totalSpent.toLocaleString()} spent out of $${totalFunding.toLocaleString()} (${aggregatePercent.toFixed(1)}%)`, margin + 6, y + 14);
+
+  y += 32;
+
+  // Individual Grants
+  grants.forEach((g, idx) => {
+    ensureSpace(60);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`${idx + 1}. ${g.name}`, margin, y);
+    y += 6;
+
+    // Table of details
+    const details = [
+      { k: 'Funder Organization', v: g.funder },
+      { k: 'Project Timeline', v: `${g.startDate} to ${g.endDate}` },
+      { k: 'Authorized Grant Size', v: `$${g.amount.toLocaleString()}` },
+      { k: 'Current Spent Tally', v: `$${(g.spentAmount ?? 0).toLocaleString()} (${g.amount > 0 ? (((g.spentAmount ?? 0)/g.amount)*100).toFixed(1) : 0}%)` },
+      { k: 'Grant Status', v: g.status.toUpperCase() }
+    ];
+
+    details.forEach(d => {
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(d.k, margin + 4, y);
+
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(51, 65, 85);
+      doc.text(d.v, margin + 55, y);
+      y += 5.5;
+    });
+
+    // KPIs Summary
+    if (g.kpis && g.kpis.length > 0) {
+      y += 2;
+      doc.setFont('Helvetica', 'semibold');
+      doc.setFontSize(9);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Key Performance Indicators (KPIs):', margin + 4, y);
+      y += 5.5;
+
+      g.kpis.forEach(kpi => {
+        ensureSpace(8);
+        doc.setFont('Helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(71, 85, 105);
+        doc.text(`• ${kpi.name}: ${kpi.current.toLocaleString()} / ${kpi.target.toLocaleString()} ${kpi.unit} (${((kpi.current/kpi.target)*100).toFixed(0)}% achieved)`, margin + 8, y);
+        y += 5;
+      });
+    }
+
+    // Subgrantees Info
+    if (g.subgrantees && g.subgrantees.length > 0) {
+      y += 2;
+      ensureSpace(12);
+      doc.setFont('Helvetica', 'semibold');
+      doc.setFontSize(9);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Allocated Subgrantees / Partners:', margin + 4, y);
+      y += 5.5;
+
+      g.subgrantees.forEach(sub => {
+        ensureSpace(8);
+        doc.setFont('Helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(71, 85, 105);
+        doc.text(`- ${sub.name} • Allocation: $${sub.allocatedAmount.toLocaleString()} • Status: ${sub.status}`, margin + 8, y);
+        y += 5;
+      });
+    }
+
+    y += 10; // spacing between grants
+  });
+
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    drawPageDecorations(doc, pageWidth, pageHeight, margin);
+  }
+
+  doc.save(`nomad-compass-grant-portfolio-${new Date().toISOString().slice(0, 10)}.pdf`);
+}

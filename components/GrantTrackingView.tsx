@@ -15,10 +15,12 @@ import {
   Users,
   ShieldCheck,
   ChevronDown,
-  ArrowRight
+  ArrowRight,
+  Download
 } from 'lucide-react';
 import { Grant, GrantKPI, Subgrantee, SubgranteeKPI, ROLE_PERMISSIONS } from '../types';
 import { useAuth } from '../src/contexts/AuthContext';
+import { exportGrantPortfolioPDF, exportToCSV, exportToJSON } from '../src/lib/exportUtils';
 
 interface GrantTrackingViewProps {
   grants: Grant[];
@@ -46,6 +48,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
       name: "New Strategic Grant",
       funder: "Foundation Name",
       amount: 50000,
+      spentAmount: 0,
       startDate: new Date().toISOString().split('T')[0],
       endDate: new Date(Date.now() + 31536000000).toISOString().split('T')[0],
       status: 'pending',
@@ -192,20 +195,50 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 font-sans tracking-tight">Grant & KPI Tracking</h2>
           <p className="text-slate-500">Manage individual funding source requirements and subgrantee performance.</p>
         </div>
-        {permissions?.canEditGrants && (
-          <button 
-            onClick={handleAddGrant}
-            className="flex items-center gap-2 bg-brand-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/20 hover:bg-brand-700 transition-all hover:scale-[1.02] active:scale-95"
-          >
-            <Plus size={18} />
-            New Tracking Goal
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {permissions?.canExportData && (
+            <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
+              <button 
+                onClick={() => exportGrantPortfolioPDF(grants)}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 hover:text-brand-600 hover:bg-slate-50 rounded-lg transition-all"
+                title="Export entire portfolio as PDF Report"
+              >
+                <Download size={14} />
+                PDF
+              </button>
+              <button 
+                onClick={() => exportToCSV(grants, 'nomad-compass-grants')}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 hover:text-brand-600 hover:bg-slate-50 rounded-lg transition-all"
+                title="Export entire portfolio as CSV"
+              >
+                <Download size={14} />
+                CSV
+              </button>
+              <button 
+                onClick={() => exportToJSON(grants, 'nomad-compass-grants')}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 hover:text-brand-600 hover:bg-slate-50 rounded-lg transition-all"
+                title="Export entire portfolio as JSON"
+              >
+                <Download size={14} />
+                JSON
+              </button>
+            </div>
+          )}
+          {permissions?.canEditGrants && (
+            <button 
+              onClick={handleAddGrant}
+              className="flex items-center gap-2 bg-brand-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/20 hover:bg-brand-700 transition-all hover:scale-[1.02] active:scale-95"
+            >
+              <Plus size={18} />
+              New Tracking Goal
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -278,6 +311,129 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                     )}
                   </div>
                 </div>
+
+                {/* Visual Progress Bar: Spent Funds versus Time Elapsed */}
+                {(() => {
+                  const totalAmount = selectedGrant.amount;
+                  const spentAmount = selectedGrant.spentAmount ?? 0;
+                  const fundsSpentPercent = totalAmount > 0 ? (spentAmount / totalAmount) * 100 : 0;
+
+                  const startDate = new Date(selectedGrant.startDate).getTime();
+                  const endDate = new Date(selectedGrant.endDate).getTime();
+                  const today = Date.now();
+
+                  let timeElapsedPercent = 0;
+                  if (endDate > startDate) {
+                    const totalDuration = endDate - startDate;
+                    const elapsedDuration = today - startDate;
+                    timeElapsedPercent = Math.min(Math.max((elapsedDuration / totalDuration) * 100, 0), 100);
+                  }
+
+                  // Burn rate calculation and indicator
+                  const diff = fundsSpentPercent - timeElapsedPercent;
+                  let burnStatus = {
+                    label: "On Track",
+                    color: "text-green-700 bg-green-50 border-green-100",
+                    desc: "Your budget burn rate matches the timeline progress well."
+                  };
+
+                  if (diff > 12) {
+                    burnStatus = {
+                      label: "High Burn Rate",
+                      color: "text-rose-700 bg-rose-50 border-rose-100",
+                      desc: "Warning: Funds are being spent significantly faster than time elapsed."
+                    };
+                  } else if (diff < -15) {
+                    burnStatus = {
+                      label: "Underutilization Alert",
+                      color: "text-amber-700 bg-amber-50 border-amber-100",
+                      desc: "Alert: Funds are being spent slower than the elapsed timeline. Risk of under-spending."
+                    };
+                  }
+
+                  return (
+                    <div className="mb-6 p-5 bg-white rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                            <TrendingUp size={14} className="text-brand-500" />
+                            Financial Burn vs. Timeline Progression
+                          </h4>
+                          <p className="text-sm font-bold text-slate-800 mt-0.5">Budget Deletion Comparison</p>
+                        </div>
+                        <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-bold ${burnStatus.color}`}>
+                          <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+                          {burnStatus.label}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Funds Spent Bar */}
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="font-semibold text-slate-500 flex items-center gap-1">
+                              <DollarSign size={12} className="text-slate-400" /> Funds Spent
+                            </span>
+                            <span className="font-bold text-slate-800">
+                              ${spentAmount.toLocaleString()} / ${totalAmount.toLocaleString()} ({fundsSpentPercent.toFixed(1)}%)
+                            </span>
+                          </div>
+                          <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-brand-500 rounded-full transition-all duration-500" 
+                              style={{ width: `${fundsSpentPercent}%` }}
+                            />
+                          </div>
+                          {permissions?.canEditGrants && (
+                            <div className="flex items-center gap-2 pt-1">
+                              <span className="text-[10px] text-slate-400 font-bold uppercase">Update Spent:</span>
+                              <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-0.5 max-w-[140px]">
+                                <span className="text-xs text-slate-400 font-bold">$</span>
+                                <input 
+                                  type="number" 
+                                  value={spentAmount}
+                                  onChange={(e) => {
+                                    const val = Math.min(Math.max(0, parseInt(e.target.value) || 0), totalAmount);
+                                    const updatedGrants = grants.map(g => g.id === selectedGrant.id ? { ...g, spentAmount: val } : g);
+                                    onUpdateGrants(updatedGrants);
+                                  }}
+                                  className="bg-transparent font-semibold text-slate-700 text-xs outline-none w-full"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Time Elapsed Bar */}
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="font-semibold text-slate-500 flex items-center gap-1">
+                              <Clock size={12} className="text-slate-400" /> Time Elapsed
+                            </span>
+                            <span className="font-bold text-slate-800">
+                              {timeElapsedPercent.toFixed(1)}% Completed
+                            </span>
+                          </div>
+                          <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-indigo-500 rounded-full transition-all duration-500" 
+                              style={{ width: `${timeElapsedPercent}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between text-[10px] text-slate-400 font-medium pt-1">
+                            <span>Start: {new Date(selectedGrant.startDate).toLocaleDateString()}</span>
+                            <span>End: {new Date(selectedGrant.endDate).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-slate-600 bg-slate-50 border border-slate-100 px-3 py-2 rounded-xl">
+                        <span className="font-semibold text-slate-700">Analysis: </span>
+                        {burnStatus.desc}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="flex gap-2 p-1 bg-slate-200/50 rounded-xl w-fit">
                    <button 
