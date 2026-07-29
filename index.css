@@ -2,6 +2,8 @@
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-mono2: "Space Mono", ui-monospace, monospace;
   --color-brand-50: #f4f7fa;
   --color-brand-100: #e2ebf4;
   --color-brand-500: #1b365d;
@@ -9,11 +11,53 @@
   --color-brand-700: #0b1a33;
   --color-brand-800: #0c1626;
   --color-brand-900: #050d18;
+
+  /* Cartographic instrument palette (shared with the sign-in) */
+  --color-ink: #0a1a30;
+  --color-abyss: #071322;
+  --color-surface: #0e2038;
+  --color-surface2: #13294a;
+  --color-hairline: #24405f;
+  --color-parchment: #f1e9d6;
+  --color-ivory: #efeadd;
+  --color-brass: #cba85c;
+  --color-brassbright: #e7ce88;
+  --color-teal: #4fc4d3;
+  --color-tealdim: #2f8b98;
+  --color-inkmute: #93a6c2;
+  --color-inkfaint: #5c7291;
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 font-sans;
+  @apply bg-ink text-parchment font-sans;
 }
+
+/* faint chart graticule for the app shell */
+.compass-canvas { position: relative; }
+.compass-canvas::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(203, 168, 92, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(203, 168, 92, 0.06) 1px, transparent 1px);
+  background-size: 72px 72px;
+  pointer-events: none;
+  z-index: 0;
+}
+.compass-canvas > * { position: relative; z-index: 1; }
+
+/* dark recharts tooltip */
+.recharts-default-tooltip {
+  background: #0b1c33 !important;
+  border: 1px solid #24405f !important;
+  border-radius: 10px !important;
+  box-shadow: 0 18px 40px -18px rgba(0,0,0,0.7) !important;
+}
+.recharts-tooltip-item { color: #f1e9d6 !important; }
+.recharts-tooltip-label { color: #93a6c2 !important; }
+.recharts-legend-item-text { color: #93a6c2 !important; }
+.recharts-cartesian-axis-tick-value { fill: #93a6c2; }
 
 .prose-content::-webkit-scrollbar {
   width: 6px;

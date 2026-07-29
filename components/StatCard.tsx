@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUpRight, ArrowDownRight, Activity } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area } from 'recharts';
 
 interface StatCardProps {
@@ -15,63 +15,75 @@ interface StatCardProps {
   subValue?: string;
 }
 
-export const StatCard: React.FC<StatCardProps> = ({ 
-  title, 
-  value, 
-  trend, 
-  trendDirection = 'neutral', 
-  icon, 
+export const StatCard: React.FC<StatCardProps> = ({
+  title,
+  value,
+  trend,
+  trendDirection = 'neutral',
+  icon,
   description,
   gradientFrom,
-  gradientTo,
   sparklineData,
-  subValue
+  subValue,
 }) => {
+  // Brass for governance/quality metrics, teal for impact/efficiency
+  const isBrass = /purple|amber|pink|orange/.test(gradientFrom);
+  const accent = isBrass ? '#cba85c' : '#4fc4d3';
+
   return (
-    <div className={`relative overflow-hidden rounded-2xl p-6 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl group bg-gradient-to-br ${gradientFrom} ${gradientTo}`}>
-      
-      {/* Background decoration */}
-      <div className="absolute -right-6 -top-6 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl group-hover:opacity-20 transition-opacity duration-500"></div>
-      
-      <div className="relative z-10 text-white">
-        <div className="flex justify-between items-start mb-2">
-          <div className="p-2 rounded-xl bg-white/20 backdrop-blur-sm shadow-inner">
-            {React.cloneElement(icon as React.ReactElement<any>, { className: 'text-white w-5 h-5' })}
+    <div className="relative overflow-hidden rounded-xl p-6 bg-surface border border-hairline transition-all duration-300 hover:border-brass/45 group">
+      {/* accent rule */}
+      <div className="absolute top-0 left-0 h-full w-0.5" style={{ background: accent, opacity: 0.85 }}></div>
+
+      <div className="relative z-10">
+        <div className="flex justify-between items-start mb-5">
+          <div
+            className="p-2 rounded-lg border"
+            style={{ background: `${accent}18`, borderColor: `${accent}40`, color: accent }}
+          >
+            {React.cloneElement(icon as React.ReactElement<any>, { className: 'w-5 h-5' })}
           </div>
-          
+
           {trend && (
-            <div className={`flex items-center text-xs font-bold px-2 py-1 rounded-full backdrop-blur-md bg-white/20 border border-white/10 shadow-sm`}>
-              {trendDirection === 'up' ? <ArrowUpRight className="w-3 h-3 mr-1" /> : <ArrowDownRight className="w-3 h-3 mr-1" />}
+            <div
+              className="flex items-center text-[0.68rem] font-mono2 font-bold px-2 py-1 rounded-full border"
+              style={
+                trendDirection === 'down'
+                  ? { color: '#93a6c2', background: 'rgba(147,166,194,0.08)', borderColor: 'rgba(147,166,194,0.25)' }
+                  : { color: accent, background: `${accent}14`, borderColor: `${accent}33` }
+              }
+            >
+              {trendDirection === 'up' ? (
+                <ArrowUpRight className="w-3 h-3 mr-1" />
+              ) : trendDirection === 'down' ? (
+                <ArrowDownRight className="w-3 h-3 mr-1" />
+              ) : null}
               {trend}
             </div>
           )}
         </div>
 
-        <h3 className="text-white/80 text-sm font-medium uppercase tracking-wider mb-1 mt-4">{title}</h3>
+        <h3 className="text-inkfaint text-[0.6rem] font-mono2 uppercase tracking-[0.18em] mb-2">{title}</h3>
         <div className="flex items-baseline gap-2">
-          <div className="text-3xl font-bold tracking-tight drop-shadow-sm">{value}</div>
-          {subValue && <span className="text-sm font-medium text-white/70">{subValue}</span>}
+          <div className="font-display text-3xl font-semibold tracking-tight text-ivory">{value}</div>
+          {subValue && <span className="text-sm font-medium text-inkmute">{subValue}</span>}
         </div>
-        
-        {description && (
-          <p className="text-white/70 text-xs mt-1 flex items-center font-light">
-             {description}
-          </p>
-        )}
+
+        {description && <p className="text-inkmute text-xs mt-1.5 leading-relaxed">{description}</p>}
       </div>
 
-      {/* Sparkline Chart */}
+      {/* Sparkline */}
       {sparklineData && (
-        <div className="absolute bottom-0 left-0 right-0 h-16 opacity-30 group-hover:opacity-50 transition-opacity">
+        <div className="absolute bottom-0 left-0 right-0 h-14 opacity-40 group-hover:opacity-70 transition-opacity">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={sparklineData}>
-              <Area 
-                type="monotone" 
-                dataKey="value" 
-                stroke="#fff" 
-                fill="#fff" 
-                strokeWidth={2}
-              />
+              <defs>
+                <linearGradient id={`sc-${title.replace(/\s/g, '')}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={accent} stopOpacity={0.35} />
+                  <stop offset="100%" stopColor={accent} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <Area type="monotone" dataKey="value" stroke={accent} fill={`url(#sc-${title.replace(/\s/g, '')})`} strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         </div>

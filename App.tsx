@@ -56,12 +56,13 @@ import { generateImpactReport, generateDashboardInsights } from './services/gemi
 import { DashboardStats, ProgramMetric, AIAnalysisData, Grant, Opportunity, ROLE_PERMISSIONS } from './types';
 
 // --- Colors & Gradients ---
+// Cartographic chart ramps — teal (impact), brass (funding), parchment (neutral)
 const COLORS = {
-  blue: ['#0ea5e9', '#38bdf8', '#7dd3fc', '#bae6fd'],
-  green: ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0'],
-  purple: ['#a855f7', '#c084fc', '#d8b4fe', '#e9d5ff'],
-  orange: ['#f97316', '#fb923c', '#fdba74', '#fed7aa'],
-  slate: ['#475569', '#64748b', '#94a3b8', '#cbd5e1']
+  blue: ['#4fc4d3', '#6fd2de', '#9ae0e8', '#c4eef2'],
+  green: ['#4fc4d3', '#3faebd', '#2f8b98', '#256e78'],
+  purple: ['#cba85c', '#e7ce88', '#8fa6c4', '#5c7291'],
+  orange: ['#cba85c', '#e7ce88', '#b8905a', '#8a6d3f'],
+  slate: ['#6f86a6', '#93a6c2', '#b7c4d8', '#d8e0ec']
 };
 
 // --- Mock Data ---
@@ -571,15 +572,15 @@ const App: React.FC = () => {
   const isQualityAlert = isDataQualityLow(stats.dataQuality?.level);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900">
-      
+    <div className="compass-canvas min-h-screen bg-ink flex font-sans text-parchment">
+
       {/* Sidebar */}
-      <aside 
+      <aside
         className={`${
           isSidebarOpen ? 'w-64' : 'w-20'
-        } bg-slate-900 text-white transition-all duration-300 ease-in-out fixed h-full z-20 flex flex-col shadow-2xl`}
+        } bg-abyss text-parchment transition-all duration-300 ease-in-out fixed h-full z-20 flex flex-col shadow-2xl border-r border-hairline/50`}
       >
-        <div className="h-20 flex items-center justify-start px-5 border-b border-slate-800/50">
+        <div className="h-20 flex items-center justify-start px-5 border-b border-hairline/40">
           <BrandLogo size={32} showText={isSidebarOpen} variant="light" />
         </div>
 
@@ -672,7 +673,7 @@ const App: React.FC = () => {
             />
           )}
           <div className="pt-4 pb-2 px-3">
-            <p className={`text-[10px] font-bold text-slate-500 uppercase tracking-widest ${!isSidebarOpen && 'hidden'}`}>Preview Features</p>
+            <p className={`text-[10px] font-mono2 text-inkfaint uppercase tracking-[0.2em] ${!isSidebarOpen && 'hidden'}`}>Preview Features</p>
           </div>
           {isDemoMode ? (
             <DemoHint text="Cross-Source Analytics" position="right">
@@ -695,16 +696,16 @@ const App: React.FC = () => {
           )}
           <button 
             onClick={() => setIsDemoMode(!isDemoMode)}
-            className={`flex items-center gap-3 w-full p-3 rounded-xl transition-all duration-200 group ${
-              isDemoMode 
-                ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' 
-                : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+            className={`flex items-center gap-3 w-full p-3 rounded-lg transition-all duration-200 group ${
+              isDemoMode
+                ? 'bg-brass/10 text-brassbright border border-brass/25'
+                : 'text-inkmute hover:bg-white/5 hover:text-parchment border border-transparent'
             }`}
           >
             <Sparkles size={20} className={isDemoMode ? 'animate-pulse' : ''} />
             {isSidebarOpen && <span className="font-medium text-sm whitespace-nowrap">Demo Mode</span>}
             {isSidebarOpen && isDemoMode && (
-              <div className="ml-auto w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]"></div>
+              <div className="ml-auto w-2 h-2 rounded-full bg-brass shadow-[0_0_8px_rgba(203,168,92,0.7)]"></div>
             )}
           </button>
           
@@ -714,13 +715,13 @@ const App: React.FC = () => {
           <NavItem icon={<MapPin size={20} />} label="Geographic Reach" isOpen={isSidebarOpen} />
           <NavItem icon={<DollarSign size={20} />} label="Financials" isOpen={isSidebarOpen} />
           
-          <div className="px-3 pt-4 border-t border-slate-800/30 mt-4">
-            <button 
+          <div className="px-3 pt-4 border-t border-hairline/40 mt-4">
+            <button
               onClick={() => handleStripePayment()}
-              className={`w-full group flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-widest transition-all duration-300 ${
-                isSidebarOpen 
-                  ? 'bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 shadow-lg shadow-emerald-900/40 text-white' 
-                  : 'bg-emerald-600/20 text-emerald-500 hover:bg-emerald-600/30'
+              className={`w-full group flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-bold text-xs uppercase tracking-widest transition-all duration-300 ${
+                isSidebarOpen
+                  ? 'bg-gradient-to-b from-brassbright to-brass hover:brightness-105 shadow-lg shadow-brass/25 text-[#26200e]'
+                  : 'bg-brass/15 text-brass hover:bg-brass/25'
               }`}
               title="Support Project"
             >
@@ -730,7 +731,7 @@ const App: React.FC = () => {
           </div>
         </nav>
 
-        <div className="p-3 border-t border-slate-800/50 bg-slate-900">
+        <div className="p-3 border-t border-hairline/40 bg-abyss">
            <NavItem icon={<Settings size={20} />} label="Settings" isOpen={isSidebarOpen} />
         </div>
       </aside>
@@ -739,66 +740,66 @@ const App: React.FC = () => {
       <main className={`flex-1 transition-all duration-300 ${isSidebarOpen ? 'ml-64' : 'ml-20'}`}>
         
         {/* Header */}
-        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200/60 sticky top-0 z-10 px-8 flex items-center justify-between shadow-sm">
+        <header className="h-20 bg-abyss/85 backdrop-blur-md border-b border-hairline/50 sticky top-0 z-10 px-8 flex items-center justify-between">
           <DemoModeBanner isActive={isDemoMode} onClose={() => setIsDemoMode(false)} />
           <div className="flex items-center gap-4">
-            <button 
+            <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all"
+              className="p-2 text-inkmute hover:text-parchment hover:bg-white/5 rounded-lg transition-all"
             >
               <Menu size={20} />
             </button>
             <div className="relative hidden md:block group">
-                <Search className="absolute left-3 top-3 text-slate-400 w-4 h-4 group-focus-within:text-brand-500 transition-colors" />
-                <input 
-                    type="text" 
-                    placeholder="Search metrics..." 
-                    className="pl-10 pr-4 py-2.5 bg-slate-100/50 border border-transparent rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:bg-white w-64 outline-none transition-all"
+                <Search className="absolute left-3 top-3 text-inkfaint w-4 h-4 group-focus-within:text-teal transition-colors" />
+                <input
+                    type="text"
+                    placeholder="Search metrics..."
+                    className="pl-10 pr-4 py-2.5 bg-ink/70 border border-hairline/60 rounded-lg text-sm text-parchment placeholder:text-inkfaint focus:ring-2 focus:ring-teal/40 focus:border-teal/50 w-64 outline-none transition-all"
                 />
             </div>
           </div>
 
           <div className="flex gap-3">
             {isOnline ? (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-200 shadow-sm">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-teal/10 text-teal text-xs font-semibold rounded-full border border-teal/25">
+                <div className="w-1.5 h-1.5 rounded-full bg-teal animate-pulse"></div>
                 <span>Online</span>
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 text-xs font-semibold rounded-full border border-amber-200 shadow-sm">
-                <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-brass/10 text-brassbright text-xs font-semibold rounded-full border border-brass/25">
+                <div className="w-1.5 h-1.5 rounded-full bg-brass"></div>
                 <span>Working Offline (Cached)</span>
               </div>
             )}
 
             {isDemoMode ? (
               <DemoHint text="Verified by AI" position="bottom">
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 text-xs font-semibold rounded-full border border-green-200 shadow-sm">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-teal/10 text-teal text-xs font-semibold rounded-full border border-teal/25">
                     <ShieldCheck size={14} />
                     <span>Verified Data</span>
                 </div>
               </DemoHint>
             ) : (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 text-xs font-semibold rounded-full border border-green-200 shadow-sm">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-teal/10 text-teal text-xs font-semibold rounded-full border border-teal/25">
                   <ShieldCheck size={14} />
                   <span>Verified Data</span>
               </div>
             )}
-            <button className="relative p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
+            <button className="relative p-2 text-inkmute hover:text-parchment hover:bg-white/5 rounded-lg transition-colors">
               <Bell size={20} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white ring-2 ring-white"></span>
+              <span className="absolute top-2 right-2 w-2 h-2 bg-brass rounded-full ring-2 ring-abyss"></span>
             </button>
-            <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
+            <div className="flex items-center gap-3 pl-4 border-l border-hairline/50">
                <div className="text-right hidden sm:block">
-                  <p className="text-xs font-bold text-slate-900">{profile?.displayName}</p>
-                  <button 
+                  <p className="text-xs font-bold text-parchment">{profile?.displayName}</p>
+                  <button
                     onClick={logout}
-                    className="text-[10px] text-slate-400 hover:text-red-500 font-bold uppercase transition-colors"
+                    className="text-[10px] text-inkfaint hover:text-brass font-bold uppercase transition-colors"
                   >
                     Sign Out
                   </button>
                </div>
-               <div className="w-10 h-10 bg-gradient-to-br from-brand-100 to-purple-100 rounded-full flex items-center justify-center text-brand-700 font-bold border-2 border-white shadow-md">
+               <div className="w-10 h-10 bg-gradient-to-br from-surface2 to-surface rounded-full flex items-center justify-center text-brass font-bold border border-brass/40">
                    {profile?.displayName?.charAt(0).toUpperCase() || 'U'}
                </div>
             </div>
@@ -823,19 +824,20 @@ const App: React.FC = () => {
               {/* Dashboard Header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-3 duration-500">
                 <div>
-                  <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Program Impact</h1>
-                  <p className="text-slate-500 mt-1 flex items-center gap-2">
-                    FY 2025 • Q1-Q2 Analysis <span className="w-1 h-1 rounded-full bg-slate-300"></span> Last updated today
+                  <p className="font-mono2 text-[0.62rem] tracking-[0.28em] uppercase text-brass mb-1.5">Bearing · Program Impact</p>
+                  <h1 className="font-display text-4xl font-semibold text-ivory tracking-tight">Program Impact</h1>
+                  <p className="text-inkmute mt-1.5 flex items-center gap-2 text-sm font-mono2">
+                    FY 2025 · Q1–Q2 <span className="w-1 h-1 rounded-full bg-inkfaint"></span> Updated today
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   {permissions?.canExportData && (
                     <button 
                       onClick={() => exportDashboardPDF(stats, grants)}
-                      className="flex items-center gap-2 bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 px-4 py-2.5 rounded-xl shadow-sm font-medium transition-all hover:scale-[1.02] active:scale-95 animate-in fade-in"
+                      className="flex items-center gap-2 bg-surface text-parchment border border-hairline hover:border-brass/50 hover:bg-surface2 px-4 py-2.5 rounded-lg font-medium transition-all active:scale-95 animate-in fade-in"
                       title="Export complete dashboard analytics as a PDF report"
                     >
-                      <Download size={18} className="text-slate-500" />
+                      <Download size={18} className="text-inkmute" />
                       Export PDF
                     </button>
                   )}
@@ -844,10 +846,10 @@ const App: React.FC = () => {
                     <DemoHint text="AI-Driven Strategy" position="bottom">
                       <button 
                         onClick={() => setShowInsights(!showInsights)}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all ${
-                          showInsights 
-                          ? 'bg-purple-100 text-purple-700 border border-purple-200 shadow-sm' 
-                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all ${
+                          showInsights
+                          ? 'bg-teal/12 text-teal border border-teal/30'
+                          : 'bg-surface text-inkmute border border-hairline hover:border-brass/50 hover:text-parchment'
                         }`}
                       >
                         <BrainCircuit size={18} />
@@ -857,10 +859,10 @@ const App: React.FC = () => {
                   ) : (
                     <button 
                       onClick={() => setShowInsights(!showInsights)}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all ${
-                        showInsights 
-                        ? 'bg-purple-100 text-purple-700 border border-purple-200' 
-                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all ${
+                        showInsights
+                        ? 'bg-teal/12 text-teal border border-teal/30'
+                        : 'bg-surface text-inkmute border border-hairline hover:border-brass/50 hover:text-parchment'
                       }`}
                     >
                       <BrainCircuit size={18} />
@@ -872,7 +874,7 @@ const App: React.FC = () => {
                     <DemoHint text="Grant-Ready Markdown" position="bottom">
                       <button 
                         onClick={handleGenerateReport}
-                        className="flex items-center gap-2 bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 text-white px-5 py-2.5 rounded-xl shadow-lg shadow-brand-500/20 font-medium transition-all hover:scale-[1.02] active:scale-95"
+                        className="flex items-center gap-2 bg-gradient-to-b from-brassbright to-brass hover:brightness-105 text-[#26200e] px-5 py-2.5 rounded-lg shadow-lg shadow-brass/25 font-semibold transition-all active:scale-95"
                       >
                         <Sparkles size={18} />
                         Generate Grant Report
@@ -881,7 +883,7 @@ const App: React.FC = () => {
                   ) : (
                     <button 
                       onClick={handleGenerateReport}
-                      className="flex items-center gap-2 bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 text-white px-5 py-2.5 rounded-xl shadow-lg shadow-brand-500/20 font-medium transition-all hover:scale-[1.02] active:scale-95"
+                      className="flex items-center gap-2 bg-gradient-to-b from-brassbright to-brass hover:brightness-105 text-[#26200e] px-5 py-2.5 rounded-lg shadow-lg shadow-brass/25 font-semibold transition-all active:scale-95"
                     >
                       <Sparkles size={18} />
                       Generate Grant Report
@@ -891,31 +893,31 @@ const App: React.FC = () => {
               </div>
 
               {/* Theory of Change Banner */}
-              <div className="bg-white rounded-2xl p-0 shadow-lg border border-slate-100/60 relative overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
-                  <div className="absolute top-0 left-0 w-2 h-full bg-gradient-to-b from-brand-400 to-purple-500"></div>
+              <div className="bg-surface rounded-xl p-0 border border-hairline relative overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-teal to-brass"></div>
                   <div className="p-6">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-5 flex items-center gap-2">
-                      <Activity size={14} className="text-brand-500" /> Theory of Change Pathway
+                    <h3 className="text-[0.62rem] font-mono2 text-brass uppercase tracking-[0.24em] mb-5 flex items-center gap-2">
+                      <Activity size={14} className="text-teal" /> Theory of Change · Pathway
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center relative z-10">
                         <div className="flex flex-col group">
-                            <span className="text-xs text-slate-400 font-semibold mb-1 uppercase tracking-wider">Input</span>
-                            <span className="text-xl font-bold text-slate-800 group-hover:text-brand-600 transition-colors">${(stats.totalBudgetSpent / 1000).toFixed(1)}k Invested</span>
+                            <span className="text-[0.6rem] text-inkfaint font-mono2 mb-1.5 uppercase tracking-[0.16em]">Input</span>
+                            <span className="font-display text-xl font-semibold text-parchment group-hover:text-brassbright transition-colors">${(stats.totalBudgetSpent / 1000).toFixed(1)}k Invested</span>
                         </div>
-                        <div className="hidden md:flex justify-center text-slate-300"><ArrowRight size={20} /></div>
+                        <div className="hidden md:flex justify-center text-inkfaint"><ArrowRight size={18} /></div>
                         <div className="flex flex-col group">
-                            <span className="text-xs text-slate-400 font-semibold mb-1 uppercase tracking-wider">Activity</span>
-                            <span className="text-xl font-bold text-slate-800 group-hover:text-brand-600 transition-colors">{stats.theoryOfChange.activities}</span>
+                            <span className="text-[0.6rem] text-inkfaint font-mono2 mb-1.5 uppercase tracking-[0.16em]">Activity</span>
+                            <span className="font-display text-xl font-semibold text-parchment group-hover:text-brassbright transition-colors">{stats.theoryOfChange.activities}</span>
                         </div>
-                        <div className="hidden md:flex justify-center text-slate-300"><ArrowRight size={20} /></div>
+                        <div className="hidden md:flex justify-center text-inkfaint"><ArrowRight size={18} /></div>
                         <div className="flex flex-col group">
-                            <span className="text-xs text-slate-400 font-semibold mb-1 uppercase tracking-wider">Outcome</span>
-                            <span className="text-xl font-bold text-slate-800 group-hover:text-brand-600 transition-colors">{stats.theoryOfChange.outcomes}</span>
+                            <span className="text-[0.6rem] text-inkfaint font-mono2 mb-1.5 uppercase tracking-[0.16em]">Outcome</span>
+                            <span className="font-display text-xl font-semibold text-parchment group-hover:text-brassbright transition-colors">{stats.theoryOfChange.outcomes}</span>
                         </div>
-                        <div className="hidden md:flex justify-center text-slate-300"><ArrowRight size={20} /></div>
+                        <div className="hidden md:flex justify-center text-inkfaint"><ArrowRight size={18} /></div>
                         <div className="flex flex-col group">
-                            <span className="text-xs text-slate-400 font-semibold mb-1 uppercase tracking-wider">Impact</span>
-                            <span className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-purple-600">{stats.theoryOfChange.impact}</span>
+                            <span className="text-[0.6rem] text-inkfaint font-mono2 mb-1.5 uppercase tracking-[0.16em]">Impact</span>
+                            <span className="font-display text-xl font-semibold text-teal">{stats.theoryOfChange.impact}</span>
                         </div>
                     </div>
                   </div>
@@ -975,19 +977,19 @@ const App: React.FC = () => {
                 <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8">
                 
                 {/* Demographics Section */}
-                <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300">
+                <div className="bg-surface p-8 rounded-xl border border-hairline hover:border-brass/30 transition-colors duration-300">
                   <div className="flex items-center justify-between mb-8">
                       <div>
-                        <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">Demographic Reach</h3>
-                        <p className="text-sm text-slate-500">Beneficiaries by Age and Ethnicity</p>
+                        <h3 className="font-display font-semibold text-ivory text-lg flex items-center gap-2">Demographic Reach</h3>
+                        <p className="text-sm text-inkmute">Beneficiaries by Age and Ethnicity</p>
                       </div>
-                      <button className="text-slate-400 hover:text-slate-600"><Settings size={16} /></button>
+                      <button className="text-inkfaint hover:text-parchment"><Settings size={16} /></button>
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                     {/* Age Distribution (Pie) */}
                     <div className="space-y-4">
-                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center">Age Distribution</h4>
+                      <h4 className="text-[0.6rem] font-mono2 text-inkfaint uppercase tracking-[0.18em] text-center">Age Distribution</h4>
                       <div className="h-64 relative">
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
@@ -1015,8 +1017,8 @@ const App: React.FC = () => {
                           
                           {/* Center Text */}
                           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-                              <span className="text-3xl font-bold text-slate-800">{stats.totalPeopleServed.toLocaleString()}</span>
-                              <p className="text-xs text-slate-500 font-medium uppercase tracking-tighter">Served</p>
+                              <span className="font-display text-3xl font-semibold text-ivory">{stats.totalPeopleServed.toLocaleString()}</span>
+                              <p className="text-[0.6rem] text-inkfaint font-mono2 uppercase tracking-tighter">Served</p>
                           </div>
                       </div>
 
@@ -1025,7 +1027,7 @@ const App: React.FC = () => {
                           {stats.demographics.age.map((item, i) => (
                               <div key={i} className="flex items-center gap-1.5">
                                   <div className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS.blue[i]}}></div>
-                                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">{item.name}</span>
+                                  <span className="text-[10px] text-inkmute font-mono2 uppercase tracking-wide">{item.name}</span>
                               </div>
                           ))}
                       </div>
@@ -1033,7 +1035,7 @@ const App: React.FC = () => {
 
                     {/* Race/Ethnicity (Bar) */}
                     <div className="space-y-4">
-                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center">Race & Ethnicity</h4>
+                      <h4 className="text-[0.6rem] font-mono2 text-inkfaint uppercase tracking-[0.18em] text-center">Race & Ethnicity</h4>
                       <div className="h-64">
                           <ResponsiveContainer width="100%" height="100%">
                               <BarChart 
@@ -1046,41 +1048,41 @@ const App: React.FC = () => {
                                     dataKey="name" 
                                     type="category" 
                                     width={100} 
-                                    tick={{ fontSize: 10, fill: '#64748b', fontWeight: 500 }} 
+                                    tick={{ fontSize: 10, fill: '#93a6c2', fontWeight: 500 }} 
                                     axisLine={false} 
                                     tickLine={false}
                                   />
                                   <Tooltip 
-                                    cursor={{ fill: '#f8fafc' }}
+                                    cursor={{ fill: 'rgba(79,196,211,0.06)' }}
                                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
                                   />
                                   <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24}>
                                       {stats.demographics.race.map((entry, index) => (
                                           <Cell key={`cell-${index}`} fill={COLORS.slate[index % COLORS.slate.length]} />
                                       ))}
-                                      <LabelList dataKey="value" position="right" style={{ fontSize: 10, fill: '#64748b', fontWeight: 700 }} />
+                                      <LabelList dataKey="value" position="right" style={{ fontSize: 10, fill: '#93a6c2', fontWeight: 700 }} />
                                   </Bar>
                               </BarChart>
                           </ResponsiveContainer>
                       </div>
                       <div className="flex justify-center">
-                        <span className="text-[10px] text-slate-400 font-medium italic">Relative distribution percentage</span>
+                        <span className="text-[10px] text-inkfaint font-medium italic">Relative distribution percentage</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Historical Impact Chart */}
-                <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300">
+                <div className="bg-surface p-8 rounded-xl border border-hairline hover:border-brass/30 transition-colors duration-300">
                   <div className="flex items-center justify-between mb-8">
                     <div>
-                      <h3 className="font-bold text-slate-800 text-lg">Impact Trajectory</h3>
-                      <p className="text-sm text-slate-500">Outcomes achieved over time</p>
+                      <h3 className="font-display font-semibold text-ivory text-lg">Impact Trajectory</h3>
+                      <p className="text-sm text-inkmute">Outcomes achieved over time</p>
                     </div>
-                    <div className="flex items-center gap-2 bg-slate-50 rounded-lg p-1 border border-slate-200">
-                        <button className="px-3 py-1 text-xs font-semibold bg-white text-slate-800 rounded-md shadow-sm">6M</button>
-                        <button className="px-3 py-1 text-xs font-medium text-slate-500 hover:text-slate-800">1Y</button>
-                        <button className="px-3 py-1 text-xs font-medium text-slate-500 hover:text-slate-800">ALL</button>
+                    <div className="flex items-center gap-2 bg-ink rounded-lg p-1 border border-hairline">
+                        <button className="px-3 py-1 text-xs font-semibold bg-teal/15 text-teal rounded-md">6M</button>
+                        <button className="px-3 py-1 text-xs font-medium text-inkmute hover:text-parchment">1Y</button>
+                        <button className="px-3 py-1 text-xs font-medium text-inkmute hover:text-parchment">ALL</button>
                     </div>
                   </div>
                   <div className="h-72 w-full">
@@ -1088,37 +1090,37 @@ const App: React.FC = () => {
                       <AreaChart data={stats.programs || MOCK_PROGRAMS} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                         <defs>
                           <linearGradient id="colorServed" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2}/>
-                            <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                            <stop offset="5%" stopColor="#4fc4d3" stopOpacity={0.2}/>
+                            <stop offset="95%" stopColor="#4fc4d3" stopOpacity={0}/>
                           </linearGradient>
                           <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.2}/>
-                            <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
+                            <stop offset="5%" stopColor="#cba85c" stopOpacity={0.2}/>
+                            <stop offset="95%" stopColor="#cba85c" stopOpacity={0}/>
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
-                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#24405f" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#93a6c2', fontSize: 12}} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#93a6c2', fontSize: 12}} />
                         <Tooltip 
                           contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }} 
-                          cursor={{stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4'}}
+                          cursor={{stroke: '#3a5878', strokeWidth: 1, strokeDasharray: '4 4'}}
                         />
                         <Legend iconType="circle" />
                         <Area 
                             type="monotone" 
                             dataKey="peopleServed" 
                             name="Outcomes"
-                            stroke="#8b5cf6" 
+                            stroke="#4fc4d3" 
                             strokeWidth={3}
                             fillOpacity={1} 
                             fill="url(#colorServed)" 
-                            activeDot={{r: 6, strokeWidth: 0, fill: '#8b5cf6'}}
+                            activeDot={{r: 6, strokeWidth: 0, fill: '#4fc4d3'}}
                         />
                         <Area 
                             type="monotone" 
                             dataKey="costPerPerson" 
                             name="Efficiency ($)"
-                            stroke="#0ea5e9" 
+                            stroke="#cba85c" 
                             strokeWidth={3}
                             fillOpacity={1} 
                             fill="url(#colorCost)" 
@@ -1129,16 +1131,16 @@ const App: React.FC = () => {
                 </div>
 
                 {/* Financial Health Section */}
-                <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300 animate-in fade-in slide-in-from-bottom-7 duration-700 delay-400">
+                <div className="bg-surface p-8 rounded-xl border border-hairline hover:border-brass/30 transition-colors duration-300 animate-in fade-in slide-in-from-bottom-7 duration-700 delay-400">
                   <div className="flex items-center justify-between mb-8">
                     <div>
-                      <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
-                        <DollarSign size={20} className="text-emerald-500" />
+                      <h3 className="font-display font-semibold text-ivory text-lg flex items-center gap-2">
+                        <DollarSign size={20} className="text-teal" />
                         Financial Health
                       </h3>
-                      <p className="text-sm text-slate-500">Resource Allocation & Funding Diversity</p>
+                      <p className="text-sm text-inkmute">Resource Allocation & Funding Diversity</p>
                     </div>
-                    <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-wider rounded-full border border-emerald-100 shadow-sm">
+                    <div className="flex items-center gap-2 px-3 py-1 bg-teal/10 text-teal text-[10px] font-mono2 uppercase tracking-wider rounded-full border border-teal/25">
                       Reserve: {stats.financials.operatingReserveMonths} mo.
                     </div>
                   </div>
@@ -1146,7 +1148,7 @@ const App: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     {/* Spending Breakdown */}
                     <div className="space-y-4">
-                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Spending Breakdown</h4>
+                      <h4 className="text-[0.6rem] font-mono2 text-inkfaint uppercase tracking-[0.18em]">Spending Breakdown</h4>
                       <div className="h-40 relative">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
@@ -1170,7 +1172,7 @@ const App: React.FC = () => {
                           </PieChart>
                         </ResponsiveContainer>
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                           <span className="text-lg font-bold text-slate-800">{stats.financials.spending[0].value}%</span>
+                           <span className="font-display text-lg font-semibold text-ivory">{stats.financials.spending[0].value}%</span>
                         </div>
                       </div>
                       
@@ -1181,20 +1183,20 @@ const App: React.FC = () => {
                             <Area 
                               type="monotone" 
                               dataKey="value" 
-                              stroke="#10b981" 
-                              fill="#10b981" 
+                              stroke="#4fc4d3" 
+                              fill="#4fc4d3" 
                               fillOpacity={0.1}
                               strokeWidth={2}
                             />
                           </AreaChart>
                         </ResponsiveContainer>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight text-center mt-1">Total Spending Trend</p>
+                        <p className="text-[9px] text-inkfaint font-mono2 uppercase tracking-tight text-center mt-1">Total Spending Trend</p>
                       </div>
                     </div>
 
                     {/* Funding Sources */}
                     <div className="space-y-4">
-                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Funding Diversity</h4>
+                      <h4 className="text-[0.6rem] font-mono2 text-inkfaint uppercase tracking-[0.18em]">Funding Diversity</h4>
                       <div className="h-40 relative">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
@@ -1218,7 +1220,7 @@ const App: React.FC = () => {
                           </PieChart>
                         </ResponsiveContainer>
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                           <span className="text-lg font-bold text-slate-800">{stats.financials.sources[0].value}%</span>
+                           <span className="font-display text-lg font-semibold text-ivory">{stats.financials.sources[0].value}%</span>
                         </div>
                       </div>
 
@@ -1229,41 +1231,41 @@ const App: React.FC = () => {
                             <Area 
                               type="monotone" 
                               dataKey="value" 
-                              stroke="#f97316" 
-                              fill="#f97316" 
+                              stroke="#cba85c" 
+                              fill="#cba85c" 
                               fillOpacity={0.1}
                               strokeWidth={2}
                             />
                           </AreaChart>
                         </ResponsiveContainer>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight text-center mt-1">New Funding Trend</p>
+                        <p className="text-[9px] text-inkfaint font-mono2 uppercase tracking-tight text-center mt-1">New Funding Trend</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Geographic Reach */}
-                <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300 animate-in fade-in slide-in-from-bottom-7 duration-700 delay-500">
+                <div className="bg-surface p-8 rounded-xl border border-hairline hover:border-brass/30 transition-colors duration-300 animate-in fade-in slide-in-from-bottom-7 duration-700 delay-500">
                     <div className="flex items-center justify-between mb-8">
                         <div>
-                            <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
-                              <MapPin size={20} className="text-brand-500" /> 
+                            <h3 className="font-display font-semibold text-ivory text-lg flex items-center gap-2">
+                              <MapPin size={20} className="text-teal" /> 
                               Service Areas
                             </h3>
-                            <p className="text-sm text-slate-500">Regional Outreach Breakdown</p>
+                            <p className="text-sm text-inkmute">Regional Outreach Breakdown</p>
                         </div>
-                        <div className="text-xs text-slate-400 font-medium">89% Urban Focus</div>
+                        <div className="text-xs text-inkmute font-mono2">89% Urban Focus</div>
                     </div>
                     <div className="space-y-6">
                         {stats.geographic.neighborhoods.map((area, i) => (
                             <div key={i} className="group">
                                 <div className="flex justify-between text-sm mb-1.5">
-                                    <span className="text-slate-600 font-medium">{area.name}</span>
-                                    <span className="text-slate-900 font-bold">{area.value}%</span>
+                                    <span className="text-inkmute font-medium">{area.name}</span>
+                                    <span className="text-parchment font-bold">{area.value}%</span>
                                 </div>
-                                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                <div className="h-2 bg-abyss rounded-full overflow-hidden border border-hairline/50">
                                     <div 
-                                      className="h-full bg-gradient-to-r from-brand-400 to-brand-600 rounded-full transition-all duration-[1500ms]" 
+                                      className="h-full bg-gradient-to-r from-teal to-brass rounded-full transition-all duration-[1500ms]" 
                                       style={{ width: `${area.value}%` }}
                                     ></div>
                                 </div>
@@ -1333,13 +1335,14 @@ const NavItem: React.FC<{
   return (
     <button 
       onClick={onClick}
-      className={`relative flex items-center gap-3 w-full p-3 rounded-xl transition-all duration-200 group ${
-      active 
-        ? 'bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-lg shadow-brand-500/30' 
-        : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+      className={`relative flex items-center gap-3 w-full p-3 rounded-lg transition-all duration-200 group ${
+      active
+        ? 'bg-teal/10 text-ivory border border-teal/25'
+        : 'text-inkmute hover:bg-white/5 hover:text-parchment border border-transparent'
     }`}>
+      {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-0.5 rounded-full bg-brass"></span>}
       <span className="relative">
-        <span className={`${active ? 'text-white' : 'text-slate-400 group-hover:text-white transition-colors'}`}>{icon}</span>
+        <span className={`${active ? 'text-teal' : 'text-inkfaint group-hover:text-parchment transition-colors'}`}>{icon}</span>
         {/* Subtle dot on the icon itself if sidebar is collapsed */}
         {alert && !isOpen && (
           <span className="absolute -top-1 -right-1 flex h-2 w-2">
