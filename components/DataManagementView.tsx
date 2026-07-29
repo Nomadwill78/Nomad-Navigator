@@ -305,12 +305,12 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
   };
 
   const FieldGroup: React.FC<{ icon: React.ReactNode; title: string; children: React.ReactNode }> = ({ icon, title, children }) => (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6">
-      <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-        <div className="p-2 bg-white rounded-lg shadow-sm text-brand-600">
+    <div className="bg-surface rounded-2xl border border-hairline shadow-sm overflow-hidden mb-6">
+      <div className="p-4 border-b border-hairline/60 bg-ink/50 flex items-center gap-3">
+        <div className="p-2 bg-surface rounded-lg shadow-sm text-teal">
           {icon}
         </div>
-        <h4 className="font-bold text-slate-800">{title}</h4>
+        <h4 className="font-bold text-parchment">{title}</h4>
       </div>
       <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {children}
@@ -331,10 +331,10 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
     return (
       <div className="space-y-1.5">
         <div className="flex items-center gap-1.5">
-          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</label>
+          <label className="text-xs font-bold text-inkmute uppercase tracking-wider">{label}</label>
           <div className="group relative">
-            <Info size={14} className="text-slate-300 cursor-help hover:text-brand-500 transition-colors" />
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-slate-900 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl z-50">
+            <Info size={14} className="text-inkfaint cursor-help hover:text-teal transition-colors" />
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-abyss text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl z-50">
               {tooltip}
               <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900"></div>
             </div>
@@ -346,7 +346,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
           value={value ?? ""}
           onChange={(e) => handleChange(path, type === 'number' ? parseFloat(e.target.value) : e.target.value)}
           placeholder={placeholder}
-          className={`w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
+          className={`w-full px-4 py-2.5 bg-ink/50 border border-hairline rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:bg-surface outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
         />
       </div>
     );
@@ -356,15 +356,15 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Manage Metrics</h2>
-          <p className="text-slate-500">Update your nonprofit's core impact and financial data.</p>
+          <h2 className="text-2xl font-bold text-ivory">Manage Metrics</h2>
+          <p className="text-inkmute">Update your nonprofit's core impact and financial data.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {permissions?.canExportData && (
-            <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
+            <div className="flex items-center gap-2 bg-surface border border-hairline rounded-xl p-1 shadow-sm">
               <button 
                 onClick={() => exportToCSV(stats, 'nomad-compass-metrics')}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 hover:text-brand-600 hover:bg-slate-50 rounded-lg transition-all"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-inkmute hover:text-teal hover:bg-ink/50 rounded-lg transition-all"
                 title="Export metrics as CSV"
               >
                 <Download size={14} />
@@ -372,7 +372,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
               </button>
               <button 
                 onClick={() => exportToJSON(stats, 'nomad-compass-metrics')}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 hover:text-brand-600 hover:bg-slate-50 rounded-lg transition-all"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-inkmute hover:text-teal hover:bg-ink/50 rounded-lg transition-all"
                 title="Export metrics as JSON"
               >
                 <Download size={14} />
@@ -381,7 +381,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
             </div>
           )}
           {permissions?.canEditMetrics && (
-            <button className="flex items-center gap-2 bg-brand-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/20 hover:bg-brand-700 transition-all">
+            <button className="flex items-center gap-2 bg-gradient-to-b from-brassbright to-brass text-[#26200e] px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-brass/25 hover:brightness-105 transition-all">
               <Save size={18} />
               Save Changes
             </button>
@@ -391,20 +391,20 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
 
       {/* CSV Import Section */}
       {permissions?.canEditMetrics && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6">
-          <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+        <div className="bg-surface rounded-2xl border border-hairline shadow-sm overflow-hidden mb-6">
+          <div className="p-4 border-b border-hairline/60 bg-ink/50 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-white rounded-lg shadow-sm text-indigo-600">
+              <div className="p-2 bg-surface rounded-lg shadow-sm text-indigo-300">
                 <Upload size={18} />
               </div>
               <div>
-                <h4 className="font-bold text-slate-800">CSV Data Stream Integration</h4>
-                <p className="text-xs text-slate-500">Import program metrics from any database or CSV report</p>
+                <h4 className="font-bold text-parchment">CSV Data Stream Integration</h4>
+                <p className="text-xs text-inkmute">Import program metrics from any database or CSV report</p>
               </div>
             </div>
             <button 
               onClick={downloadSampleCSV}
-              className="flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100/80 px-2.5 py-1.5 rounded-lg transition-all"
+              className="flex items-center gap-1 text-xs font-semibold text-teal hover:text-teal bg-teal/10 hover:bg-teal/10 px-2.5 py-1.5 rounded-lg transition-all"
             >
               <Download size={13} />
               Sample CSV
@@ -413,14 +413,14 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
 
           <div className="p-6">
             {successMessage && (
-              <div className="mb-6 p-4 bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm rounded-xl flex items-center gap-3 animate-in fade-in duration-300">
+              <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/25 text-emerald-200 text-sm rounded-xl flex items-center gap-3 animate-in fade-in duration-300">
                 <CheckCircle size={18} className="text-emerald-500 shrink-0" />
                 <span className="font-medium">{successMessage}</span>
               </div>
             )}
 
             {uploadError && (
-              <div className="mb-6 p-4 bg-rose-50 border border-rose-100 text-rose-800 text-sm rounded-xl flex items-center gap-3 animate-in fade-in duration-300">
+              <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/25 text-rose-200 text-sm rounded-xl flex items-center gap-3 animate-in fade-in duration-300">
                 <AlertCircle size={18} className="text-rose-500 shrink-0" />
                 <span className="font-medium">{uploadError}</span>
               </div>
@@ -435,8 +435,8 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                 onClick={() => fileInputRef.current?.click()}
                 className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all duration-300 ${
                   dragActive 
-                    ? 'border-indigo-500 bg-indigo-50/50 scale-[0.99]' 
-                    : 'border-slate-200 hover:border-indigo-400 hover:bg-slate-50/40'
+                    ? 'border-indigo-500 bg-indigo-500/10/50 scale-[0.99]' 
+                    : 'border-hairline hover:border-indigo-400 hover:bg-ink/50'
                 }`}
               >
                 <input 
@@ -446,27 +446,27 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                   accept=".csv"
                   className="hidden"
                 />
-                <div className="p-4 bg-slate-50 rounded-full text-slate-400 group-hover:scale-110 transition-transform">
+                <div className="p-4 bg-ink/50 rounded-full text-inkfaint group-hover:scale-110 transition-transform">
                   <FileSpreadsheet size={32} className="text-indigo-500" />
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-bold text-slate-700">Drag & drop your CSV file here</p>
-                  <p className="text-xs text-slate-400 mt-1">or click to browse from your device</p>
+                  <p className="text-sm font-bold text-parchment">Drag & drop your CSV file here</p>
+                  <p className="text-xs text-inkfaint mt-1">or click to browse from your device</p>
                 </div>
-                <div className="text-[10px] bg-slate-100 text-slate-500 px-2.5 py-1 rounded-md font-semibold uppercase tracking-wider">
+                <div className="text-[10px] bg-white/5 text-inkmute px-2.5 py-1 rounded-md font-semibold uppercase tracking-wider">
                   Supports UTF-8 CSV
                 </div>
               </div>
             ) : (
               <div className="space-y-6 animate-in fade-in duration-400">
                 {/* Mapping Controls */}
-                <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200/60 space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                <div className="p-5 bg-ink/50 rounded-2xl border border-hairline/60 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-hairline pb-3">
                     <div>
-                      <h5 className="font-bold text-slate-800 text-sm">Header Mapping Configuration</h5>
-                      <p className="text-xs text-slate-500 mt-0.5">We found headers. Match them to the required Program Metric fields.</p>
+                      <h5 className="font-bold text-parchment text-sm">Header Mapping Configuration</h5>
+                      <p className="text-xs text-inkmute mt-0.5">We found headers. Match them to the required Program Metric fields.</p>
                     </div>
-                    <div className="text-xs font-semibold bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-lg border border-indigo-100">
+                    <div className="text-xs font-semibold bg-indigo-500/10 text-indigo-300 px-2.5 py-1 rounded-lg border border-indigo-500/25">
                       File: {selectedFileName}
                     </div>
                   </div>
@@ -474,13 +474,13 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {/* Name mapping */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                      <label className="text-xs font-bold text-inkmute uppercase tracking-wider flex items-center gap-1">
                         Name Field <span className="text-rose-500">*</span>
                       </label>
                       <select 
                         value={mapping.name}
                         onChange={(e) => setMapping({ ...mapping, name: e.target.value })}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full px-3 py-2 bg-surface border border-hairline rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
                       >
                         <option value="">-- Choose CSV Column --</option>
                         {headers.map(h => <option key={h} value={h}>{h}</option>)}
@@ -489,13 +489,13 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
 
                     {/* Month mapping */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                      <label className="text-xs font-bold text-inkmute uppercase tracking-wider">
                         Month / Timeline Field
                       </label>
                       <select 
                         value={mapping.month}
                         onChange={(e) => setMapping({ ...mapping, month: e.target.value })}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full px-3 py-2 bg-surface border border-hairline rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
                       >
                         <option value="">-- Choose CSV Column --</option>
                         {headers.map(h => <option key={h} value={h}>{h}</option>)}
@@ -504,13 +504,13 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
 
                     {/* People Served mapping */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                      <label className="text-xs font-bold text-inkmute uppercase tracking-wider flex items-center gap-1">
                         People Served <span className="text-rose-500">*</span>
                       </label>
                       <select 
                         value={mapping.peopleServed}
                         onChange={(e) => setMapping({ ...mapping, peopleServed: e.target.value })}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full px-3 py-2 bg-surface border border-hairline rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
                       >
                         <option value="">-- Choose CSV Column --</option>
                         {headers.map(h => <option key={h} value={h}>{h}</option>)}
@@ -519,13 +519,13 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
 
                     {/* Total Cost mapping */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                      <label className="text-xs font-bold text-inkmute uppercase tracking-wider flex items-center gap-1">
                         Total Cost Spent <span className="text-rose-500">*</span>
                       </label>
                       <select 
                         value={mapping.totalCost}
                         onChange={(e) => setMapping({ ...mapping, totalCost: e.target.value })}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full px-3 py-2 bg-surface border border-hairline rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
                       >
                         <option value="">-- Choose CSV Column --</option>
                         {headers.map(h => <option key={h} value={h}>{h}</option>)}
@@ -534,13 +534,13 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
 
                     {/* Cost Per Person mapping */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                      <label className="text-xs font-bold text-inkmute uppercase tracking-wider">
                         Cost Per Person (ROI)
                       </label>
                       <select 
                         value={mapping.costPerPerson}
                         onChange={(e) => setMapping({ ...mapping, costPerPerson: e.target.value })}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full px-3 py-2 bg-surface border border-hairline rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
                       >
                         <option value="">-- Auto-calculate from cost/people --</option>
                         {headers.map(h => <option key={h} value={h}>{h}</option>)}
@@ -549,21 +549,21 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
 
                     {/* Import mode */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                      <label className="text-xs font-bold text-inkmute uppercase tracking-wider">
                         Import Strategy
                       </label>
-                      <div className="flex bg-white rounded-xl border border-slate-200 p-0.5 w-full">
+                      <div className="flex bg-surface rounded-xl border border-hairline p-0.5 w-full">
                         <button 
                           type="button"
                           onClick={() => setImportMode('append')}
-                          className={`flex-1 py-1 px-3 text-xs font-bold rounded-lg transition-all ${importMode === 'append' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
+                          className={`flex-1 py-1 px-3 text-xs font-bold rounded-lg transition-all ${importMode === 'append' ? 'bg-indigo-600 text-white shadow-sm' : 'text-inkmute hover:bg-ink/50'}`}
                         >
                           Append
                         </button>
                         <button 
                           type="button"
                           onClick={() => setImportMode('replace')}
-                          className={`flex-1 py-1 px-3 text-xs font-bold rounded-lg transition-all ${importMode === 'replace' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
+                          className={`flex-1 py-1 px-3 text-xs font-bold rounded-lg transition-all ${importMode === 'replace' ? 'bg-indigo-600 text-white shadow-sm' : 'text-inkmute hover:bg-ink/50'}`}
                         >
                           Overwrite
                         </button>
@@ -575,11 +575,11 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                 {/* Grid Preview */}
                 {parsedPreview.length > 0 && (
                   <div className="space-y-2">
-                    <h5 className="font-bold text-slate-800 text-xs uppercase tracking-wider">Mapped Stream Preview ({parsedPreview.length} records)</h5>
-                    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm max-h-60 overflow-y-auto">
+                    <h5 className="font-bold text-parchment text-xs uppercase tracking-wider">Mapped Stream Preview ({parsedPreview.length} records)</h5>
+                    <div className="overflow-x-auto rounded-xl border border-hairline bg-surface shadow-sm max-h-60 overflow-y-auto">
                       <table className="w-full border-collapse text-left text-xs">
                         <thead>
-                          <tr className="bg-slate-50 border-b border-slate-100 font-bold text-slate-600">
+                          <tr className="bg-ink/50 border-b border-hairline/60 font-bold text-inkmute">
                             <th className="px-4 py-2.5">Name</th>
                             <th className="px-4 py-2.5">Month</th>
                             <th className="px-4 py-2.5 text-right">Beneficiaries Served</th>
@@ -587,14 +587,14 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                             <th className="px-4 py-2.5 text-right">Cost Per Person</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                        <tbody className="divide-y divide-hairline/60 font-medium text-parchment">
                           {parsedPreview.slice(0, 10).map((m, i) => (
-                            <tr key={i} className="hover:bg-slate-50/50">
-                              <td className="px-4 py-2.5 font-bold text-slate-800">{m.name}</td>
-                              <td className="px-4 py-2.5 text-slate-500">{m.month}</td>
+                            <tr key={i} className="hover:bg-ink/50">
+                              <td className="px-4 py-2.5 font-bold text-parchment">{m.name}</td>
+                              <td className="px-4 py-2.5 text-inkmute">{m.month}</td>
                               <td className="px-4 py-2.5 text-right">{m.peopleServed.toLocaleString()}</td>
                               <td className="px-4 py-2.5 text-right">${m.totalCost.toLocaleString()}</td>
-                              <td className="px-4 py-2.5 text-right font-bold text-indigo-600">${m.costPerPerson.toLocaleString()}</td>
+                              <td className="px-4 py-2.5 text-right font-bold text-indigo-300">${m.costPerPerson.toLocaleString()}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -604,10 +604,10 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                 )}
 
                 {/* Import Action Buttons */}
-                <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
+                <div className="flex items-center justify-end gap-3 border-t border-hairline/60 pt-4">
                   <button 
                     onClick={resetImporter}
-                    className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all"
+                    className="px-4 py-2 border border-hairline text-inkmute rounded-xl text-xs font-bold hover:bg-ink/50 transition-all"
                   >
                     Cancel / Discard
                   </button>
@@ -737,14 +737,14 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
 
       <FieldGroup icon={<TrendingUp />} title="Key Performance Indicators (SaaS KPIs)">
         {(stats.saasKpis || []).map((kpi, idx) => (
-          <div key={kpi.id} className="p-5 rounded-2xl border border-slate-100 bg-slate-50/50 space-y-4 col-span-1 md:col-span-2 lg:col-span-3">
-            <h5 className="font-bold text-slate-800 text-sm border-b border-slate-200/60 pb-2 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-brand-500"></span>
+          <div key={kpi.id} className="p-5 rounded-2xl border border-hairline/60 bg-ink/50 space-y-4 col-span-1 md:col-span-2 lg:col-span-3">
+            <h5 className="font-bold text-parchment text-sm border-b border-hairline/60 pb-2 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-teal"></span>
               {kpi.name}
             </h5>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Current Value</label>
+                <label className="text-xs font-bold text-inkmute uppercase tracking-wider">Current Value</label>
                 <input
                   type="text"
                   disabled={!permissions?.canEditMetrics}
@@ -756,11 +756,11 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                     newStats.saasKpis = newKpis;
                     onUpdate(newStats);
                   }}
-                  className={`w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
+                  className={`w-full px-4 py-2.5 bg-surface border border-hairline rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Percentage Change (%)</label>
+                <label className="text-xs font-bold text-inkmute uppercase tracking-wider">Percentage Change (%)</label>
                 <input
                   type="number"
                   step="0.1"
@@ -773,11 +773,11 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                     newStats.saasKpis = newKpis;
                     onUpdate(newStats);
                   }}
-                  className={`w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
+                  className={`w-full px-4 py-2.5 bg-surface border border-hairline rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Brief Explanation</label>
+                <label className="text-xs font-bold text-inkmute uppercase tracking-wider">Brief Explanation</label>
                 <input
                   type="text"
                   disabled={!permissions?.canEditMetrics}
@@ -789,7 +789,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                     newStats.saasKpis = newKpis;
                     onUpdate(newStats);
                   }}
-                  className={`w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
+                  className={`w-full px-4 py-2.5 bg-surface border border-hairline rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
                 />
               </div>
             </div>
@@ -797,13 +797,13 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
         ))}
       </FieldGroup>
 
-      <div className="bg-blue-50 border border-blue-100 rounded-2xl p-6 flex gap-4">
+      <div className="bg-blue-500/10 border border-blue-500/25 rounded-2xl p-6 flex gap-4">
         <div className="bg-blue-500 text-white p-3 rounded-xl h-fit">
           <Database size={24} />
         </div>
         <div>
           <h4 className="font-bold text-blue-900 mb-1">Data Entry Checklist</h4>
-          <p className="text-sm text-blue-800 leading-relaxed max-w-2xl">
+          <p className="text-sm text-blue-200 leading-relaxed max-w-2xl">
             To generate a high-quality **Grant Readiness Report**, ensure you have entered verified outcomes and financial efficiency ratios. AI analysis performs best when 'Outcomes' and 'Benchmark' fields match your internal audit documents.
           </p>
         </div>

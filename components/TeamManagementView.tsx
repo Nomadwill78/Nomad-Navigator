@@ -59,15 +59,15 @@ export const TeamManagementView: React.FC = () => {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Users className="text-brand-500" /> Team Management
+          <h2 className="text-2xl font-bold text-ivory flex items-center gap-2">
+            <Users className="text-teal" /> Team Management
           </h2>
-          <p className="text-slate-500">Manage your organization's users and permissions. (Limit: 8 users)</p>
+          <p className="text-inkmute">Manage your organization's users and permissions. (Limit: 8 users)</p>
         </div>
         {role === 'admin' && members.length < 8 && (
           <button 
             onClick={() => setIsInviteModalOpen(true)}
-            className="bg-brand-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-brand-700 transition-all shadow-lg shadow-brand-500/20"
+            className="bg-gradient-to-b from-brassbright to-brass text-[#26200e] px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:brightness-105 transition-all shadow-lg shadow-brass/25"
           >
             <UserPlus size={18} /> Invite Colleague
           </button>
@@ -75,43 +75,43 @@ export const TeamManagementView: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
+         <div className="bg-surface p-6 rounded-3xl border border-hairline shadow-sm relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-10">
-               <Users size={64} className="text-slate-900" />
+               <Users size={64} className="text-ivory" />
             </div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Seats Used</p>
-            <p className="text-3xl font-black text-slate-900">{members.length} <span className="text-slate-300 text-xl">/ 8</span></p>
-            <div className="mt-4 h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+            <p className="text-xs font-bold text-inkfaint uppercase tracking-widest mb-1">Seats Used</p>
+            <p className="text-3xl font-black text-ivory">{members.length} <span className="text-inkfaint text-xl">/ 8</span></p>
+            <div className="mt-4 h-2 w-full bg-white/5 rounded-full overflow-hidden">
                <div 
-                 className="h-full bg-brand-500 transition-all duration-500" 
+                 className="h-full bg-teal transition-all duration-500" 
                  style={{ width: `${(members.length / 8) * 100}%` }}
                />
             </div>
          </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden text-sm">
+      <div className="bg-surface rounded-3xl border border-hairline shadow-sm overflow-hidden text-sm">
         <table className="w-full text-left">
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-[10px]">User</th>
-              <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-[10px]">Role</th>
-              <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-[10px]">Status</th>
-              <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-[10px]">Joined</th>
-              {role === 'admin' && <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-[10px] text-right">Actions</th>}
+            <tr className="bg-ink/50 border-b border-hairline">
+              <th className="px-6 py-4 font-bold text-inkmute uppercase tracking-wider text-[10px]">User</th>
+              <th className="px-6 py-4 font-bold text-inkmute uppercase tracking-wider text-[10px]">Role</th>
+              <th className="px-6 py-4 font-bold text-inkmute uppercase tracking-wider text-[10px]">Status</th>
+              <th className="px-6 py-4 font-bold text-inkmute uppercase tracking-wider text-[10px]">Joined</th>
+              {role === 'admin' && <th className="px-6 py-4 font-bold text-inkmute uppercase tracking-wider text-[10px] text-right">Actions</th>}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-hairline/60">
             {members.map((member, i) => (
-              <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+              <tr key={i} className="hover:bg-ink/50 transition-colors">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center font-bold text-xs">
+                    <div className="w-8 h-8 bg-teal/10 text-teal rounded-full flex items-center justify-center font-bold text-xs">
                       {member.email.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <p className="font-bold text-slate-900">{member.email}</p>
-                      <p className="text-[10px] text-slate-400 font-medium">{member.userId ? 'Active' : 'Pending Invitation'}</p>
+                      <p className="font-bold text-ivory">{member.email}</p>
+                      <p className="text-[10px] text-inkfaint font-medium">{member.userId ? 'Active' : 'Pending Invitation'}</p>
                     </div>
                   </div>
                 </td>
@@ -120,7 +120,7 @@ export const TeamManagementView: React.FC = () => {
                     <select 
                       value={member.role}
                       onChange={(e) => updateMemberRole((member as any).docId, e.target.value as UserRole)}
-                      className="bg-transparent text-[10px] font-bold uppercase tracking-wider text-slate-600 outline-none hover:text-brand-500 cursor-pointer"
+                      className="bg-transparent text-[10px] font-bold uppercase tracking-wider text-inkmute outline-none hover:text-teal cursor-pointer"
                     >
                       {(['admin', 'grant_coordinator', 'impact_analyst', 'compliance_officer', 'data_entry', 'viewer'] as UserRole[]).map(r => (
                         <option key={r} value={r}>{r.replace('_', ' ')}</option>
@@ -128,24 +128,24 @@ export const TeamManagementView: React.FC = () => {
                     </select>
                   ) : (
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                      member.role === 'admin' ? 'bg-purple-50 text-purple-600' :
-                      member.role === 'grant_coordinator' ? 'bg-blue-50 text-blue-600' :
-                      member.role === 'impact_analyst' ? 'bg-emerald-50 text-emerald-600' :
-                      member.role === 'compliance_officer' ? 'bg-amber-50 text-amber-600' :
-                      member.role === 'data_entry' ? 'bg-slate-100 text-slate-600' :
-                      'bg-slate-50 text-slate-400'
+                      member.role === 'admin' ? 'bg-purple-500/10 text-purple-300' :
+                      member.role === 'grant_coordinator' ? 'bg-blue-500/10 text-blue-300' :
+                      member.role === 'impact_analyst' ? 'bg-emerald-500/10 text-emerald-300' :
+                      member.role === 'compliance_officer' ? 'bg-amber-500/10 text-amber-300' :
+                      member.role === 'data_entry' ? 'bg-white/5 text-inkmute' :
+                      'bg-ink/50 text-inkfaint'
                     }`}>
                       {member.role.replace('_', ' ')}
                     </span>
                   )}
                 </td>
                 <td className="px-6 py-4">
-                   <div className="flex items-center gap-1.5 text-slate-500">
+                   <div className="flex items-center gap-1.5 text-inkmute">
                       {member.userId ? <CheckCircle2 size={14} className="text-green-500" /> : <div className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse" />}
                       <span className="text-xs font-medium">{member.userId ? 'Verified' : 'Pending'}</span>
                    </div>
                 </td>
-                <td className="px-6 py-4 text-slate-500 font-medium">
+                <td className="px-6 py-4 text-inkmute font-medium">
                   {new Date(member.joinedAt).toLocaleDateString()}
                 </td>
                 {role === 'admin' && (
@@ -153,7 +153,7 @@ export const TeamManagementView: React.FC = () => {
                     {member.userId !== user?.uid && member.userId !== organization?.creatorId && (
                       <button 
                         onClick={() => handleDeleteMember((member as any).docId)}
-                        className="text-slate-300 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-50"
+                        className="text-inkfaint hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-500/10"
                       >
                         <Trash2 size={16} />
                       </button>
@@ -167,28 +167,28 @@ export const TeamManagementView: React.FC = () => {
       </div>
 
       {isInviteModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-          <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
-            <h3 className="text-2xl font-black text-slate-900 mb-2">Invite Collaborator</h3>
-            <p className="text-slate-500 text-sm mb-8">Role-based access ensures data integrity for your donors.</p>
+        <div className="fixed inset-0 bg-abyss/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+          <div className="bg-surface rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
+            <h3 className="text-2xl font-black text-ivory mb-2">Invite Collaborator</h3>
+            <p className="text-inkmute text-sm mb-8">Role-based access ensures data integrity for your donors.</p>
             
             <div className="space-y-6">
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Email Address</label>
+                <label className="text-[10px] font-bold text-inkfaint uppercase tracking-widest block mb-1.5">Email Address</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-inkfaint" size={16} />
                   <input 
                     type="email"
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
                     placeholder="teammate@example.com"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                    className="w-full pl-10 pr-4 py-2.5 bg-ink/50 border border-hairline rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Permission Role</label>
+                <label className="text-[10px] font-bold text-inkfaint uppercase tracking-widest block mb-1.5">Permission Role</label>
                 <div className="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
                   {(['admin', 'grant_coordinator', 'impact_analyst', 'compliance_officer', 'data_entry', 'viewer'] as UserRole[]).map((r) => (
                     <button 
@@ -196,14 +196,14 @@ export const TeamManagementView: React.FC = () => {
                       onClick={() => setInviteRole(r)}
                       className={`p-3 rounded-xl border text-left transition-all ${
                         inviteRole === r 
-                          ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500' 
-                          : 'border-slate-200 hover:border-slate-300'
+                          ? 'border-brand-500 bg-teal/10 ring-1 ring-brand-500' 
+                          : 'border-hairline hover:border-hairline'
                       }`}
                     >
-                      <p className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 ${inviteRole === r ? 'text-brand-600' : 'text-slate-600'}`}>
+                      <p className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 ${inviteRole === r ? 'text-teal' : 'text-inkmute'}`}>
                         {r.replace('_', ' ')}
                       </p>
-                      <p className="text-[9px] text-slate-400 leading-tight">
+                      <p className="text-[9px] text-inkfaint leading-tight">
                         {r === 'admin' ? 'Full system administration' : 
                          r === 'grant_coordinator' ? 'Manage grant lifecycle' :
                          r === 'impact_analyst' ? 'Manage impact metrics' :
@@ -218,14 +218,14 @@ export const TeamManagementView: React.FC = () => {
               <div className="flex gap-4 pt-4">
                 <button 
                   onClick={() => setIsInviteModalOpen(false)}
-                  className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold hover:bg-slate-200 transition-all"
+                  className="flex-1 bg-white/5 text-inkmute py-3 rounded-xl font-bold hover:bg-white/10 transition-all"
                 >
                   Cancel
                 </button>
                 <button 
                   onClick={handleInvite}
                   disabled={!inviteEmail.trim()}
-                  className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition-all disabled:opacity-50"
+                  className="flex-1 bg-abyss text-white py-3 rounded-xl font-bold hover:bg-surface2 transition-all disabled:opacity-50"
                 >
                   Send Invite
                 </button>
