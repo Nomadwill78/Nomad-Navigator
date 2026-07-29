@@ -1,7 +1,96 @@
 import React, { useState } from 'react';
-import { Activity, ShieldCheck, Zap, Globe, Sparkles, Mail, Lock, LogIn, UserPlus, AlertCircle } from 'lucide-react';
+import { Mail, Lock, ShieldCheck, AlertCircle } from 'lucide-react';
 import { useAuth } from '../src/contexts/AuthContext';
-import { BrandLogo } from './BrandLogo';
+import './LoginView.css';
+
+const C = 130; // compass center
+
+function rot(deg: number, x: number, y: number): [number, number] {
+  const r = (deg * Math.PI) / 180;
+  const dx = x - C;
+  const dy = y - C;
+  return [C + dx * Math.cos(r) - dy * Math.sin(r), C + dx * Math.sin(r) + dy * Math.cos(r)];
+}
+
+const pts = (arr: [number, number][]) => arr.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+
+const CompassRose: React.FC = () => {
+  // graduated degree ring: a tick every 5°, longest at the cardinals
+  const ticks = Array.from({ length: 72 }, (_, i) => {
+    const ang = i * 5;
+    const isCardinal = i % 18 === 0;
+    const isMajor = i % 9 === 0;
+    const isMed = i % 3 === 0;
+    const inner = isCardinal ? 96 : isMajor ? 100 : isMed ? 104 : 106;
+    const [x1, y1] = rot(ang, C, C - 112);
+    const [x2, y2] = rot(ang, C, C - inner);
+    return { x1, y1, x2, y2, cls: isCardinal ? 'lv-tick-c' : isMajor ? 'lv-tick-mj' : 'lv-tick' };
+  });
+
+  // primary 4-point star — each cardinal split into a dark/light half (engraved look)
+  const cardinals = [0, 90, 180, 270].map((a) => {
+    const tip = rot(a, C, C - 92);
+    const bl = rot(a, C - 9, C - 20);
+    const br = rot(a, C + 9, C - 20);
+    const ctr: [number, number] = [C, C];
+    return { dark: pts([tip, bl, ctr]), light: pts([tip, br, ctr]) };
+  });
+
+  // secondary diagonal points — thin brass kites behind
+  const diagonals = [45, 135, 225, 315].map((a) => {
+    const tip = rot(a, C, C - 60);
+    const bl = rot(a, C - 6, C - 16);
+    const br = rot(a, C + 6, C - 16);
+    return pts([tip, br, [C, C], bl]);
+  });
+
+  const letters: [string, number, boolean][] = [['N', 0, true], ['E', 90, false], ['S', 180, false], ['W', 270, false]];
+
+  return (
+    <svg className="lv-compass" viewBox="0 0 260 260" role="img" aria-label="Compass rose">
+      <circle className="lv-ring-soft" cx={C} cy={C} r={118} />
+      <circle className="lv-ring" cx={C} cy={C} r={112} />
+      <circle className="lv-ring-soft" cx={C} cy={C} r={70} />
+
+      {ticks.map((t, i) => (
+        <line key={i} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} className={t.cls} strokeLinecap="round" />
+      ))}
+
+      {letters.map(([ch, a, isN]) => {
+        const [lx, ly] = rot(a, C, C - 122);
+        return (
+          <text key={ch} x={lx} y={ly + 4} textAnchor="middle" className={`lv-card-l ${isN ? 'lv-card-n' : ''}`}>
+            {ch}
+          </text>
+        );
+      })}
+
+      {diagonals.map((d, i) => (
+        <polygon key={`d${i}`} points={d} className="lv-star-diag" />
+      ))}
+      {cardinals.map((s, i) => (
+        <g key={`c${i}`}>
+          <polygon points={s.dark} className="lv-star-dark" />
+          <polygon points={s.light} className="lv-star-light" />
+        </g>
+      ))}
+
+      {/* magnetic needle — settles to true north on load */}
+      <g className="lv-needle">
+        <polygon points={pts([[C, C - 80], [C - 6, C], [C + 6, C]])} className="lv-needle-n" />
+        <polygon points={pts([[C, C + 80], [C - 6, C], [C + 6, C]])} className="lv-needle-s" />
+      </g>
+      <circle className="lv-hub-outer" cx={C} cy={C} r={7} />
+      <circle className="lv-hub-inner" cx={C} cy={C} r={3} />
+
+      {/* true-north marker */}
+      <polygon
+        points={pts([[C, 6], [C + 3.5, 15], [C, 24], [C - 3.5, 15]])}
+        className="lv-north-star"
+      />
+    </svg>
+  );
+};
 
 export const LoginView: React.FC = () => {
   const { login, loginWithEmail, registerWithEmail } = useAuth();
@@ -30,140 +119,155 @@ export const LoginView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      {/* Background elements */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-brand-500/10 rounded-full blur-[125px] -translate-y-1/2 translate-x-1/2"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-500/10 rounded-full blur-[125px] translate-y-1/2 -translate-x-1/2"></div>
-      
-      <div className="max-w-md w-full relative z-10 text-center text-slate-100">
-        <div className="flex flex-col items-center justify-center mb-10">
-          <BrandLogo size={64} showText={true} textPosition="bottom" variant="light" className="mb-2" />
-          <h1 className="text-3xl font-extrabold text-white mt-4 mb-2 tracking-tight">Compass</h1>
-          <p className="text-slate-400 text-sm max-w-sm">The AI-powered impact intelligence platform for modern nonprofits.</p>
+    <div className="lv-root">
+      {/* LEFT — the instrument */}
+      <section className="lv-hero">
+        <div className="lv-brand">
+          <svg className="lv-brand-mark" viewBox="0 0 100 100" fill="none" stroke="#f1e9d6" aria-hidden="true">
+            <circle cx="50" cy="50" r="30" strokeWidth="2" opacity="0.5" />
+            <polygon points="50,18 55,50 50,82 45,50" fill="#cba85c" stroke="none" />
+            <polygon points="18,50 50,45 82,50 50,55" fill="#f1e9d6" stroke="none" opacity="0.7" />
+            <circle cx="50" cy="50" r="4" fill="#0a1a30" stroke="#cba85c" strokeWidth="1.5" />
+          </svg>
+          <div>
+            <div className="lv-brand-name">NOMAD <span>COMPASS</span></div>
+            <div className="lv-brand-sub">by Nomad Consulting</div>
+          </div>
         </div>
-        
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
+
+        <div className="lv-hero-mid">
+          <span className="lv-eyebrow">Impact intelligence · for nonprofits</span>
+          <h1 className="lv-headline">
+            Steer your mission by the <em>numbers that matter.</em>
+          </h1>
+          <p className="lv-sub">
+            Nomad Compass turns scattered program data into a clear read on your impact,
+            your funding, and the one move that should come next.
+          </p>
+
+          <div className="lv-bearings">
+            <div className="lv-bearing">
+              <span className="lv-bearing-deg">N&nbsp;000°</span>
+              <span className="lv-bearing-key">Impact</span>
+              <span className="lv-bearing-val">Lives improved, tracked program by program.</span>
+            </div>
+            <div className="lv-bearing">
+              <span className="lv-bearing-deg">E&nbsp;090°</span>
+              <span className="lv-bearing-key">Funding</span>
+              <span className="lv-bearing-val">Every dollar allocated, and visible.</span>
+            </div>
+            <div className="lv-bearing">
+              <span className="lv-bearing-deg">W&nbsp;270°</span>
+              <span className="lv-bearing-key">Direction</span>
+              <span className="lv-bearing-val">AI reads the data and points to your next step.</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="lv-compass-wrap" aria-hidden="true">
+          <CompassRose />
+        </div>
+      </section>
+
+      {/* RIGHT — the cartouche sign-in */}
+      <section className="lv-panel">
+        <div className="lv-cartouche">
+          <span className="lv-corner tl" /><span className="lv-corner tr" />
+          <span className="lv-corner bl" /><span className="lv-corner br" />
+
+          <div className="lv-panel-eyebrow">{method === 'email' ? (view === 'login' ? 'Return to your chart' : 'Register your organization') : 'Set your bearing'}</div>
+          <h2 className="lv-panel-title">
+            {method === 'email'
+              ? (view === 'login' ? 'Sign in to your dashboard' : 'Create your account')
+              : 'Welcome to Compass'}
+          </h2>
+
           {error && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-3 text-left">
-              <AlertCircle className="text-red-500 shrink-0" size={18} />
-              <p className="text-xs text-red-200 font-medium">{error}</p>
+            <div className="lv-error">
+              <AlertCircle size={16} className="shrink-0" style={{ color: '#e0897d' }} />
+              <p>{error}</p>
             </div>
           )}
 
           {method === 'choice' ? (
-            <div className="space-y-4">
-              <button 
-                onClick={login}
-                className="w-full bg-white text-slate-900 py-4 rounded-2xl font-black text-sm hover:bg-slate-100 transition-all active:scale-95 shadow-xl flex items-center justify-center gap-3"
-              >
-                <Globe size={18} className="text-brand-500" />
+            <div className="lv-stack">
+              <button className="lv-btn lv-btn-google" onClick={login}>
+                <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.56c2.08-1.92 3.28-4.74 3.28-8.09Z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.98.66-2.24 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z" />
+                  <path fill="#FBBC05" d="M5.84 14.11a6.6 6.6 0 0 1 0-4.22V7.05H2.18a11 11 0 0 0 0 9.9l3.66-2.84Z" />
+                  <path fill="#EA4335" d="M12 4.75c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 1.44 14.97.5 12 .5A11 11 0 0 0 2.18 7.05l3.66 2.84C6.71 6.68 9.14 4.75 12 4.75Z" />
+                </svg>
                 Continue with Google
               </button>
-              
-              <div className="relative py-2">
-                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
-                <div className="relative flex justify-center text-xs uppercase"><span className="bg-slate-900 px-4 text-slate-500 font-bold tracking-widest">or</span></div>
-              </div>
 
-              <button 
-                onClick={() => setMethod('email')}
-                className="w-full bg-white/5 text-white border border-white/10 py-4 rounded-2xl font-bold text-sm hover:bg-white/10 transition-all active:scale-95 flex items-center justify-center gap-3"
-              >
-                <Mail size={18} className="text-brand-400" />
-                Continue with Email
+              <div className="lv-or"><span>or</span></div>
+
+              <button className="lv-btn lv-btn-ghost" onClick={() => setMethod('email')}>
+                <Mail size={17} />
+                Continue with email
               </button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4 text-left">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-white capitalize">{view}</h2>
-                <button 
-                  type="button"
-                  onClick={() => setMethod('choice')}
-                  className="text-xs font-bold text-brand-400 hover:text-brand-300"
-                >
-                  Back to options
+            <form className="lv-form" onSubmit={handleSubmit}>
+              <div className="lv-form-head">
+                <button type="button" className="lv-back" onClick={() => setMethod('choice')}>
+                  ← All options
                 </button>
               </div>
 
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">Email Address</label>
-                <div className="relative group">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-brand-400 transition-colors" size={16} />
-                  <input 
+              <div className="lv-field">
+                <label htmlFor="lv-email">Email address</label>
+                <div className="lv-input-wrap">
+                  <Mail size={16} />
+                  <input
+                    id="lv-email"
+                    className="lv-input"
                     type="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all"
                     placeholder="name@organization.org"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">Password</label>
-                <div className="relative group">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-brand-400 transition-colors" size={16} />
-                  <input 
+              <div className="lv-field">
+                <label htmlFor="lv-pass">Password</label>
+                <div className="lv-input-wrap">
+                  <Lock size={16} />
+                  <input
+                    id="lv-pass"
+                    className="lv-input"
                     type="password"
                     required
                     minLength={6}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all"
                     placeholder="••••••••"
                   />
                 </div>
               </div>
 
-              <button 
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full bg-brand-600 text-white py-4 rounded-2xl font-black text-sm hover:bg-brand-500 transition-all active:scale-95 shadow-xl shadow-brand-600/20 flex items-center justify-center gap-3 mt-4 disabled:opacity-50"
-              >
-                {isSubmitting ? (
-                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <>
-                    {view === 'login' ? <LogIn size={18} /> : <UserPlus size={18} />}
-                    {view === 'login' ? 'Sign In' : 'Create Account'}
-                  </>
-                )}
+              <button type="submit" className="lv-btn lv-btn-primary" disabled={isSubmitting}>
+                {isSubmitting ? <span className="lv-spinner" /> : view === 'login' ? 'Sign in' : 'Create account'}
               </button>
 
-              <div className="text-center mt-6">
-                <button 
-                  type="button"
-                  onClick={() => setView(view === 'login' ? 'register' : 'login')}
-                  className="text-xs font-medium text-slate-400 hover:text-white transition-colors"
-                >
-                  {view === 'login' ? "Don't have an account? " : "Already have an account? "}
-                  <span className="text-brand-400 font-bold underline decoration-brand-400/30 underline-offset-4">
-                    {view === 'login' ? 'Create one' : 'Sign in'}
-                  </span>
+              <div className="lv-swap">
+                {view === 'login' ? "New to Compass? " : 'Already have an account? '}
+                <button type="button" onClick={() => setView(view === 'login' ? 'register' : 'login')}>
+                  {view === 'login' ? 'Create an account' : 'Sign in'}
                 </button>
               </div>
             </form>
           )}
 
-          <div className="mt-8 pt-8 border-t border-white/5 grid grid-cols-2 gap-4">
-             <div className="flex flex-col items-center gap-2">
-                <div className="p-2 bg-white/5 rounded-lg text-slate-400"><ShieldCheck size={16} /></div>
-                <p className="text-[10px] text-slate-500 font-medium">Secure Auth</p>
-             </div>
-             <div className="flex flex-col items-center gap-2">
-                <div className="p-2 bg-white/5 rounded-lg text-slate-400"><Sparkles size={16} /></div>
-                <p className="text-[10px] text-slate-500 font-medium">AI Insights</p>
-             </div>
+          <div className="lv-foot">
+            <ShieldCheck size={13} />
+            <span>Your impact data stays encrypted, always</span>
           </div>
-          
-          <p className="text-slate-500 text-[10px] mt-6 leading-relaxed">
-            By signing in, you agree to our Terms of Service and Privacy Policy. 
-            Nomad Compass uses institutional-grade encryption for all impact data.
-          </p>
         </div>
-      </div>
+      </section>
     </div>
   );
 };
