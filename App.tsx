@@ -459,27 +459,19 @@ const App: React.FC = () => {
     }
   }, [grants, isDemoMode]);
 
-  // Stripe Payment Handler
-  const handleStripePayment = async (amount: number = 2500) => {
-    try {
-      const response = await fetch('/api/create-checkout-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ amount }),
-      });
-      const data = await response.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        console.error('Failed to create checkout session:', data.error);
-        alert('Payment failed to initialize. Please try again.');
-      }
-    } catch (error) {
-      console.error('Payment error:', error);
-      alert('An error occurred. Please check your connection.');
+  // Stripe donation link. Opens a hosted Stripe Payment Link — no backend
+  // needed, so it works on the static Vercel deployment. Create the link in the
+  // Stripe Dashboard (Payment Links → let customers choose the amount) and paste
+  // its URL below. Until a real link is set, the button shows a friendly notice
+  // instead of a broken error.
+  const DONATION_LINK = 'https://buy.stripe.com/9B6fZjgOS3NSfWC5DQ8ww0e';
+
+  const handleStripePayment = () => {
+    if (DONATION_LINK.includes('REPLACE_WITH_YOUR_PAYMENT_LINK')) {
+      alert('Donations are being set up — thank you for your support! Please check back soon.');
+      return;
     }
+    window.location.href = DONATION_LINK;
   };
 
   // Toggle Demo Mode (Loads clean demo metrics of different size, doesn't rewrite persistent cache)
@@ -724,7 +716,7 @@ const App: React.FC = () => {
           
           <div className="px-3 pt-4 border-t border-slate-800/30 mt-4">
             <button 
-              onClick={() => handleStripePayment(5000)}
+              onClick={() => handleStripePayment()}
               className={`w-full group flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-widest transition-all duration-300 ${
                 isSidebarOpen 
                   ? 'bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 shadow-lg shadow-emerald-900/40 text-white' 
