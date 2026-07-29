@@ -12,8 +12,11 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react(), tailwindcss()],
       define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+        // Accept either GEMINI_API_KEY or VITE_GEMINI_API_KEY (the name set in
+        // Vercel). Without this, the key resolves empty at build time and the
+        // GoogleGenAI client throws "An API Key must be set", blanking the app.
+        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY),
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY)
       },
       resolve: {
         alias: {
