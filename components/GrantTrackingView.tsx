@@ -257,7 +257,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                 onClick={() => setSelectedGrantId(grant.id)}
                 className={`w-full text-left p-4 rounded-2xl border transition-all ${
                   selectedGrantId === grant.id 
-                    ? 'bg-surface border-brand-500 shadow-md ring-1 ring-brand-500/20' 
+                    ? 'bg-surface border-teal/40 shadow-md ring-1 ring-teal/25' 
                     : 'bg-surface border-hairline hover:border-hairline shadow-sm'
                 }`}
               >
@@ -481,7 +481,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                      type="text" 
                                      value={kpi.name}
                                      onChange={(e) => handleUpdateKPI(selectedGrant.id, kpi.id, { name: e.target.value })}
-                                     className="flex-1 bg-transparent font-bold text-parchment text-sm border-b border-transparent hover:border-hairline focus:border-brand-400 outline-none transition-colors"
+                                     className="flex-1 bg-transparent font-bold text-parchment text-sm border-b border-transparent hover:border-hairline focus:border-teal/40 outline-none transition-colors"
                                    />
                                    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${trend.bg} ${trend.color} text-[10px] font-bold uppercase tracking-wider`}>
                                      {trend.icon}
@@ -495,7 +495,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                        type="number" 
                                        value={kpi.current}
                                        onChange={(e) => handleUpdateKPI(selectedGrant.id, kpi.id, { current: parseInt(e.target.value) || 0 })}
-                                       className="w-full bg-transparent border-b border-hairline/60 hover:border-hairline focus:border-brand-400 focus:bg-surface px-2 py-1 text-sm font-bold text-parchment outline-none transition-all"
+                                       className="w-full bg-transparent border-b border-hairline/60 hover:border-hairline focus:border-teal/40 focus:bg-surface px-2 py-1 text-sm font-bold text-parchment outline-none transition-all"
                                      />
                                    </div>
                                  </div>
@@ -506,13 +506,13 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                        type="number" 
                                        value={kpi.target}
                                        onChange={(e) => handleUpdateKPI(selectedGrant.id, kpi.id, { target: parseInt(e.target.value) || 1 })}
-                                       className="w-24 bg-transparent border-b border-hairline/60 hover:border-hairline focus:border-brand-400 focus:bg-surface px-2 py-1 text-sm font-bold text-parchment outline-none transition-all"
+                                       className="w-24 bg-transparent border-b border-hairline/60 hover:border-hairline focus:border-teal/40 focus:bg-surface px-2 py-1 text-sm font-bold text-parchment outline-none transition-all"
                                      />
                                      <input 
                                        type="text" 
                                        value={kpi.unit}
                                        onChange={(e) => handleUpdateKPI(selectedGrant.id, kpi.id, { unit: e.target.value })}
-                                       className="flex-1 bg-transparent border-b border-hairline/60 hover:border-hairline focus:border-brand-400 focus:bg-surface px-2 py-1 text-sm font-bold text-parchment outline-none transition-all"
+                                       className="flex-1 bg-transparent border-b border-hairline/60 hover:border-hairline focus:border-teal/40 focus:bg-surface px-2 py-1 text-sm font-bold text-parchment outline-none transition-all"
                                      />
                                    </div>
                                  </div>

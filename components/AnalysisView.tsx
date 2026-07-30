@@ -198,7 +198,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ stats, grants }) => 
       {/* Insight Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
          {data.slice(0, 4).map((item, i) => (
-           <div key={i} className="bg-surface p-6 rounded-2xl border border-hairline shadow-sm flex flex-col justify-between group hover:border-brand-500 transition-all cursor-default">
+           <div key={i} className="bg-surface p-6 rounded-2xl border border-hairline shadow-sm flex flex-col justify-between group hover:border-teal/40 transition-all cursor-default">
               <div>
                 <p className="text-[10px] font-bold text-inkfaint uppercase tracking-widest mb-1">{item.name}</p>
                 <h4 className="text-2xl font-bold text-parchment tabular-nums">
@@ -217,7 +217,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ stats, grants }) => 
       <div className="bg-abyss text-white rounded-3xl p-8 flex items-start gap-6 relative overflow-hidden">
          <div className="absolute top-0 right-0 w-64 h-64 bg-teal/10 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2"></div>
          <div className="bg-surface2 p-4 rounded-2xl border border-slate-700">
-            <Info className="text-brand-400" size={24} />
+            <Info className="text-teal" size={24} />
          </div>
          <div className="relative z-10">
             <h4 className="font-bold text-lg mb-2">Analysis Calibration</h4>

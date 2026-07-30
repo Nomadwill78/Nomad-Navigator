@@ -32,7 +32,7 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
             <input 
               type="text" 
               placeholder="Search databases..."
-              className="pl-10 pr-4 py-2 bg-surface border border-hairline rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all w-64"
+              className="pl-10 pr-4 py-2 bg-surface border border-hairline rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal/25 transition-all w-64"
             />
           </div>
           <button className="bg-abyss text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-surface2 transition-all">
@@ -111,7 +111,7 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
           <div className="bg-abyss rounded-3xl p-6 text-white overflow-hidden relative shadow-2xl">
             <div className="relative z-10">
               <div className="bg-white/10 w-fit p-3 rounded-2xl mb-4 backdrop-blur-sm">
-                <TrendingUp size={24} className="text-brand-400" />
+                <TrendingUp size={24} className="text-teal" />
               </div>
               <h4 className="text-xl font-bold mb-2 tracking-tight">Strategy Intelligence</h4>
               <p className="text-inkfaint text-sm leading-relaxed mb-6">

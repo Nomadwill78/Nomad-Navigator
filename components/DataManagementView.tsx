@@ -346,7 +346,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
           value={value ?? ""}
           onChange={(e) => handleChange(path, type === 'number' ? parseFloat(e.target.value) : e.target.value)}
           placeholder={placeholder}
-          className={`w-full px-4 py-2.5 bg-ink/50 border border-hairline rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:bg-surface outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
+          className={`w-full px-4 py-2.5 bg-ink/50 border border-hairline rounded-xl text-sm focus:ring-2 focus:ring-teal/40 focus:bg-surface outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
         />
       </div>
     );
@@ -614,7 +614,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                   <button 
                     onClick={handleImport}
                     disabled={!mapping.name || !mapping.peopleServed || !mapping.totalCost}
-                    className={`flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold text-white shadow-md shadow-brand-500/10 transition-all ${
+                    className={`flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold text-white shadow-md shadow-brass/25 transition-all ${
                       (!mapping.name || !mapping.peopleServed || !mapping.totalCost)
                         ? 'bg-slate-300 cursor-not-allowed shadow-none'
                         : 'bg-indigo-600 hover:bg-indigo-700 hover:scale-[1.01] active:scale-[0.99]'
@@ -756,7 +756,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                     newStats.saasKpis = newKpis;
                     onUpdate(newStats);
                   }}
-                  className={`w-full px-4 py-2.5 bg-surface border border-hairline rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
+                  className={`w-full px-4 py-2.5 bg-surface border border-hairline rounded-xl text-sm focus:ring-2 focus:ring-teal/40 outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
                 />
               </div>
               <div className="space-y-1.5">
@@ -773,7 +773,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                     newStats.saasKpis = newKpis;
                     onUpdate(newStats);
                   }}
-                  className={`w-full px-4 py-2.5 bg-surface border border-hairline rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
+                  className={`w-full px-4 py-2.5 bg-surface border border-hairline rounded-xl text-sm focus:ring-2 focus:ring-teal/40 outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
                 />
               </div>
               <div className="space-y-1.5">
@@ -789,7 +789,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                     newStats.saasKpis = newKpis;
                     onUpdate(newStats);
                   }}
-                  className={`w-full px-4 py-2.5 bg-surface border border-hairline rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
+                  className={`w-full px-4 py-2.5 bg-surface border border-hairline rounded-xl text-sm focus:ring-2 focus:ring-teal/40 outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
                 />
               </div>
             </div>

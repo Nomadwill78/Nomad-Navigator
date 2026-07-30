@@ -182,7 +182,7 @@ export const TeamManagementView: React.FC = () => {
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
                     placeholder="teammate@example.com"
-                    className="w-full pl-10 pr-4 py-2.5 bg-ink/50 border border-hairline rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                    className="w-full pl-10 pr-4 py-2.5 bg-ink/50 border border-hairline rounded-xl text-sm focus:ring-2 focus:ring-teal/40 outline-none"
                   />
                 </div>
               </div>
@@ -196,7 +196,7 @@ export const TeamManagementView: React.FC = () => {
                       onClick={() => setInviteRole(r)}
                       className={`p-3 rounded-xl border text-left transition-all ${
                         inviteRole === r 
-                          ? 'border-brand-500 bg-teal/10 ring-1 ring-brand-500' 
+                          ? 'border-teal/40 bg-teal/10 ring-1 ring-teal/40' 
                           : 'border-hairline hover:border-hairline'
                       }`}
                     >

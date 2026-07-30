@@ -533,7 +533,7 @@ const App: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <Activity size={48} className="text-brand-500 animate-spin" />
+        <Activity size={48} className="text-teal animate-spin" />
       </div>
     );
   }
