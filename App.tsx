@@ -52,6 +52,7 @@ import { KpiSidebar } from './components/KpiSidebar';
 import { useAuth } from './src/contexts/AuthContext';
 import { generateImpactReport } from './services/geminiService';
 import { DashboardStats, ProgramMetric, Grant, Opportunity, ROLE_PERMISSIONS } from './types';
+import { Analytics } from '@vercel/analytics/react';
 
 // --- Colors & Gradients ---
 // Cartographic chart ramps — teal (impact), brass (funding), parchment (neutral)
@@ -1208,6 +1209,7 @@ const App: React.FC = () => {
         isLoading={isGeneratingReport}
       />
 
+      <Analytics />
     </div>
   );
 };
