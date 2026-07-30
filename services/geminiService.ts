@@ -1,53 +1,7 @@
-import { GoogleGenAI, Type } from "@google/genai";
-import { DashboardStats, AIAnalysisData, ReportFrequency } from "../types";
+import { GoogleGenAI } from "@google/genai";
+import { DashboardStats, ReportFrequency } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-export const generateDashboardInsights = async (data: DashboardStats): Promise<AIAnalysisData> => {
-  try {
-    const prompt = `
-      Analyze the following nonprofit dashboard data for "Nomad Compass". 
-      Provide strategic insights, risks, and recommendations.
-      
-      Data:
-      ${JSON.stringify(data)}
-    `;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            keyFindings: { type: Type.ARRAY, items: { type: Type.STRING } },
-            recommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
-            risks: { type: Type.ARRAY, items: { type: Type.STRING } },
-            trendAnalysis: { type: Type.STRING },
-            readinessScore: { type: Type.INTEGER, description: "Grant readiness score between 0 and 100" }
-          },
-          required: ["keyFindings", "recommendations", "risks", "trendAnalysis", "readinessScore"]
-        }
-      }
-    });
-
-    const text = response.text;
-    if (!text) throw new Error("No data returned");
-    
-    return JSON.parse(text) as AIAnalysisData;
-  } catch (error) {
-    console.error("Error generating insights:", error);
-    // Return fallback data if AI fails
-    return {
-      keyFindings: ["Data analysis unavailable at this moment.", "Please check connection."],
-      recommendations: ["Review manual reports."],
-      risks: ["Analysis incomplete."],
-      trendAnalysis: "Unable to calculate.",
-      readinessScore: 0
-    };
-  }
-};
 
 export const generateImpactReport = async (data: DashboardStats, frequency: ReportFrequency = 'quarterly'): Promise<string> => {
   try {

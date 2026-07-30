@@ -16,7 +16,6 @@ import {
   ShieldCheck,
   Scale,
   ArrowRight,
-  BrainCircuit,
   ChevronDown,
   Database,
   Download
@@ -40,7 +39,6 @@ import {
 } from 'recharts';
 import { StatCard } from './components/StatCard';
 import { ImpactReportModal } from './components/ImpactReportModal';
-import { AIInsightsPanel } from './components/AIInsightsPanel';
 import { DataManagementView } from './components/DataManagementView';
 import { GrantTrackingView } from './components/GrantTrackingView';
 import { AnalysisView } from './components/AnalysisView';
@@ -52,8 +50,8 @@ import { DemoModeBanner, DemoHint } from './components/DemoTour';
 import { BrandLogo } from './components/BrandLogo';
 import { KpiSidebar } from './components/KpiSidebar';
 import { useAuth } from './src/contexts/AuthContext';
-import { generateImpactReport, generateDashboardInsights } from './services/geminiService';
-import { DashboardStats, ProgramMetric, AIAnalysisData, Grant, Opportunity, ROLE_PERMISSIONS } from './types';
+import { generateImpactReport } from './services/geminiService';
+import { DashboardStats, ProgramMetric, Grant, Opportunity, ROLE_PERMISSIONS } from './types';
 
 // --- Colors & Gradients ---
 // Cartographic chart ramps — teal (impact), brass (funding), parchment (neutral)
@@ -410,21 +408,6 @@ const App: React.FC = () => {
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [reportContent, setReportContent] = useState<string>("");
   
-  // AI Insights State with Offline Cache Fallback
-  const [showInsights, setShowInsights] = useState(true);
-  const [insights, setInsights] = useState<AIAnalysisData | null>(() => {
-    try {
-      const cached = localStorage.getItem('nomad_compass_insights');
-      if (cached) {
-        return JSON.parse(cached);
-      }
-    } catch (e) {
-      console.error('Failed to parse cached insights:', e);
-    }
-    return null;
-  });
-  const [isLoadingInsights, setIsLoadingInsights] = useState(false);
-
   // Connectivity Listeners to track network changes
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -494,28 +477,6 @@ const App: React.FC = () => {
     }
   }, [isDemoMode]);
 
-  const fetchInsights = async () => {
-    setIsLoadingInsights(true);
-    try {
-      const data = await generateDashboardInsights(stats);
-      setInsights(data);
-      // Cache insights in localStorage
-      localStorage.setItem('nomad_compass_insights', JSON.stringify(data));
-    } catch (e) {
-      console.error('Network analysis error, attempting to serve offline fallback:', e);
-      const cached = localStorage.getItem('nomad_compass_insights');
-      if (cached) {
-        setInsights(JSON.parse(cached));
-      }
-    } finally {
-      setIsLoadingInsights(false);
-    }
-  };
-
-  // Load AI Insights on mount and when stats update
-  useEffect(() => {
-    fetchInsights();
-  }, [stats]);
 
   // Handle Payment Success/Cancel Notifications
   useEffect(() => {
@@ -600,24 +561,6 @@ const App: React.FC = () => {
               icon={<LayoutDashboard size={20} />} 
               label="Impact Overview" 
               active={activeView === 'dashboard'} 
-              isOpen={isSidebarOpen} 
-              onClick={() => setActiveView('dashboard')}
-            />
-          )}
-
-          {isDemoMode ? (
-            <DemoHint text="Smart Insights Engine" position="right">
-              <NavItem 
-                icon={<BrainCircuit size={20} />} 
-                label="AI Analysis" 
-                isOpen={isSidebarOpen} 
-                onClick={() => setActiveView('dashboard')}
-              />
-            </DemoHint>
-          ) : (
-            <NavItem 
-              icon={<BrainCircuit size={20} />} 
-              label="AI Analysis" 
               isOpen={isSidebarOpen} 
               onClick={() => setActiveView('dashboard')}
             />
@@ -843,34 +786,6 @@ const App: React.FC = () => {
                   )}
 
                   {isDemoMode ? (
-                    <DemoHint text="AI-Driven Strategy" position="bottom">
-                      <button 
-                        onClick={() => setShowInsights(!showInsights)}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all ${
-                          showInsights
-                          ? 'bg-teal/12 text-teal border border-teal/30'
-                          : 'bg-surface text-inkmute border border-hairline hover:border-brass/50 hover:text-parchment'
-                        }`}
-                      >
-                        <BrainCircuit size={18} />
-                        {showInsights ? 'Hide AI Analysis' : 'Show AI Analysis'}
-                      </button>
-                    </DemoHint>
-                  ) : (
-                    <button 
-                      onClick={() => setShowInsights(!showInsights)}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all ${
-                        showInsights
-                        ? 'bg-teal/12 text-teal border border-teal/30'
-                        : 'bg-surface text-inkmute border border-hairline hover:border-brass/50 hover:text-parchment'
-                      }`}
-                    >
-                      <BrainCircuit size={18} />
-                      {showInsights ? 'Hide AI Analysis' : 'Show AI Analysis'}
-                    </button>
-                  )}
-
-                  {isDemoMode ? (
                     <DemoHint text="Grant-Ready Markdown" position="bottom">
                       <button 
                         onClick={handleGenerateReport}
@@ -922,11 +837,6 @@ const App: React.FC = () => {
                     </div>
                   </div>
               </div>
-
-              {/* AI Insights Section */}
-              {showInsights && (
-                <AIInsightsPanel data={insights} isLoading={isLoadingInsights} onRefresh={fetchInsights} />
-              )}
 
               {/* Core Metric Cards with Gradients */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-5 duration-700 delay-200">
