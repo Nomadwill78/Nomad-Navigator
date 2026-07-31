@@ -45,6 +45,7 @@ import { AnalysisView } from './components/AnalysisView';
 import { GrantDiscoveryView } from './components/GrantDiscoveryView';
 import { TeamManagementView } from './components/TeamManagementView';
 import { LoginView } from './components/LoginView';
+import { TrialSignupView } from './components/TrialSignupView';
 import { OnboardingView } from './components/OnboardingView';
 import { DemoModeBanner, DemoHint } from './components/DemoTour';
 import { BrandLogo } from './components/BrandLogo';
@@ -491,9 +492,16 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Public free-trial signup page — no login required
+  if (typeof window !== 'undefined' &&
+      (window.location.pathname.replace(/\/+$/, '') === '/free-trial' ||
+       new URLSearchParams(window.location.search).has('trial'))) {
+    return <TrialSignupView />;
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-ink flex items-center justify-center">
         <Activity size={48} className="text-teal animate-spin" />
       </div>
     );

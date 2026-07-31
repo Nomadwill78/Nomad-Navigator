@@ -95,5 +95,20 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && userId == request.auth.uid;
     }
+
+    // Public free-trial signups. Anyone may submit a request (create only);
+    // no one can read/edit/delete them via the app — the owner reads them in
+    // the Firebase console. Fields are size-bounded to limit abuse.
+    match /trial_signups/{signupId} {
+      allow create: if
+        incoming().keys().hasOnly(['name', 'email', 'org', 'useCase', 'status', 'createdAt']) &&
+        incoming().name is string && incoming().name.size() > 0 && incoming().name.size() < 120 &&
+        incoming().email is string && incoming().email.size() > 3 && incoming().email.size() < 200 &&
+        incoming().org is string && incoming().org.size() > 0 && incoming().org.size() < 200 &&
+        incoming().useCase is string && incoming().useCase.size() < 2000 &&
+        incoming().status == 'pending' &&
+        incoming().createdAt == request.time;
+      allow read, update, delete: if false;
+    }
   }
 }
