@@ -1,0 +1,6 @@
+# Solo-owner code ownership policy
+# Changes to any file require owner review once branch protection is enabled.
+* @Nomadwill78
+
+# Changes to automation and deployment workflows require explicit owner review.
+/.github/workflows/ @Nomadwill78
