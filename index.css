@@ -4,13 +4,6 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Fraunces", Georgia, serif;
   --font-mono2: "Space Mono", ui-monospace, monospace;
-  --color-brand-50: #f4f7fa;
-  --color-brand-100: #e2ebf4;
-  --color-brand-500: #1b365d;
-  --color-brand-600: #132747;
-  --color-brand-700: #0b1a33;
-  --color-brand-800: #0c1626;
-  --color-brand-900: #050d18;
 
   /* Cartographic instrument palette (shared with the sign-in) */
   --color-ink: #0a1a30;

@@ -57,11 +57,10 @@ import { DashboardStats, ProgramMetric, Grant, Opportunity, ROLE_PERMISSIONS } f
 // --- Colors & Gradients ---
 // Cartographic chart ramps — teal (impact), brass (funding), parchment (neutral)
 const COLORS = {
-  blue: ['#4fc4d3', '#6fd2de', '#9ae0e8', '#c4eef2'],
-  green: ['#4fc4d3', '#3faebd', '#2f8b98', '#256e78'],
-  purple: ['#cba85c', '#e7ce88', '#8fa6c4', '#5c7291'],
-  orange: ['#cba85c', '#e7ce88', '#b8905a', '#8a6d3f'],
-  slate: ['#6f86a6', '#93a6c2', '#b7c4d8', '#d8e0ec']
+  impact: ['#4fc4d3', '#6fd2de', '#9ae0e8', '#c4eef2'],
+  impactDeep: ['#4fc4d3', '#3faebd', '#2f8b98', '#256e78'],
+  funding: ['#cba85c', '#e7ce88', '#b8905a', '#8a6d3f'],
+  neutral: ['#6f86a6', '#93a6c2', '#b7c4d8', '#d8e0ec']
 };
 
 // --- Mock Data ---
@@ -923,7 +922,7 @@ const App: React.FC = () => {
                                 label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                               >
                                 {stats.demographics.age.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={COLORS.blue[index % COLORS.blue.length]} stroke="none" />
+                                  <Cell key={`cell-${index}`} fill={COLORS.impact[index % COLORS.impact.length]} stroke="none" />
                                 ))}
                               </Pie>
                               <Tooltip 
@@ -944,7 +943,7 @@ const App: React.FC = () => {
                       <div className="flex justify-center gap-4 flex-wrap">
                           {stats.demographics.age.map((item, i) => (
                               <div key={i} className="flex items-center gap-1.5">
-                                  <div className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS.blue[i]}}></div>
+                                  <div className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS.impact[i]}}></div>
                                   <span className="text-[10px] text-inkmute font-mono2 uppercase tracking-wide">{item.name}</span>
                               </div>
                           ))}
@@ -976,7 +975,7 @@ const App: React.FC = () => {
                                   />
                                   <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24}>
                                       {stats.demographics.race.map((entry, index) => (
-                                          <Cell key={`cell-${index}`} fill={COLORS.slate[index % COLORS.slate.length]} />
+                                          <Cell key={`cell-${index}`} fill={COLORS.neutral[index % COLORS.neutral.length]} />
                                       ))}
                                       <LabelList dataKey="value" position="right" style={{ fontSize: 10, fill: '#93a6c2', fontWeight: 700 }} />
                                   </Bar>
@@ -1081,7 +1080,7 @@ const App: React.FC = () => {
                               paddingAngle={5}
                             >
                               {stats.financials.spending.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS.green[index % COLORS.green.length]} stroke="none" />
+                                <Cell key={`cell-${index}`} fill={COLORS.impactDeep[index % COLORS.impactDeep.length]} stroke="none" />
                               ))}
                             </Pie>
                             <Tooltip 
@@ -1129,7 +1128,7 @@ const App: React.FC = () => {
                               paddingAngle={5}
                             >
                               {stats.financials.sources.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS.orange[index % COLORS.orange.length]} stroke="none" />
+                                <Cell key={`cell-${index}`} fill={COLORS.funding[index % COLORS.funding.length]} stroke="none" />
                               ))}
                             </Pie>
                             <Tooltip 

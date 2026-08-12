@@ -299,7 +299,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                     <h3 className="text-2xl font-bold text-ivory mb-1">{selectedGrant.name}</h3>
                     <div className="flex items-center gap-4 text-sm text-inkmute">
                         <span className="flex items-center gap-1.5"><DollarSign size={14} className="text-inkfaint" /> {selectedGrant.funder}</span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-inkfaint"></span>
                         <span className="flex items-center gap-1.5"><Calendar size={14} className="text-inkfaint" /> {selectedGrant.startDate} - {selectedGrant.endDate}</span>
                     </div>
                   </div>

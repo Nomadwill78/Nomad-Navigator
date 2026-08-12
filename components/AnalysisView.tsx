@@ -131,7 +131,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ stats, grants }) => 
       </div>
 
       {/* Main Analysis Card */}
-      <div className="bg-surface rounded-3xl border border-hairline shadow-xl shadow-slate-200/50 overflow-hidden">
+      <div className="bg-surface rounded-3xl border border-hairline shadow-xl shadow-abyss/50 overflow-hidden">
         <div className="p-8 border-b border-hairline/60 flex items-center justify-between">
            <div className="flex items-center gap-3">
               <div className="bg-gradient-to-b from-brassbright to-brass text-[#26200e] p-2.5 rounded-xl">
@@ -216,7 +216,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ stats, grants }) => 
       {/* Methodology Note */}
       <div className="bg-abyss text-white rounded-3xl p-8 flex items-start gap-6 relative overflow-hidden">
          <div className="absolute top-0 right-0 w-64 h-64 bg-teal/10 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2"></div>
-         <div className="bg-surface2 p-4 rounded-2xl border border-slate-700">
+         <div className="bg-surface2 p-4 rounded-2xl border border-hairline">
             <Info className="text-teal" size={24} />
          </div>
          <div className="relative z-10">

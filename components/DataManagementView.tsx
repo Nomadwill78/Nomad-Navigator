@@ -336,7 +336,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
             <Info size={14} className="text-inkfaint cursor-help hover:text-teal transition-colors" />
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-abyss text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl z-50">
               {tooltip}
-              <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900"></div>
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-abyss"></div>
             </div>
           </div>
         </div>
@@ -616,7 +616,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                     disabled={!mapping.name || !mapping.peopleServed || !mapping.totalCost}
                     className={`flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold text-white shadow-md shadow-brass/25 transition-all ${
                       (!mapping.name || !mapping.peopleServed || !mapping.totalCost)
-                        ? 'bg-slate-300 cursor-not-allowed shadow-none'
+                        ? 'bg-surface2 cursor-not-allowed shadow-none'
                         : 'bg-indigo-600 hover:bg-indigo-700 hover:scale-[1.01] active:scale-[0.99]'
                     }`}
                   >

@@ -120,11 +120,11 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
               <div className="space-y-3">
                 <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
                   <div className="w-1.5 h-1.5 bg-teal rounded-full animate-pulse" />
-                  <span className="text-xs font-medium text-slate-100">Top Funder: Bill & Melinda Gates</span>
+                  <span className="text-xs font-medium text-parchment">Top Funder: Bill & Melinda Gates</span>
                 </div>
                 <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
                    <div className="w-1.5 h-1.5 bg-teal rounded-full animate-pulse" />
-                   <span className="text-xs font-medium text-slate-100">Market Trend: Up 14%</span>
+                   <span className="text-xs font-medium text-parchment">Market Trend: Up 14%</span>
                 </div>
               </div>
             </div>
