@@ -127,13 +127,17 @@ export const TeamManagementView: React.FC = () => {
                       ))}
                     </select>
                   ) : (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                      member.role === 'admin' ? 'bg-purple-500/10 text-purple-300' :
-                      member.role === 'grant_coordinator' ? 'bg-blue-500/10 text-blue-300' :
-                      member.role === 'impact_analyst' ? 'bg-emerald-500/10 text-emerald-300' :
-                      member.role === 'compliance_officer' ? 'bg-amber-500/10 text-amber-300' :
-                      member.role === 'data_entry' ? 'bg-abyss text-inkmute' :
-                      'bg-ink/50 text-inkfaint'
+                    // Two Bearings Rule: teal for the impact role, brass for the money and
+                    // governance roles, neutral for the roles that hold no authority. Admin
+                    // is the lit face of brass — the only role that can manage the team and
+                    // delete grants.
+                    <span className={`px-2 py-0.5 rounded-full border text-[10px] font-mono2 font-bold uppercase tracking-[0.16em] ${
+                      member.role === 'admin' ? 'bg-brass/10 border-brass/25 text-brassbright' :
+                      member.role === 'grant_coordinator' ? 'bg-brass/10 border-brass/25 text-brass' :
+                      member.role === 'impact_analyst' ? 'bg-teal/10 border-teal/25 text-teal' :
+                      member.role === 'compliance_officer' ? 'bg-brass/10 border-brass/25 text-brass' :
+                      member.role === 'data_entry' ? 'bg-abyss border-hairline text-inkmute' :
+                      'bg-abyss border-hairline text-inkfaint'
                     }`}>
                       {member.role.replace('_', ' ')}
                     </span>
