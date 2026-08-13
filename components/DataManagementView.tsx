@@ -334,9 +334,9 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
           <label className="text-xs font-bold text-inkmute uppercase tracking-wider">{label}</label>
           <div className="group relative">
             <Info size={14} className="text-inkfaint cursor-help hover:text-teal transition-colors" />
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-abyss text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl z-50">
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-abyss text-ivory text-[10px] rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl z-50">
               {tooltip}
-              <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900"></div>
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-abyss"></div>
             </div>
           </div>
         </div>
@@ -394,7 +394,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
         <div className="bg-surface rounded-2xl border border-hairline shadow-sm overflow-hidden mb-6">
           <div className="p-4 border-b border-hairline/60 bg-ink/50 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-surface rounded-lg shadow-sm text-indigo-300">
+              <div className="p-2 bg-surface rounded-lg shadow-sm text-brassbright">
                 <Upload size={18} />
               </div>
               <div>
@@ -413,8 +413,8 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
 
           <div className="p-6">
             {successMessage && (
-              <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/25 text-emerald-200 text-sm rounded-xl flex items-center gap-3 animate-in fade-in duration-300">
-                <CheckCircle size={18} className="text-emerald-500 shrink-0" />
+              <div className="mb-6 p-4 bg-teal/10 border border-teal/25 text-teal text-sm rounded-xl flex items-center gap-3 animate-in fade-in duration-300">
+                <CheckCircle size={18} className="text-teal shrink-0" />
                 <span className="font-medium">{successMessage}</span>
               </div>
             )}
@@ -435,8 +435,8 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                 onClick={() => fileInputRef.current?.click()}
                 className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all duration-300 ${
                   dragActive 
-                    ? 'border-indigo-500 bg-indigo-500/10/50 scale-[0.99]' 
-                    : 'border-hairline hover:border-indigo-400 hover:bg-ink/50'
+                    ? 'border-brass bg-brass/10 scale-[0.99]' 
+                    : 'border-hairline hover:border-brass/50 hover:bg-ink/50'
                 }`}
               >
                 <input 
@@ -447,7 +447,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                   className="hidden"
                 />
                 <div className="p-4 bg-ink/50 rounded-full text-inkfaint group-hover:scale-110 transition-transform">
-                  <FileSpreadsheet size={32} className="text-indigo-500" />
+                  <FileSpreadsheet size={32} className="text-brass" />
                 </div>
                 <div className="text-center">
                   <p className="text-sm font-bold text-parchment">Drag & drop your CSV file here</p>
@@ -466,7 +466,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                       <h5 className="font-bold text-parchment text-sm">Header Mapping Configuration</h5>
                       <p className="text-xs text-inkmute mt-0.5">We found headers. Match them to the required Program Metric fields.</p>
                     </div>
-                    <div className="text-xs font-semibold bg-indigo-500/10 text-indigo-300 px-2.5 py-1 rounded-lg border border-indigo-500/25">
+                    <div className="text-xs font-semibold bg-brass/10 text-brassbright px-2.5 py-1 rounded-lg border border-brass/25">
                       File: {selectedFileName}
                     </div>
                   </div>
@@ -480,7 +480,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                       <select 
                         value={mapping.name}
                         onChange={(e) => setMapping({ ...mapping, name: e.target.value })}
-                        className="w-full px-3 py-2 bg-surface border border-hairline rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full px-3 py-2 bg-surface border border-hairline rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal/40 outline-none"
                       >
                         <option value="">-- Choose CSV Column --</option>
                         {headers.map(h => <option key={h} value={h}>{h}</option>)}
@@ -495,7 +495,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                       <select 
                         value={mapping.month}
                         onChange={(e) => setMapping({ ...mapping, month: e.target.value })}
-                        className="w-full px-3 py-2 bg-surface border border-hairline rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full px-3 py-2 bg-surface border border-hairline rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal/40 outline-none"
                       >
                         <option value="">-- Choose CSV Column --</option>
                         {headers.map(h => <option key={h} value={h}>{h}</option>)}
@@ -510,7 +510,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                       <select 
                         value={mapping.peopleServed}
                         onChange={(e) => setMapping({ ...mapping, peopleServed: e.target.value })}
-                        className="w-full px-3 py-2 bg-surface border border-hairline rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full px-3 py-2 bg-surface border border-hairline rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal/40 outline-none"
                       >
                         <option value="">-- Choose CSV Column --</option>
                         {headers.map(h => <option key={h} value={h}>{h}</option>)}
@@ -525,7 +525,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                       <select 
                         value={mapping.totalCost}
                         onChange={(e) => setMapping({ ...mapping, totalCost: e.target.value })}
-                        className="w-full px-3 py-2 bg-surface border border-hairline rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full px-3 py-2 bg-surface border border-hairline rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal/40 outline-none"
                       >
                         <option value="">-- Choose CSV Column --</option>
                         {headers.map(h => <option key={h} value={h}>{h}</option>)}
@@ -540,7 +540,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                       <select 
                         value={mapping.costPerPerson}
                         onChange={(e) => setMapping({ ...mapping, costPerPerson: e.target.value })}
-                        className="w-full px-3 py-2 bg-surface border border-hairline rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full px-3 py-2 bg-surface border border-hairline rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal/40 outline-none"
                       >
                         <option value="">-- Auto-calculate from cost/people --</option>
                         {headers.map(h => <option key={h} value={h}>{h}</option>)}
@@ -556,14 +556,14 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                         <button 
                           type="button"
                           onClick={() => setImportMode('append')}
-                          className={`flex-1 py-1 px-3 text-xs font-bold rounded-lg transition-all ${importMode === 'append' ? 'bg-indigo-600 text-white shadow-sm' : 'text-inkmute hover:bg-ink/50'}`}
+                          className={`flex-1 py-1 px-3 text-xs font-bold rounded-lg transition-all ${importMode === 'append' ? 'bg-gradient-to-b from-brassbright to-brass text-[#26200e]' : 'text-inkmute hover:bg-ink/50'}`}
                         >
                           Append
                         </button>
                         <button 
                           type="button"
                           onClick={() => setImportMode('replace')}
-                          className={`flex-1 py-1 px-3 text-xs font-bold rounded-lg transition-all ${importMode === 'replace' ? 'bg-indigo-600 text-white shadow-sm' : 'text-inkmute hover:bg-ink/50'}`}
+                          className={`flex-1 py-1 px-3 text-xs font-bold rounded-lg transition-all ${importMode === 'replace' ? 'bg-gradient-to-b from-brassbright to-brass text-[#26200e]' : 'text-inkmute hover:bg-ink/50'}`}
                         >
                           Overwrite
                         </button>
@@ -594,7 +594,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                               <td className="px-4 py-2.5 text-inkmute">{m.month}</td>
                               <td className="px-4 py-2.5 text-right">{m.peopleServed.toLocaleString()}</td>
                               <td className="px-4 py-2.5 text-right">${m.totalCost.toLocaleString()}</td>
-                              <td className="px-4 py-2.5 text-right font-bold text-indigo-300">${m.costPerPerson.toLocaleString()}</td>
+                              <td className="px-4 py-2.5 text-right font-bold text-brassbright">${m.costPerPerson.toLocaleString()}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -614,10 +614,10 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                   <button 
                     onClick={handleImport}
                     disabled={!mapping.name || !mapping.peopleServed || !mapping.totalCost}
-                    className={`flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold text-white shadow-md shadow-brass/25 transition-all ${
+                    className={`flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold transition-all ${
                       (!mapping.name || !mapping.peopleServed || !mapping.totalCost)
-                        ? 'bg-slate-300 cursor-not-allowed shadow-none'
-                        : 'bg-indigo-600 hover:bg-indigo-700 hover:scale-[1.01] active:scale-[0.99]'
+                        ? 'bg-surface2 text-inkfaint border border-hairline cursor-not-allowed'
+                        : 'bg-gradient-to-b from-brassbright to-brass text-[#26200e] shadow-lg shadow-brass/25 hover:brightness-105 active:scale-[0.98]'
                     }`}
                   >
                     Confirm & Stream Data
@@ -797,13 +797,13 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
         ))}
       </FieldGroup>
 
-      <div className="bg-blue-500/10 border border-blue-500/25 rounded-2xl p-6 flex gap-4">
-        <div className="bg-blue-500 text-white p-3 rounded-xl h-fit">
+      <div className="bg-teal/10 border border-teal/25 rounded-2xl p-6 flex gap-4">
+        <div className="bg-teal text-abyss p-3 rounded-xl h-fit">
           <Database size={24} />
         </div>
         <div>
-          <h4 className="font-bold text-blue-900 mb-1">Data Entry Checklist</h4>
-          <p className="text-sm text-blue-200 leading-relaxed max-w-2xl">
+          <h4 className="font-bold text-ivory mb-1">Data Entry Checklist</h4>
+          <p className="text-sm text-parchment leading-relaxed max-w-2xl">
             To generate a high-quality **Grant Readiness Report**, ensure you have entered verified outcomes and financial efficiency ratios. AI analysis performs best when 'Outcomes' and 'Benchmark' fields match your internal audit documents.
           </p>
         </div>

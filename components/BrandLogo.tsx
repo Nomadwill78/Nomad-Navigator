@@ -15,9 +15,10 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
   className = '',
   ...props
 }) => {
-  // Determine color matching logo
-  const textColor = variant === 'light' ? 'text-white' : variant === 'dark' ? 'text-slate-900' : 'text-[#1b365d]';
-  const logoColor = variant === 'light' ? 'white' : variant === 'dark' ? '#0f172a' : '#1b365d';
+  // Cartographic palette: parchment on the dark app ground, sea ink on light
+  // surfaces (print/export), brass when the mark stands alone. See DESIGN.md.
+  const textColor = variant === 'light' ? 'text-parchment' : variant === 'dark' ? 'text-ink' : 'text-brass';
+  const logoColor = variant === 'light' ? '#f1e9d6' : variant === 'dark' ? '#0a1a30' : '#cba85c';
 
   const logoSvg = (
     <svg
@@ -93,7 +94,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
         {logoSvg}
         <div className="text-center">
           <h2 className={`font-black tracking-widest text-[22px] font-sans ${textColor}`}>NOMAD</h2>
-          <p className={`text-[9px] font-semibold tracking-[0.25em] text-slate-400 uppercase`}>CONSULTING</p>
+          <p className={`text-[0.6rem] font-mono2 font-semibold tracking-[0.25em] text-inkfaint uppercase`}>CONSULTING</p>
         </div>
       </div>
     );
@@ -104,9 +105,9 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
       {logoSvg}
       <div className="flex flex-col text-left leading-none">
         <h2 className={`font-sans font-extrabold tracking-widest text-lg ${textColor}`}>
-          NOMAD <span className={variant === 'light' ? 'text-slate-300' : 'text-slate-400'}>COMPASS</span>
+          NOMAD <span className="text-brass">COMPASS</span>
         </h2>
-        <p className={`text-[8px] font-bold tracking-[0.3em] duration-300 text-slate-400 opacity-90`}>
+        <p className={`text-[0.6rem] font-mono2 font-bold tracking-[0.3em] text-inkfaint uppercase`}>
           BY NOMAD CONSULTING
         </p>
       </div>

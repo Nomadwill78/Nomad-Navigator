@@ -1,0 +1,248 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-11T13:00:00.000Z",
+  "title": "Design System: Nomad Compass",
+  "extensions": {
+    "colorMeta": {
+      "teal": {
+        "role": "primary",
+        "displayName": "Signal Teal",
+        "canonical": "#4fc4d3",
+        "tonalRamp": ["#0b2a2f", "#123f47", "#1a5760", "#25707c", "#2f8b98", "#4fc4d3", "#9ae0e8", "#dff5f8"]
+      },
+      "tealdim": {
+        "role": "primary",
+        "displayName": "Deep Teal",
+        "canonical": "#2f8b98",
+        "tonalRamp": ["#08181b", "#0f2c31", "#164048", "#1f5760", "#276f7a", "#2f8b98", "#6cb9c3", "#c3e4e9"]
+      },
+      "brass": {
+        "role": "secondary",
+        "displayName": "Lamplit Brass",
+        "canonical": "#cba85c",
+        "tonalRamp": ["#241c0b", "#3b2f13", "#54431c", "#6f5926", "#8a6d3f", "#b8905a", "#cba85c", "#f2e2ba"]
+      },
+      "brassbright": {
+        "role": "secondary",
+        "displayName": "Bright Brass",
+        "canonical": "#e7ce88",
+        "tonalRamp": ["#2a2210", "#43371a", "#5d4d25", "#7a6631", "#98803f", "#c0a45f", "#e7ce88", "#f7eed3"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Sea Ink",
+        "canonical": "#0a1a30",
+        "tonalRamp": ["#040b16", "#071322", "#0a1a30", "#0e2038", "#13294a", "#24405f", "#5c7291", "#93a6c2"]
+      },
+      "abyss": {
+        "role": "neutral",
+        "displayName": "Abyss",
+        "canonical": "#071322",
+        "tonalRamp": ["#02060c", "#040b16", "#071322", "#0a1a30", "#0e2038", "#13294a", "#1c3452", "#24405f"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Chart Surface",
+        "canonical": "#0e2038",
+        "tonalRamp": ["#050d18", "#071322", "#0a1a30", "#0e2038", "#13294a", "#1a3559", "#24405f", "#3a5878"]
+      },
+      "surface2": {
+        "role": "neutral",
+        "displayName": "Raised Surface",
+        "canonical": "#13294a",
+        "tonalRamp": ["#070f1c", "#0a1a30", "#0e2038", "#13294a", "#1a3559", "#24405f", "#3a5878", "#5c7291"]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#24405f",
+        "tonalRamp": ["#0a1220", "#13294a", "#1c3452", "#24405f", "#3a5878", "#5c7291", "#93a6c2", "#d8e0ec"]
+      },
+      "parchment": {
+        "role": "neutral",
+        "displayName": "Chart Parchment",
+        "canonical": "#f1e9d6",
+        "tonalRamp": ["#2b2618", "#453e28", "#605739", "#7d724c", "#9c8f65", "#c4b894", "#f1e9d6", "#faf6ec"]
+      },
+      "ivory": {
+        "role": "neutral",
+        "displayName": "Ivory",
+        "canonical": "#efeadd",
+        "tonalRamp": ["#29271e", "#433f30", "#5d5844", "#7a7359", "#9a9273", "#c2bba1", "#efeadd", "#f9f7f0"]
+      },
+      "inkmute": {
+        "role": "neutral",
+        "displayName": "Muted Ink",
+        "canonical": "#93a6c2",
+        "tonalRamp": ["#141d2b", "#213047", "#2f4363", "#405880", "#5c7291", "#7a8fad", "#93a6c2", "#d8e0ec"]
+      },
+      "inkfaint": {
+        "role": "neutral",
+        "displayName": "Faint Ink",
+        "canonical": "#7d92b3",
+        "tonalRamp": ["#141d2b", "#213047", "#2f4363", "#42597a", "#5c7291", "#7d92b3", "#a3b4cd", "#d8e0ec"]
+      },
+      "alert": {
+        "role": "tertiary",
+        "displayName": "Alert",
+        "canonical": "#d25a4e",
+        "tonalRamp": ["#2b100d", "#451a15", "#61251e", "#803129", "#a34036", "#d25a4e", "#e79086", "#f4c9c2"]
+      },
+      "alerttext": {
+        "role": "tertiary",
+        "displayName": "Alert Text",
+        "canonical": "#f4c9c2",
+        "tonalRamp": ["#2b100d", "#451a15", "#61251e", "#803129", "#a34036", "#d25a4e", "#e79086", "#f4c9c2"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Entry moments only — sign-in and trial headlines. Italic runs in Bright Brass." },
+      "headline": { "displayName": "Headline", "purpose": "The page title on a dashboard view." },
+      "title": { "displayName": "Title", "purpose": "Card and panel headings." },
+      "metric": { "displayName": "Metric", "purpose": "The number itself — stat values, KPI readouts, chart centers. Never falls back to the body font." },
+      "body": { "displayName": "Body", "purpose": "Descriptions and paragraph copy. Cap measure at 65–75ch." },
+      "label": { "displayName": "Label", "purpose": "Field labels, eyebrows, units, axis names, status text. Always uppercase, always tracked." }
+    },
+    "shadows": [
+      { "name": "cartouche-lift", "value": "0 40px 90px -40px rgba(0,0,0,0.8)", "purpose": "Documents of record that have left the plane — the sign-in cartouche, the trial card, modals." },
+      { "name": "brass-glow", "value": "0 12px 30px -14px rgba(203,168,92,0.55)", "purpose": "Warm halo beneath primary brass buttons at rest, so they read as lit metal." },
+      { "name": "brass-glow-hover", "value": "0 16px 36px -14px rgba(203,168,92,0.7)", "purpose": "Deepened glow on primary button hover." },
+      { "name": "chart-tooltip", "value": "0 18px 40px -18px rgba(0,0,0,0.7)", "purpose": "The dark Recharts tooltip, paired with a hairline border at 10px radius." }
+    ],
+    "motion": [
+      { "name": "ease-rise", "value": "cubic-bezier(0.2, 0.7, 0.2, 1)", "purpose": "Entrance easing for the staggered rise on sign-in (14px up, 0.7s, 50–60ms stagger)." },
+      { "name": "ease-settle", "value": "cubic-bezier(0.22, 1, 0.3, 1)", "purpose": "Damped overshoot for the compass needle settling on load (2.1s, -52° → 8° → -3° → 0°)." },
+      { "name": "duration-press", "value": "120ms", "purpose": "Button press compression to scale(0.98)." },
+      { "name": "duration-state", "value": "200ms", "purpose": "Color, border, and shadow state changes on controls." },
+      { "name": "duration-surface", "value": "300ms", "purpose": "Card border warming on hover and sidebar collapse." }
+    ],
+    "breakpoints": [
+      { "name": "sign-in-stack", "value": "900px" },
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "container-max", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Lit brass with dark brass-tinted text. Every committing action — generate report, request trial, sign in.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z\"/></svg>Generate Grant Report</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(180deg, #e7ce88, #cba85c); color: #26200e; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; font-weight: 600; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 12px 30px -14px rgba(203,168,92,0.55); transition: filter 200ms ease, box-shadow 200ms ease, transform 120ms ease; } .ds-btn-primary:hover { filter: brightness(1.05); box-shadow: 0 16px 36px -14px rgba(203,168,92,0.7); } .ds-btn-primary:active { transform: scale(0.98); } .ds-btn-primary:focus-visible { outline: 2px solid #cba85c; outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Chart Surface fill inside a hairline that warms toward brass on hover. Non-committing actions like export.",
+      "html": "<button class=\"ds-btn-secondary\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"7 10 12 15 17 10\"/><line x1=\"12\" y1=\"15\" x2=\"12\" y2=\"3\"/></svg>Export PDF</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; gap: 8px; background: #0e2038; color: #f1e9d6; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; padding: 10px 16px; border: 1px solid #24405f; border-radius: 8px; cursor: pointer; transition: background 200ms ease, border-color 200ms ease, transform 120ms ease; } .ds-btn-secondary svg { color: #93a6c2; } .ds-btn-secondary:hover { background: #13294a; border-color: rgba(203,168,92,0.5); } .ds-btn-secondary:active { transform: scale(0.98); } .ds-btn-secondary:focus-visible { outline: 2px solid #cba85c; outline-offset: 2px; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Transparent with a muted-ink border; hover brings a brass border over a faint brass wash.",
+      "html": "<button class=\"ds-btn-ghost\">Continue with email</button>",
+      "css": ".ds-btn-ghost { display: flex; width: 100%; align-items: center; justify-content: center; gap: 11px; background: transparent; color: #f1e9d6; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; font-size: 0.86rem; font-weight: 600; padding: 14px 16px; border: 1px solid rgba(147,166,194,0.28); border-radius: 7px; cursor: pointer; transition: background 200ms ease, border-color 200ms ease, transform 120ms ease; } .ds-btn-ghost:hover { border-color: #cba85c; background: rgba(203,168,92,0.06); } .ds-btn-ghost:active { transform: scale(0.98); } .ds-btn-ghost:focus-visible { outline: 2px solid #cba85c; outline-offset: 2px; }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Recessed well with a leading icon; focus turns both the border and the icon teal and adds a soft ring.",
+      "html": "<div class=\"ds-field\"><label for=\"ds-email\">Work email</label><div class=\"ds-input-wrap\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"2\" y=\"4\" width=\"20\" height=\"16\" rx=\"2\"/><path d=\"m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7\"/></svg><input id=\"ds-email\" type=\"email\" placeholder=\"jordan@yourorg.org\" /></div></div>",
+      "css": ".ds-field label { display: block; font-family: 'Space Mono', ui-monospace, monospace; font-size: 0.58rem; letter-spacing: 0.2em; text-transform: uppercase; color: #7d92b3; margin-bottom: 6px; } .ds-input-wrap { position: relative; } .ds-input-wrap svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: #7d92b3; transition: color 200ms ease; pointer-events: none; } .ds-input-wrap:focus-within svg { color: #4fc4d3; } .ds-field input { width: 100%; background: rgba(7,19,34,0.7); border: 1px solid rgba(147,166,194,0.2); border-radius: 7px; padding: 11px 14px 11px 37px; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; font-size: 0.88rem; color: #efeadd; transition: border-color 200ms ease, box-shadow 200ms ease; } .ds-field input::placeholder { color: #7d92b3; } .ds-field input:focus { outline: none; border-color: #4fc4d3; box-shadow: 0 0 0 3px rgba(79,196,211,0.16); }"
+    },
+    {
+      "name": "Stat Card",
+      "kind": "custom",
+      "refersTo": "stat-card",
+      "description": "The signature component: accent rule, tinted icon, trend pill, Space Mono label, Fraunces metric, sparkline bleeding off the bottom edge.",
+      "html": "<div class=\"ds-stat\"><span class=\"ds-stat-rule\"></span><div class=\"ds-stat-head\"><span class=\"ds-stat-icon\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><circle cx=\"12\" cy=\"12\" r=\"6\"/><circle cx=\"12\" cy=\"12\" r=\"2\"/></svg></span><span class=\"ds-stat-trend\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M7 7h10v10\"/><path d=\"M7 17 17 7\"/></svg>+12.5% vs target</span></div><h3 class=\"ds-stat-label\">Program Outcomes</h3><div class=\"ds-stat-value\"><span class=\"ds-stat-num\">13,600</span><span class=\"ds-stat-unit\">households</span></div><p class=\"ds-stat-desc\">Sustained clean water access</p><svg class=\"ds-stat-spark\" viewBox=\"0 0 240 56\" preserveAspectRatio=\"none\"><defs><linearGradient id=\"dsSpark\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0%\" stop-color=\"#4fc4d3\" stop-opacity=\"0.35\"/><stop offset=\"100%\" stop-color=\"#4fc4d3\" stop-opacity=\"0\"/></linearGradient></defs><path d=\"M0 46 L48 40 L96 33 L144 35 L192 22 L240 8 L240 56 L0 56 Z\" fill=\"url(#dsSpark)\"/><path d=\"M0 46 L48 40 L96 33 L144 35 L192 22 L240 8\" fill=\"none\" stroke=\"#4fc4d3\" stroke-width=\"2\"/></svg></div>",
+      "css": ".ds-stat { position: relative; overflow: hidden; background: #0e2038; border: 1px solid #24405f; border-radius: 12px; padding: 24px; transition: border-color 300ms ease; } .ds-stat:hover { border-color: rgba(203,168,92,0.45); } .ds-stat-rule { position: absolute; top: 0; left: 0; height: 100%; width: 2px; background: #4fc4d3; opacity: 0.85; } .ds-stat-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; } .ds-stat-icon { display: inline-flex; padding: 8px; border-radius: 8px; background: rgba(79,196,211,0.09); border: 1px solid rgba(79,196,211,0.25); color: #4fc4d3; } .ds-stat-trend { display: inline-flex; align-items: center; gap: 4px; font-family: 'Space Mono', ui-monospace, monospace; font-size: 0.6rem; font-weight: 700; padding: 4px 8px; border-radius: 9999px; color: #4fc4d3; background: rgba(79,196,211,0.08); border: 1px solid rgba(79,196,211,0.2); } .ds-stat-label { font-family: 'Space Mono', ui-monospace, monospace; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.18em; color: #7d92b3; margin: 0 0 8px; } .ds-stat-value { display: flex; align-items: baseline; gap: 8px; } .ds-stat-num { font-family: 'Fraunces', Georgia, serif; font-size: 1.875rem; font-weight: 600; letter-spacing: -0.025em; color: #efeadd; } .ds-stat-unit { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; color: #93a6c2; } .ds-stat-desc { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; font-size: 0.75rem; line-height: 1.6; color: #93a6c2; margin: 6px 0 0; } .ds-stat-spark { position: absolute; bottom: 0; left: 0; right: 0; width: 100%; height: 56px; opacity: 0.4; transition: opacity 300ms ease; } .ds-stat:hover .ds-stat-spark { opacity: 0.7; }"
+    },
+    {
+      "name": "Nav Item (active)",
+      "kind": "nav",
+      "refersTo": "nav-item-active",
+      "description": "Teal wash and border with an Ivory label, plus the 2px brass tab on the left edge — the one element where both accents legitimately meet.",
+      "html": "<nav class=\"ds-nav\"><button class=\"ds-nav-item ds-nav-active\"><span class=\"ds-nav-tab\"></span><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"9\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"5\" rx=\"1\"/><rect x=\"14\" y=\"12\" width=\"7\" height=\"9\" rx=\"1\"/><rect x=\"3\" y=\"16\" width=\"7\" height=\"5\" rx=\"1\"/></svg>Impact Overview</button><button class=\"ds-nav-item\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><circle cx=\"12\" cy=\"12\" r=\"6\"/><circle cx=\"12\" cy=\"12\" r=\"2\"/></svg>Grant Tracking</button></nav>",
+      "css": ".ds-nav { display: flex; flex-direction: column; gap: 8px; background: #071322; padding: 12px; border-radius: 8px; } .ds-nav-item { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: #93a6c2; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background 200ms ease, color 200ms ease, border-color 200ms ease; } .ds-nav-item svg { color: #7d92b3; transition: color 200ms ease; } .ds-nav-item:hover { background: rgba(255,255,255,0.05); color: #f1e9d6; } .ds-nav-item:hover svg { color: #f1e9d6; } .ds-nav-active { background: rgba(79,196,211,0.1); border-color: rgba(79,196,211,0.25); color: #efeadd; } .ds-nav-active svg { color: #4fc4d3; } .ds-nav-tab { position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 20px; width: 2px; border-radius: 9999px; background: #cba85c; } .ds-nav-item:focus-visible { outline: 2px solid #cba85c; outline-offset: 2px; }"
+    },
+    {
+      "name": "Status Pill",
+      "kind": "chip",
+      "refersTo": "chip-teal",
+      "description": "Full-round accent wash inside an accent border. Teal for online, verified, and positive; brass for offline, demo mode, and governance.",
+      "html": "<div class=\"ds-pills\"><span class=\"ds-pill ds-pill-teal\"><span class=\"ds-dot\"></span>Online</span><span class=\"ds-pill ds-pill-teal\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/><path d=\"m9 12 2 2 4-4\"/></svg>Verified Data</span><span class=\"ds-pill ds-pill-brass\"><span class=\"ds-dot ds-dot-brass\"></span>Working Offline (Cached)</span></div>",
+      "css": ".ds-pills { display: flex; flex-wrap: wrap; gap: 12px; } .ds-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 9999px; font-family: 'Space Mono', ui-monospace, monospace; font-size: 0.6rem; font-weight: 700; text-transform: none; } .ds-pill-teal { color: #4fc4d3; background: rgba(79,196,211,0.1); border: 1px solid rgba(79,196,211,0.25); } .ds-pill-brass { color: #e7ce88; background: rgba(203,168,92,0.1); border: 1px solid rgba(203,168,92,0.25); } .ds-dot { width: 6px; height: 6px; border-radius: 9999px; background: #4fc4d3; animation: ds-pulse 2s ease-in-out infinite; } .ds-dot-brass { background: #cba85c; animation: none; } @keyframes ds-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }"
+    },
+    {
+      "name": "Cartouche",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The framed panel for entry and authority moments: 4px radius, brass corner ticks, inset double hairline, deep lift shadow. Never used for routine cards.",
+      "html": "<div class=\"ds-cartouche\"><span class=\"ds-corner ds-tl\"></span><span class=\"ds-corner ds-tr\"></span><span class=\"ds-corner ds-bl\"></span><span class=\"ds-corner ds-br\"></span><div class=\"ds-eyebrow\">Limited · 10 spots</div><h1 class=\"ds-cartouche-title\">Start your 30-day free trial</h1><p class=\"ds-cartouche-body\">Tell us about your team and we'll be in touch.</p></div>",
+      "css": ".ds-cartouche { position: relative; max-width: 25.5rem; background: linear-gradient(180deg, #0e2038, #0b1b31); border: 1px solid rgba(203,168,92,0.24); border-radius: 4px; padding: 38px 34px; box-shadow: 0 40px 90px -40px rgba(0,0,0,0.8); } .ds-cartouche::before { content: \"\"; position: absolute; inset: 7px; border: 1px solid rgba(203,168,92,0.12); border-radius: 2px; pointer-events: none; } .ds-corner { position: absolute; width: 12px; height: 12px; border-color: #cba85c; border-style: solid; border-width: 0; } .ds-tl { top: 2px; left: 2px; border-top-width: 1.5px; border-left-width: 1.5px; } .ds-tr { top: 2px; right: 2px; border-top-width: 1.5px; border-right-width: 1.5px; } .ds-bl { bottom: 2px; left: 2px; border-bottom-width: 1.5px; border-left-width: 1.5px; } .ds-br { bottom: 2px; right: 2px; border-bottom-width: 1.5px; border-right-width: 1.5px; } .ds-eyebrow { font-family: 'Space Mono', ui-monospace, monospace; font-size: 0.6rem; letter-spacing: 0.28em; text-transform: uppercase; color: #cba85c; margin-bottom: 9px; } .ds-cartouche-title { font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 1.75rem; line-height: 1.1; letter-spacing: -0.01em; color: #efeadd; margin: 0 0 10px; } .ds-cartouche-body { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; line-height: 1.6; color: #93a6c2; margin: 0; }"
+    },
+    {
+      "name": "Chart Panel",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The standard content container: flat Chart Surface, hairline border warming to brass on hover, 32px padding, Fraunces title over a muted subtitle.",
+      "html": "<div class=\"ds-panel\"><div class=\"ds-panel-head\"><div><h3 class=\"ds-panel-title\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#4fc4d3\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/></svg>Service Areas</h3><p class=\"ds-panel-sub\">Regional Outreach Breakdown</p></div><span class=\"ds-panel-meta\">89% Urban Focus</span></div><div class=\"ds-bar-row\"><div class=\"ds-bar-head\"><span class=\"ds-bar-name\">South Memphis</span><span class=\"ds-bar-val\">32%</span></div><div class=\"ds-bar-track\"><div class=\"ds-bar-fill\" style=\"width:32%\"></div></div></div><div class=\"ds-bar-row\"><div class=\"ds-bar-head\"><span class=\"ds-bar-name\">Whitehaven</span><span class=\"ds-bar-val\">24%</span></div><div class=\"ds-bar-track\"><div class=\"ds-bar-fill\" style=\"width:24%\"></div></div></div></div>",
+      "css": ".ds-panel { background: #0e2038; border: 1px solid #24405f; border-radius: 12px; padding: 32px; transition: border-color 300ms ease; } .ds-panel:hover { border-color: rgba(203,168,92,0.3); } .ds-panel-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 32px; } .ds-panel-title { display: flex; align-items: center; gap: 8px; font-family: 'Fraunces', Georgia, serif; font-size: 1.125rem; font-weight: 600; color: #efeadd; margin: 0; } .ds-panel-sub { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; color: #93a6c2; margin: 4px 0 0; } .ds-panel-meta { font-family: 'Space Mono', ui-monospace, monospace; font-size: 0.75rem; color: #93a6c2; } .ds-bar-row { margin-bottom: 24px; } .ds-bar-head { display: flex; justify-content: space-between; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; margin-bottom: 6px; } .ds-bar-name { color: #93a6c2; font-weight: 500; } .ds-bar-val { color: #f1e9d6; font-weight: 700; } .ds-bar-track { height: 8px; background: #071322; border: 1px solid rgba(36,64,95,0.5); border-radius: 9999px; overflow: hidden; } .ds-bar-fill { height: 100%; border-radius: 9999px; background: linear-gradient(90deg, #4fc4d3, #cba85c); transition: width 1500ms cubic-bezier(0.22, 1, 0.3, 1); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Chart Table",
+    "overview": "A navigator's chart table at night. The ground is deep sea ink, unlit except where it matters. Charts are drawn in parchment; the instruments on top of them are brass; the one live reading — the needle, the signal, the thing currently true — is teal. Beneath everything runs a faint graticule, the surveyor's grid that says every position here was plotted, not guessed.\n\nThe character is warm and expeditionary. This is not a compliance console. The person using it is on a long journey with a real destination, and the surfaces they touch — parchment text, brass edges, the lamplit warmth of the accent — should feel like equipment that has been carried somewhere, not software that was provisioned. The warmth lives in the surround: the paper-toned type, the brass hairlines, the glow under a primary action. The data itself stays sober. Warm frame, precise readout — that tension is the whole system, and collapsing either side breaks it. Decorate the instrument, never the measurement.\n\nControls are tactile and confident. Brass buttons carry a real gradient and a warm glow, they compress on press, inputs answer focus with a teal ring. Nothing here is a flat rectangle waiting to be told it was clicked.",
+    "keyCharacteristics": [
+      "Dark ground always; parchment is the ink, never the paper",
+      "Two accents with jobs: teal reads impact, brass reads money, governance, and action",
+      "Three typefaces with strict roles: Fraunces states, Inter explains, Space Mono labels",
+      "Flat surfaces separated by 1px hairlines — depth by line, not by shadow",
+      "A fixed 72px graticule behind the entire application",
+      "Brass corner ticks and inset double hairlines mark a surface as a document of record"
+    ],
+    "rules": [
+      { "name": "The Two Bearings Rule", "body": "Teal means impact; brass means money, governance, and action. Follow it by default so a returning user can read a screen by color before reading a word. Deviate only when a specific composition genuinely needs it — and never mix both accents into a single metric's treatment, which is what makes the code unreadable.", "section": "colors" },
+      { "name": "The Dark Ground Rule", "body": "There is no light mode. Parchment is the ink and sea ink is the paper. A white or near-white background anywhere in the product breaks the world outright.", "section": "colors" },
+      { "name": "The Rare Signal Rule", "body": "Full-strength teal covers a small fraction of any screen — it is the needle, not the sea. When more than a few elements glow teal at once, nothing reads as the live value anymore.", "section": "colors" },
+      { "name": "The Three Voices Rule", "body": "Fraunces states, Inter explains, Space Mono labels. A number is never set in Inter. A paragraph is never set in Space Mono. A field label is never set in anything but Space Mono.", "section": "typography" },
+      { "name": "The Engraved Label Rule", "body": "Every Space Mono label is uppercase with at least 0.16em tracking. Tight or sentence-case mono reads as code, not as an instrument face.", "section": "typography" },
+      { "name": "The Ivory Peak Rule", "body": "Ivory is the brightest text in the system and belongs only to headings and metric values. Body copy sits one step down in Parchment. Nothing is pure white.", "section": "typography" },
+      { "name": "The Graticule Rule", "body": "A 72px grid of 1px brass lines at 6% opacity is fixed behind the entire application. It is position: fixed, non-interactive, and sits at z-index 0 with all content lifted to z-index 1. It never scrolls with content — the chart stays still while the data moves across it.", "section": "layout" },
+      { "name": "The Hairline Rule", "body": "Separation is a line, not a shadow. If two surfaces need distinguishing, give them a 1px Hairline border or a tonal step — never a drop shadow. Reaching for shadow to solve a boundary is the single fastest way to turn this into a generic dashboard.", "section": "elevation" },
+      { "name": "The Hover Warms Rule", "body": "Cards do not lift, scale, or shadow on hover. Their border warms from Hairline toward brass at 30–45% opacity over 300ms. That is the entire hover vocabulary for a surface.", "section": "elevation" },
+      { "name": "The Cartouche Rule", "body": "Brass corner ticks plus an inset double hairline mark a surface as a document of record. Reserve them for authority and entry moments — sign-in, the trial invitation, a generated report — and never apply them to routine cards. Their meaning comes entirely from their scarcity.", "section": "shapes" },
+      { "name": "The Accent Rule Rule", "body": "A stat card's category is declared by a 2px full-height accent bar on its left edge at 85% opacity, teal or brass per the Two Bearings Rule. It is the cheapest categorical signal in the system and should be reached for before adding a colored background.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do keep the ground dark and text warm. Parchment (#f1e9d6) for body, Ivory (#efeadd) for headings and numbers.",
+      "Do separate surfaces with a 1px Hairline (#24405f) and warm that border on hover instead of adding a shadow.",
+      "Do set every label, unit, eyebrow, and axis in Space Mono, uppercase, ≥0.16em tracking.",
+      "Do set every metric value in Fraunces at 600 with tight tracking — the number is the product.",
+      "Do follow the Two Bearings Rule by default: teal for impact and live state, brass for money, governance, and action.",
+      "Do draw charts from the teal and brass ramps so a chart reads as part of the instrument rather than a library default.",
+      "Do honor prefers-reduced-motion — the sign-in already disables the compass settle and every rise animation under it.",
+      "Do give inputs a teal focus ring (3px at 16%) and buttons a 2px brass focus outline. Both already exist; match them.",
+      "Do mark sample and demo data unmistakably. The brass Demo Mode treatment exists for this reason and PRODUCT.md forbids passing sample figures off as real."
+    ],
+    "donts": [
+      "Don't introduce a light background, a white card, or bg-white anywhere. There are currently ~22 bg-white usages in the codebase; they are drift, not precedent, and should be migrated to Chart Surface or Abyss.",
+      "Don't use the legacy brand-50 through brand-900 scale in index.css. It predates the cartographic palette and is referenced by nothing — treat it as deprecated and remove it rather than reviving it.",
+      "Don't use Tailwind's slate-* or gray-* families. The system has its own neutrals: Muted Ink and Faint Ink. The remaining text-slate-* usages in BrandLogo.tsx are the last holdouts of the pre-cartographic identity.",
+      "Don't trust the chart color keys in App.tsx — COLORS.purple and COLORS.orange hold brass values and COLORS.blue holds teal. Read the values, not the names, and prefer renaming them to impact / funding / neutral.",
+      "Don't add drop shadows to cards, or scale/lift them on hover.",
+      "Don't apply corner ticks or the cartouche frame to ordinary cards. They mean 'document of record' and lose that meaning through repetition.",
+      "Don't let full-strength teal spread across a screen. If several things glow at once, none of them is the live reading.",
+      "Don't ship Recharts' default light tooltip. The dark tooltip override in index.css is part of the world; a white tooltip tears a hole in it.",
+      "Don't set a paragraph in Space Mono or a metric in Inter."
+    ]
+  }
+}
