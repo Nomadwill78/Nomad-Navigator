@@ -29,9 +29,9 @@ interface GrantTrackingViewProps {
 
 const getTrendIndicator = (current: number, target: number) => {
   const progress = current / target;
-  if (progress >= 1) return { icon: <TrendingUp size={12} />, color: 'text-green-500', bg: 'bg-green-500/10', label: 'Target Met' };
+  if (progress >= 1) return { icon: <TrendingUp size={12} />, color: 'text-teal', bg: 'bg-teal/10', label: 'Target Met' };
   if (progress >= 0.5) return { icon: <ArrowRight size={12} />, color: 'text-teal', bg: 'bg-teal/10', label: 'On Track' };
-  return { icon: <TrendingDown size={12} />, color: 'text-amber-500', bg: 'bg-amber-500/10', label: 'Below Target' };
+  return { icon: <TrendingDown size={12} />, color: 'text-brass', bg: 'bg-brass/10', label: 'Below Target' };
 };
 
 export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, onUpdateGrants }) => {
@@ -263,8 +263,8 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
               >
                 <div className="flex justify-between items-start mb-2">
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                    grant.status === 'active' ? 'bg-green-500/15 text-green-300' :
-                    grant.status === 'completed' ? 'bg-blue-500/15 text-blue-300' :
+                    grant.status === 'active' ? 'bg-teal/15 text-teal' :
+                    grant.status === 'completed' ? 'bg-teal/15 text-inkmute' :
                     'bg-white/5 text-inkmute'
                   }`}>
                     {grant.status}
@@ -333,7 +333,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                   const diff = fundsSpentPercent - timeElapsedPercent;
                   let burnStatus = {
                     label: "On Track",
-                    color: "text-green-300 bg-green-500/10 border-green-500/25",
+                    color: "text-teal bg-teal/10 border-teal/25",
                     desc: "Your budget burn rate matches the timeline progress well."
                   };
 
@@ -346,7 +346,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                   } else if (diff < -15) {
                     burnStatus = {
                       label: "Underutilization Alert",
-                      color: "text-amber-300 bg-amber-500/10 border-amber-500/25",
+                      color: "text-brassbright bg-brass/10 border-brass/25",
                       desc: "Alert: Funds are being spent slower than the elapsed timeline. Risk of under-spending."
                     };
                   }
@@ -378,9 +378,9 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                               ${spentAmount.toLocaleString()} / ${totalAmount.toLocaleString()} ({fundsSpentPercent.toFixed(1)}%)
                             </span>
                           </div>
-                          <div className="h-2.5 w-full bg-white/5 rounded-full overflow-hidden">
+                          <div className="h-2.5 w-full bg-abyss border border-hairline/50 rounded-full overflow-hidden">
                             <div 
-                              className="h-full bg-teal rounded-full transition-all duration-500" 
+                              className="h-full bg-brass rounded-full transition-all duration-500" 
                               style={{ width: `${fundsSpentPercent}%` }}
                             />
                           </div>
@@ -414,9 +414,9 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                               {timeElapsedPercent.toFixed(1)}% Completed
                             </span>
                           </div>
-                          <div className="h-2.5 w-full bg-white/5 rounded-full overflow-hidden">
+                          <div className="h-2.5 w-full bg-abyss border border-hairline/50 rounded-full overflow-hidden">
                             <div 
-                              className="h-full bg-indigo-500 rounded-full transition-all duration-500" 
+                              className="h-full bg-inkmute rounded-full transition-all duration-500"
                               style={{ width: `${timeElapsedPercent}%` }}
                             />
                           </div>
@@ -526,15 +526,15 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                       <Trash2 size={14} />
                                     </button>
                                   )}
-                                  <span className={`text-sm font-bold ${progress >= 100 ? 'text-green-300' : 'text-teal'}`}>
+                                  <span className={`text-sm font-bold ${progress >= 100 ? 'text-teal' : 'text-teal'}`}>
                                     {progress.toFixed(0)}%
                                   </span>
                                </div>
                             </div>
-                            <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+                            <div className="h-2 w-full bg-abyss border border-hairline/50 rounded-full overflow-hidden">
                                <div 
                                  className={`h-full rounded-full transition-all duration-500 ease-out ${
-                                   progress >= 100 ? 'bg-green-500' : 'bg-teal'
+                                   progress >= 100 ? 'bg-teal' : 'bg-teal'
                                  }`}
                                  style={{ width: `${progress}%` }}
                                ></div>
@@ -548,11 +548,11 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                   <div className="space-y-6">
                     <div className="flex items-center justify-between mb-2">
                        <h4 className="font-bold text-parchment flex items-center gap-2 text-sm uppercase tracking-wider">
-                         <Users size={16} className="text-indigo-500" /> Partner Performance
+                         <Users size={16} className="text-brass" /> Partner Performance
                        </h4>
                        <button 
                          onClick={() => handleAddSubgrantee(selectedGrant.id)}
-                         className="text-xs font-bold text-indigo-300 hover:text-indigo-300 flex items-center gap-1 border border-indigo-500/25 px-3 py-1.5 rounded-lg bg-indigo-500/10"
+                         className="text-xs font-bold text-brassbright hover:text-brassbright flex items-center gap-1 border border-brass/25 px-3 py-1.5 rounded-lg bg-brass/10"
                        >
                          <Plus size={14} /> New Subgrantee
                        </button>
@@ -573,7 +573,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                    type="text"
                                    value={sub.name}
                                    onChange={(e) => handleUpdateSubgrantee(selectedGrant.id, sub.id, { name: e.target.value })}
-                                   className="w-full bg-transparent font-bold text-ivory text-base border-b border-transparent hover:border-hairline focus:border-indigo-400 outline-none transition-colors"
+                                   className="w-full bg-transparent font-bold text-ivory text-base border-b border-transparent hover:border-hairline focus:border-teal outline-none transition-colors"
                                    placeholder="Partner Name"
                                  />
                                  <div className="flex items-center gap-2">
@@ -589,7 +589,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                    </div>
                                  </div>
                                </div>
-                               <span className="px-2 py-0.5 bg-indigo-500/10 text-indigo-300 rounded-full text-[10px] font-bold uppercase tracking-wider h-fit">
+                               <span className="px-2 py-0.5 bg-brass/10 text-brassbright rounded-full text-[10px] font-bold uppercase tracking-wider h-fit">
                                  {sub.status}
                                </span>
                              </div>
@@ -599,7 +599,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                  <p className="text-[10px] font-bold text-inkfaint uppercase tracking-widest">Performance Metrics</p>
                                  <button 
                                    onClick={() => handleAddSubgranteeKPI(selectedGrant.id, sub.id)}
-                                   className="text-[10px] font-bold text-indigo-300 hover:text-indigo-300 flex items-center gap-1"
+                                   className="text-[10px] font-bold text-brassbright hover:text-brassbright flex items-center gap-1"
                                  >
                                    <Plus size={12} /> Add Metric
                                  </button>
@@ -617,15 +617,15 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                               type="text" 
                                               value={kpi.name}
                                               onChange={(e) => handleUpdateSubgranteeKPI(selectedGrant.id, sub.id, kpi.id, { name: e.target.value })}
-                                              className="flex-1 bg-transparent font-bold text-parchment text-xs border-b border-transparent hover:border-hairline focus:border-indigo-400 outline-none transition-colors"
+                                              className="flex-1 bg-transparent font-bold text-parchment text-xs border-b border-transparent hover:border-hairline focus:border-teal outline-none transition-colors"
                                               placeholder="KPI Name"
                                             />
                                             <div className="flex items-center gap-2">
-                                              <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md ${trend.bg} ${trend.color} text-[8px] font-bold uppercase`}>
+                                              <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md ${trend.bg} ${trend.color} text-[0.6rem] font-bold uppercase`}>
                                                 {trend.icon}
                                                 <span className="hidden sm:inline">{trend.label}</span>
                                               </div>
-                                              <span className={`text-[10px] font-bold ${progress >= 100 ? 'text-green-300' : 'text-indigo-300'}`}>
+                                              <span className={`text-[10px] font-bold ${progress >= 100 ? 'text-teal' : 'text-brassbright'}`}>
                                                 {progress.toFixed(0)}%
                                               </span>
                                             </div>
@@ -638,37 +638,37 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                           </button>
                                         </div>
                                         <div>
-                                          <label className="text-[9px] text-inkfaint uppercase font-bold block mb-1">Current</label>
+                                          <label className="text-[0.6rem] text-inkfaint uppercase font-bold block mb-1">Current</label>
                                           <input 
                                             type="number" 
                                             value={kpi.current}
                                             onChange={(e) => handleUpdateSubgranteeKPI(selectedGrant.id, sub.id, kpi.id, { current: parseInt(e.target.value) || 0 })}
-                                            className="w-full bg-transparent border-b border-hairline/60 hover:border-hairline focus:border-indigo-400 focus:bg-surface px-2 py-1 text-xs font-semibold outline-none transition-all"
+                                            className="w-full bg-transparent border-b border-hairline/60 hover:border-hairline focus:border-teal focus:bg-surface px-2 py-1 text-xs font-semibold outline-none transition-all"
                                           />
                                         </div>
                                         <div>
-                                          <label className="text-[9px] text-inkfaint uppercase font-bold block mb-1">Target / Unit</label>
+                                          <label className="text-[0.6rem] text-inkfaint uppercase font-bold block mb-1">Target / Unit</label>
                                           <div className="flex items-center gap-1">
                                             <input 
                                               type="number" 
                                               value={kpi.target}
                                               onChange={(e) => handleUpdateSubgranteeKPI(selectedGrant.id, sub.id, kpi.id, { target: parseInt(e.target.value) || 1 })}
-                                              className="w-16 bg-transparent border-b border-hairline/60 hover:border-hairline focus:border-indigo-400 focus:bg-surface px-2 py-1 text-xs font-semibold outline-none transition-all"
+                                              className="w-16 bg-transparent border-b border-hairline/60 hover:border-hairline focus:border-teal focus:bg-surface px-2 py-1 text-xs font-semibold outline-none transition-all"
                                             />
                                             <input 
                                               type="text" 
                                               value={kpi.unit}
                                               onChange={(e) => handleUpdateSubgranteeKPI(selectedGrant.id, sub.id, kpi.id, { unit: e.target.value })}
-                                              className="flex-1 bg-transparent border-b border-hairline/60 hover:border-hairline focus:border-indigo-400 focus:bg-surface px-2 py-1 text-xs font-semibold outline-none transition-all"
+                                              className="flex-1 bg-transparent border-b border-hairline/60 hover:border-hairline focus:border-teal focus:bg-surface px-2 py-1 text-xs font-semibold outline-none transition-all"
                                               placeholder="Unit"
                                             />
                                           </div>
                                         </div>
                                       </div>
                                       
-                                      <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                                      <div className="h-1.5 w-full bg-abyss border border-hairline/50 rounded-full overflow-hidden">
                                         <div 
-                                          className={`h-full transition-all duration-500 ease-out ${progress >= 100 ? 'bg-green-500' : 'bg-indigo-500'}`}
+                                          className={`h-full transition-all duration-500 ease-out ${progress >= 100 ? 'bg-teal' : 'bg-brass'}`}
                                           style={{ width: `${progress}%` }}
                                         ></div>
                                       </div>
@@ -681,13 +681,13 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                       )}
                     </div>
 
-                    <div className="mt-8 p-6 bg-indigo-500/10 rounded-2xl border border-indigo-500/25 flex items-start gap-4">
-                      <div className="p-3 bg-surface rounded-xl shadow-sm text-indigo-300">
+                    <div className="mt-8 p-6 bg-brass/10 rounded-2xl border border-brass/25 flex items-start gap-4">
+                      <div className="p-3 bg-surface rounded-xl shadow-sm text-brassbright">
                         <ShieldCheck size={24} />
                       </div>
                       <div>
-                        <h5 className="font-bold text-indigo-900 mb-1">Subgrantee Compliance</h5>
-                        <p className="text-sm text-indigo-300/80 leading-relaxed font-medium">
+                        <h5 className="font-bold text-ivory mb-1">Subgrantee Compliance</h5>
+                        <p className="text-sm text-parchment/80 leading-relaxed font-medium">
                           Partner organizations are averaging **84% compliance**. Nomad Compass recommends requesting additional validation data from {selectedGrant.subgrantees?.[0]?.name || 'partners'} before the quarterly disbursement.
                         </p>
                       </div>

@@ -17,7 +17,7 @@ export const DemoModeBanner: React.FC<DemoModeBannerProps> = ({ isActive, onClos
           exit={{ y: -100, opacity: 0 }}
           className="fixed top-24 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-2xl px-4"
         >
-          <div className="bg-abyss border border-hairline text-white rounded-2xl shadow-2xl p-4 flex items-center justify-between gap-4 overflow-hidden relative">
+          <div className="bg-abyss border border-hairline text-ivory rounded-2xl shadow-2xl p-4 flex items-center justify-between gap-4 overflow-hidden relative">
             <div className="absolute top-0 left-0 w-1 h-full bg-teal"></div>
             <div className="flex items-center gap-3">
               <div className="bg-teal/15 p-2 rounded-lg">

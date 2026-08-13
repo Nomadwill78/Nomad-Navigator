@@ -35,7 +35,7 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
               className="pl-10 pr-4 py-2 bg-surface border border-hairline rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal/25 transition-all w-64"
             />
           </div>
-          <button className="bg-abyss text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-surface2 transition-all">
+          <button className="bg-abyss text-ivory px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-surface2 transition-all">
             Refresh Scan
           </button>
         </div>
@@ -62,7 +62,7 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
                     <span className="text-xs font-bold text-inkfaint uppercase tracking-widest">Match Score</span>
                     <span className="px-2 py-0.5 bg-teal/10 text-teal rounded-full text-[10px] font-black">{opp.matchScore}%</span>
                   </div>
-                  <div className="h-1.5 w-24 bg-white/5 rounded-full overflow-hidden ml-auto">
+                  <div className="h-1.5 w-24 bg-abyss border border-hairline/50 rounded-full overflow-hidden ml-auto">
                     <div 
                       className="h-full bg-teal rounded-full"
                       style={{ width: `${opp.matchScore}%` }}
@@ -96,8 +96,8 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
 
               <div className="pt-6 border-t border-hairline/60 flex justify-between items-center">
                 <div className="flex gap-2">
-                  <span className="px-3 py-1 bg-blue-500/10 text-blue-300 rounded-lg text-[10px] font-bold uppercase tracking-wider">Water & Sanitation</span>
-                  <span className="px-3 py-1 bg-purple-500/10 text-purple-300 rounded-lg text-[10px] font-bold uppercase tracking-wider">Infrastructure</span>
+                  <span className="px-3 py-1 bg-white/5 text-inkmute border border-hairline rounded-lg text-[10px] font-mono2 font-bold uppercase tracking-wider">Water &amp; Sanitation</span>
+                  <span className="px-3 py-1 bg-white/5 text-inkmute border border-hairline rounded-lg text-[10px] font-mono2 font-bold uppercase tracking-wider">Infrastructure</span>
                 </div>
                 <button className="flex items-center gap-1.5 text-teal font-bold text-xs hover:gap-2 transition-all">
                   Start AI Draft <ChevronRight size={16} />
@@ -108,7 +108,7 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
         </div>
 
         <div className="space-y-6">
-          <div className="bg-abyss rounded-3xl p-6 text-white overflow-hidden relative shadow-2xl">
+          <div className="bg-abyss rounded-3xl p-6 text-ivory overflow-hidden relative shadow-2xl">
             <div className="relative z-10">
               <div className="bg-white/10 w-fit p-3 rounded-2xl mb-4 backdrop-blur-sm">
                 <TrendingUp size={24} className="text-teal" />
@@ -133,19 +133,19 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
 
           <div className="bg-surface border border-hairline rounded-3xl p-6">
             <h4 className="font-bold text-ivory mb-4 flex items-center gap-2">
-              <CheckCircle2 size={18} className="text-green-500" /> Submission Readiness
+              <CheckCircle2 size={18} className="text-teal" /> Submission Readiness
             </h4>
             <div className="space-y-4">
               <div className="flex items-start gap-3">
-                <div className="mt-0.5"><CheckCircle2 size={14} className="text-green-500" /></div>
+                <div className="mt-0.5"><CheckCircle2 size={14} className="text-teal" /></div>
                 <p className="text-xs text-inkmute leading-relaxed font-medium">Financial audit documents are up to date (Validated 2h ago).</p>
               </div>
               <div className="flex items-start gap-3">
-                <div className="mt-0.5"><CheckCircle2 size={14} className="text-green-500" /></div>
+                <div className="mt-0.5"><CheckCircle2 size={14} className="text-teal" /></div>
                 <p className="text-xs text-inkmute leading-relaxed font-medium">KPI data verification exceeds 85% requirement.</p>
               </div>
               <div className="flex items-start gap-3">
-                <div className="mt-0.5"><AlertCircle size={14} className="text-amber-500" /></div>
+                <div className="mt-0.5"><AlertCircle size={14} className="text-brass" /></div>
                 <p className="text-xs text-inkmute leading-relaxed font-medium">Theory of Change document needs updating for 2024 standards.</p>
               </div>
             </div>

@@ -33,7 +33,8 @@ interface AnalysisViewProps {
 type MetricType = 'impact' | 'cost' | 'roi';
 type DimensionType = 'grant' | 'time' | 'funder';
 
-const COLORS = ['#cba85c', '#4fc4d3', '#4fc4d3', '#f59e0b', '#ef4444', '#6366f1'];
+// Categorical series drawn from the documented brass (funding) and teal (impact) ramps
+const COLORS = ['#cba85c', '#4fc4d3', '#e7ce88', '#2f8b98', '#b8905a', '#93a6c2'];
 
 export const AnalysisView: React.FC<AnalysisViewProps> = ({ stats, grants }) => {
   const [metric, setMetric] = useState<MetricType>('impact');
@@ -92,7 +93,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ stats, grants }) => 
                  key={m}
                  onClick={() => setMetric(m)}
                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-                   metric === m ? 'bg-abyss text-white shadow-md' : 'text-inkfaint hover:text-inkmute'
+                   metric === m ? 'bg-abyss text-ivory shadow-md' : 'text-inkfaint hover:text-inkmute'
                  }`}
                >
                  {m}
@@ -131,7 +132,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ stats, grants }) => 
       </div>
 
       {/* Main Analysis Card */}
-      <div className="bg-surface rounded-3xl border border-hairline shadow-xl shadow-abyss/50 overflow-hidden">
+      <div className="bg-surface rounded-3xl border border-hairline overflow-hidden">
         <div className="p-8 border-b border-hairline/60 flex items-center justify-between">
            <div className="flex items-center gap-3">
               <div className="bg-gradient-to-b from-brassbright to-brass text-[#26200e] p-2.5 rounded-xl">
@@ -142,7 +143,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ stats, grants }) => 
                  <p className="text-xs text-inkfaint font-medium uppercase tracking-widest">Pivoted by {dimension}</p>
               </div>
            </div>
-           <div className="flex items-center gap-2 text-green-300 bg-green-500/10 px-3 py-1.5 rounded-full text-xs font-bold border border-green-500/25">
+           <div className="flex items-center gap-2 text-teal bg-teal/10 px-3 py-1.5 rounded-full text-xs font-bold border border-teal/25">
               <ArrowUpRight size={14} />
               <span>Optimized Portfolio</span>
            </div>
@@ -158,7 +159,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ stats, grants }) => 
                      <YAxis axisLine={false} tickLine={false} tick={{fill: '#93a6c2', fontSize: 11}} />
                      <Tooltip 
                        cursor={{fill: 'rgba(79,196,211,0.06)'}}
-                       contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}
+                       contentStyle={{ background: '#0b1c33', borderRadius: '10px', border: '1px solid #24405f', boxShadow: '0 18px 40px -18px rgba(0, 0, 0, 0.7)' }}
                      />
                      <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={40}>
                         {data.map((entry, index) => (
@@ -178,7 +179,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ stats, grants }) => 
                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#93a6c2', fontSize: 11, fontWeight: 600}} dy={15} />
                      <YAxis axisLine={false} tickLine={false} tick={{fill: '#93a6c2', fontSize: 11}} />
                      <Tooltip 
-                       contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}
+                       contentStyle={{ background: '#0b1c33', borderRadius: '10px', border: '1px solid #24405f', boxShadow: '0 18px 40px -18px rgba(0, 0, 0, 0.7)' }}
                      />
                      <Area 
                        type="monotone" 
@@ -214,7 +215,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ stats, grants }) => 
       </div>
 
       {/* Methodology Note */}
-      <div className="bg-abyss text-white rounded-3xl p-8 flex items-start gap-6 relative overflow-hidden">
+      <div className="bg-abyss text-ivory rounded-3xl p-8 flex items-start gap-6 relative overflow-hidden">
          <div className="absolute top-0 right-0 w-64 h-64 bg-teal/10 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2"></div>
          <div className="bg-surface2 p-4 rounded-2xl border border-hairline">
             <Info className="text-teal" size={24} />

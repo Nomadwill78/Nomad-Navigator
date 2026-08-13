@@ -322,7 +322,7 @@ export const ImpactReportModal: React.FC<ImpactReportModalProps> = ({
             <button 
               onClick={handleCopy}
               className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
-                copied ? 'text-emerald-300 font-bold' : 'text-inkmute hover:text-ivory'
+                copied ? 'text-teal font-bold' : 'text-inkmute hover:text-ivory'
               }`}
             >
               {copied ? <Check size={16} /> : <Copy size={16} />}

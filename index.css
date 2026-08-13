@@ -4,7 +4,6 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Fraunces", Georgia, serif;
   --font-mono2: "Space Mono", ui-monospace, monospace;
-
   /* Cartographic instrument palette (shared with the sign-in) */
   --color-ink: #0a1a30;
   --color-abyss: #071322;
@@ -18,11 +17,17 @@
   --color-teal: #4fc4d3;
   --color-tealdim: #2f8b98;
   --color-inkmute: #93a6c2;
-  --color-inkfaint: #5c7291;
+  --color-inkfaint: #7d92b3;
+  /* Alert: the only red in the system. Errors and data-quality warnings only. */
+  --color-alert: #d25a4e;
+  --color-alerttext: #f4c9c2;
 }
 
 body {
   @apply bg-ink text-parchment font-sans;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* faint chart graticule for the app shell */
@@ -57,7 +62,7 @@ body {
 }
 
 .prose-content::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
+  background-color: #24405f;
   border-radius: 4px;
 }
 
