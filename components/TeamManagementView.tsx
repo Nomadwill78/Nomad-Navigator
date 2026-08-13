@@ -81,7 +81,7 @@ export const TeamManagementView: React.FC = () => {
             </div>
             <p className="text-xs font-bold text-inkfaint uppercase tracking-widest mb-1">Seats Used</p>
             <p className="text-3xl font-black text-ivory">{members.length} <span className="text-inkfaint text-xl">/ 8</span></p>
-            <div className="mt-4 h-2 w-full bg-white/5 rounded-full overflow-hidden">
+            <div className="mt-4 h-2 w-full bg-abyss border border-hairline/50 rounded-full overflow-hidden">
                <div 
                  className="h-full bg-teal transition-all duration-500" 
                  style={{ width: `${(members.length / 8) * 100}%` }}
@@ -132,7 +132,7 @@ export const TeamManagementView: React.FC = () => {
                       member.role === 'grant_coordinator' ? 'bg-blue-500/10 text-blue-300' :
                       member.role === 'impact_analyst' ? 'bg-emerald-500/10 text-emerald-300' :
                       member.role === 'compliance_officer' ? 'bg-amber-500/10 text-amber-300' :
-                      member.role === 'data_entry' ? 'bg-white/5 text-inkmute' :
+                      member.role === 'data_entry' ? 'bg-abyss text-inkmute' :
                       'bg-ink/50 text-inkfaint'
                     }`}>
                       {member.role.replace('_', ' ')}
@@ -218,7 +218,7 @@ export const TeamManagementView: React.FC = () => {
               <div className="flex gap-4 pt-4">
                 <button 
                   onClick={() => setIsInviteModalOpen(false)}
-                  className="flex-1 bg-white/5 text-inkmute py-3 rounded-xl font-bold hover:bg-white/10 transition-all"
+                  className="flex-1 bg-abyss text-inkmute py-3 rounded-xl font-bold hover:bg-surface2 transition-all"
                 >
                   Cancel
                 </button>

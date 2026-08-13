@@ -39,7 +39,7 @@ export const KpiSidebar: React.FC<KpiSidebarProps> = ({ kpis }) => {
                   <div className="flex items-baseline gap-2">
                     <span className="font-display text-2xl font-semibold text-ivory tracking-tight">{kpi.value}</span>
                     <span className={`inline-flex items-center gap-0.5 text-[11px] font-mono2 font-bold px-1.5 py-0.5 rounded-md ${
-                      isUp ? 'text-teal bg-teal/10 border border-teal/25' : 'text-inkmute bg-white/5 border border-hairline'
+                      isUp ? 'text-teal bg-teal/10 border border-teal/25' : 'text-inkmute bg-abyss border border-hairline'
                     }`}>
                       {isUp && <TrendingUp size={12} />}
                       {isUp ? '+' : ''}{kpi.changePercent}%
