@@ -75,9 +75,9 @@ export const TrialSignupView: React.FC = () => {
               </p>
 
               {error && (
-                <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/30 rounded-md p-3 mb-4 text-left">
-                  <AlertCircle size={16} className="text-red-300 shrink-0 mt-0.5" />
-                  <p className="text-xs text-red-200 leading-relaxed">{error}</p>
+                <div className="flex items-start gap-2 bg-alert/15 border border-alert/35 rounded-md p-3 mb-4 text-left">
+                  <AlertCircle size={16} className="text-alert shrink-0 mt-0.5" />
+                  <p className="text-xs text-alerttext leading-relaxed">{error}</p>
                 </div>
               )}
 

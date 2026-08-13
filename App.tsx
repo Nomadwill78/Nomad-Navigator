@@ -856,8 +856,7 @@ const App: React.FC = () => {
                   trendDirection="up"
                   description="Sustained clean water access"
                   icon={<Target />}
-                  gradientFrom="from-blue-500"
-                  gradientTo="to-indigo-600"
+                  accent="impact"
                   sparklineData={sparkImpact}
                 />
 
@@ -869,8 +868,7 @@ const App: React.FC = () => {
                   trendDirection="up"
                   description={`SROI: $${stats.sroi} social value per $1`}
                   icon={<Scale />}
-                  gradientFrom="from-emerald-500"
-                  gradientTo="to-teal-600"
+                  accent="impact"
                   sparklineData={sparkRoi}
                 />
 
@@ -881,8 +879,7 @@ const App: React.FC = () => {
                   trendDirection="neutral"
                   description={`${stats.dataQuality.method} methodology`}
                   icon={<ShieldCheck />}
-                  gradientFrom="from-purple-500"
-                  gradientTo="to-pink-600"
+                  accent="funding"
                   // No sparkline for quality
                 />
               </div>
@@ -926,8 +923,8 @@ const App: React.FC = () => {
                                 ))}
                               </Pie>
                               <Tooltip 
-                                  contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} 
-                                  itemStyle={{color: '#334155', fontWeight: 600}}
+                                  contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}}
+                                  itemStyle={{fontWeight: 600}}
                                 />
                             </PieChart>
                           </ResponsiveContainer>
@@ -1020,7 +1017,7 @@ const App: React.FC = () => {
                         <YAxis axisLine={false} tickLine={false} tick={{fill: '#93a6c2', fontSize: 12}} />
                         <Tooltip 
                           contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }} 
-                          cursor={{stroke: '#3a5878', strokeWidth: 1, strokeDasharray: '4 4'}}
+                          cursor={{stroke: '#24405f', strokeWidth: 1, strokeDasharray: '4 4'}}
                         />
                         <Legend iconType="circle" />
                         <Area 
@@ -1263,14 +1260,14 @@ const NavItem: React.FC<{
         {/* Subtle dot on the icon itself if sidebar is collapsed */}
         {alert && !isOpen && (
           <span className="absolute -top-1 -right-1 flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-alert opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-alert"></span>
           </span>
         )}
       </span>
       {isOpen && <span className="font-medium text-sm whitespace-nowrap">{label}</span>}
       {isOpen && alert && (
-        <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold bg-rose-500 text-white rounded-md uppercase tracking-wide animate-pulse">
+        <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold bg-alert/15 border border-alert/35 text-alerttext rounded-md uppercase tracking-wide animate-pulse">
           Alert
         </span>
       )}

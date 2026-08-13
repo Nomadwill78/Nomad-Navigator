@@ -145,7 +145,7 @@ export const TeamManagementView: React.FC = () => {
                 </td>
                 <td className="px-6 py-4">
                    <div className="flex items-center gap-1.5 text-inkmute">
-                      {member.userId ? <CheckCircle2 size={14} className="text-green-500" /> : <div className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse" />}
+                      {member.userId ? <CheckCircle2 size={14} className="text-teal" /> : <div className="w-1.5 h-1.5 bg-brass rounded-full animate-pulse" />}
                       <span className="text-xs font-medium">{member.userId ? 'Verified' : 'Pending'}</span>
                    </div>
                 </td>
@@ -157,7 +157,7 @@ export const TeamManagementView: React.FC = () => {
                     {member.userId !== user?.uid && member.userId !== organization?.creatorId && (
                       <button 
                         onClick={() => handleDeleteMember((member as any).docId)}
-                        className="text-inkfaint hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-500/10"
+                        className="text-inkfaint hover:text-alert transition-colors p-2 rounded-lg hover:bg-alert/15"
                       >
                         <Trash2 size={16} />
                       </button>
@@ -229,7 +229,7 @@ export const TeamManagementView: React.FC = () => {
                 <button 
                   onClick={handleInvite}
                   disabled={!inviteEmail.trim()}
-                  className="flex-1 bg-abyss text-white py-3 rounded-xl font-bold hover:bg-surface2 transition-all disabled:opacity-50"
+                  className="flex-1 bg-abyss text-parchment py-3 rounded-xl font-bold hover:bg-surface2 transition-all disabled:opacity-50"
                 >
                   Send Invite
                 </button>
