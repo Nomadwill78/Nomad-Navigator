@@ -649,7 +649,7 @@ const App: React.FC = () => {
             className={`flex items-center gap-3 w-full p-3 rounded-lg transition-all duration-200 group ${
               isDemoMode
                 ? 'bg-brass/10 text-brassbright border border-brass/25'
-                : 'text-inkmute hover:bg-white/5 hover:text-parchment border border-transparent'
+                : 'text-inkmute hover:bg-surface2 hover:text-parchment border border-transparent'
             }`}
           >
             <Sparkles size={20} className={isDemoMode ? 'animate-pulse' : ''} />
@@ -695,7 +695,7 @@ const App: React.FC = () => {
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 text-inkmute hover:text-parchment hover:bg-white/5 rounded-lg transition-all"
+              className="p-2 text-inkmute hover:text-parchment hover:bg-surface2 rounded-lg transition-all"
             >
               <Menu size={20} />
             </button>
@@ -735,7 +735,7 @@ const App: React.FC = () => {
                   <span>Verified Data</span>
               </div>
             )}
-            <button className="relative p-2 text-inkmute hover:text-parchment hover:bg-white/5 rounded-lg transition-colors">
+            <button className="relative p-2 text-inkmute hover:text-parchment hover:bg-surface2 rounded-lg transition-colors">
               <Bell size={20} />
               <span className="absolute top-2 right-2 w-2 h-2 bg-brass rounded-full ring-2 ring-abyss"></span>
             </button>
@@ -1255,7 +1255,7 @@ const NavItem: React.FC<{
       className={`relative flex items-center gap-3 w-full p-3 rounded-lg transition-all duration-200 group ${
       active
         ? 'bg-teal/10 text-ivory border border-teal/25'
-        : 'text-inkmute hover:bg-white/5 hover:text-parchment border border-transparent'
+        : 'text-inkmute hover:bg-surface2 hover:text-parchment border border-transparent'
     }`}>
       {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-0.5 rounded-full bg-brass"></span>}
       <span className="relative">

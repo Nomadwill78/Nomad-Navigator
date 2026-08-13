@@ -453,7 +453,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                   <p className="text-sm font-bold text-parchment">Drag & drop your CSV file here</p>
                   <p className="text-xs text-inkfaint mt-1">or click to browse from your device</p>
                 </div>
-                <div className="text-[10px] bg-white/5 text-inkmute px-2.5 py-1 rounded-md font-semibold uppercase tracking-wider">
+                <div className="text-[10px] bg-abyss text-inkmute px-2.5 py-1 rounded-md font-semibold uppercase tracking-wider">
                   Supports UTF-8 CSV
                 </div>
               </div>

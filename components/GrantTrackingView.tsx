@@ -265,7 +265,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                     grant.status === 'active' ? 'bg-teal/15 text-teal' :
                     grant.status === 'completed' ? 'bg-teal/15 text-inkmute' :
-                    'bg-white/5 text-inkmute'
+                    'bg-abyss text-inkmute'
                   }`}>
                     {grant.status}
                   </span>
@@ -305,7 +305,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                   </div>
                   <div className="flex gap-2">
                     {permissions?.canEditGrants && (
-                      <button className="p-2 text-inkfaint hover:text-inkmute hover:bg-white/5 rounded-lg transition-colors">
+                      <button className="p-2 text-inkfaint hover:text-inkmute hover:bg-surface2 rounded-lg transition-colors">
                         <Edit2 size={18} />
                       </button>
                     )}
@@ -435,7 +435,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                   );
                 })()}
 
-                <div className="flex gap-2 p-1 bg-white/10 rounded-xl w-fit">
+                <div className="flex gap-2 p-1 bg-abyss border border-hairline rounded-xl w-fit">
                    <button 
                      onClick={() => setActiveTab('kpis')}
                      className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'kpis' ? 'bg-surface text-ivory shadow-sm' : 'text-inkmute hover:text-parchment'}`}
