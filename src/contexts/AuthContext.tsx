@@ -11,7 +11,7 @@ import {
   runTransaction,
   serverTimestamp 
 } from 'firebase/firestore';
-import { auth, db, signInWithGoogle, getRedirectResult } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
 import { UserProfile, Organization, OrgMember, UserRole, Invitation, SEAT_LIMIT } from '../../types';
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { clearLegacyLocalData } from '../lib/orgData';
@@ -27,7 +27,6 @@ interface AuthContextType {
   loading: boolean;
   /** A pending invitation addressed to this user's email, if they have no org yet. */
   invitation: Invitation | null;
-  login: () => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerWithEmail: (email: string, pass: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -50,17 +49,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let profileUnsubscribe: (() => void) | undefined;
     let orgUnsubscribe: (() => void) | undefined;
     let memberUnsubscribe: (() => void) | undefined;
-
-    // Handle redirected sign-in results
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result) {
-          console.log("Successfully signed in via Google redirect", result.user);
-        }
-      })
-      .catch((error) => {
-        console.error("Firebase Google redirect sign-in error:", error);
-      });
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
@@ -161,15 +149,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       cancelled = true;
     };
   }, [user?.email, profile?.currentOrgId]);
-
-  const login = async () => {
-    try {
-      await signInWithGoogle();
-    } catch (error) {
-      console.error('Login failed:', error);
-      throw error;
-    }
-  };
 
   const loginWithEmail = async (email: string, pass: string) => {
     const { signInWithEmailAndPassword } = await import('../lib/firebase');
@@ -283,7 +262,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <AuthContext.Provider value={{
       user, profile, organization, role, loading, invitation,
-      login, loginWithEmail, registerWithEmail, logout, createOrg,
+      loginWithEmail, registerWithEmail, logout, createOrg,
       acceptInvitation, resendVerificationEmail
     }}>
       {children}
