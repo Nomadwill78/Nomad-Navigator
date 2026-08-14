@@ -41,25 +41,59 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
   const [isAddingGrant, setIsAddingGrant] = useState(false);
   const [selectedGrantId, setSelectedGrantId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'kpis' | 'subgrantees'>('kpis');
+  const [editingHeaderId, setEditingHeaderId] = useState<string | null>(null);
+  const [headerDraft, setHeaderDraft] = useState<{
+    name: string; funder: string; amount: string; startDate: string; endDate: string; status: Grant['status'];
+  } | null>(null);
 
   const handleAddGrant = () => {
+    // Left genuinely blank rather than filled with plausible-looking numbers —
+    // a new grant should look obviously unfinished, not like real data.
+    const today = new Date().toISOString().split('T')[0];
     const newGrant: Grant = {
       id: Date.now().toString(),
-      name: "New Strategic Grant",
-      funder: "Foundation Name",
-      amount: 50000,
+      name: '',
+      funder: '',
+      amount: 0,
       spentAmount: 0,
-      startDate: new Date().toISOString().split('T')[0],
+      startDate: today,
       endDate: new Date(Date.now() + 31536000000).toISOString().split('T')[0],
       status: 'pending',
-      kpis: [
-        { id: '1', name: 'Beneficiaries Reached', target: 1000, current: 0, unit: 'people' }
-      ],
+      kpis: [],
       subgrantees: []
     };
     onUpdateGrants([...grants, newGrant]);
     setIsAddingGrant(false);
     setSelectedGrantId(newGrant.id);
+    openHeaderEditor(newGrant);
+  };
+
+  const openHeaderEditor = (grant: Grant) => {
+    setEditingHeaderId(grant.id);
+    setHeaderDraft({
+      name: grant.name,
+      funder: grant.funder,
+      amount: String(grant.amount ?? 0),
+      startDate: grant.startDate,
+      endDate: grant.endDate,
+      status: grant.status,
+    });
+  };
+
+  const saveHeaderEditor = () => {
+    if (!editingHeaderId || !headerDraft) return;
+    const parsedAmount = Number(headerDraft.amount);
+    onUpdateGrants(grants.map(g => g.id === editingHeaderId ? {
+      ...g,
+      name: headerDraft.name.trim() || 'Untitled Grant',
+      funder: headerDraft.funder.trim(),
+      amount: Number.isFinite(parsedAmount) ? Math.max(0, parsedAmount) : g.amount,
+      startDate: headerDraft.startDate,
+      endDate: headerDraft.endDate,
+      status: headerDraft.status,
+    } : g));
+    setEditingHeaderId(null);
+    setHeaderDraft(null);
   };
 
   const handleUpdateKPI = (grantId: string, kpiId: string, updates: Partial<GrantKPI>) => {
@@ -235,7 +269,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
               className="flex items-center gap-2 bg-gradient-to-b from-brassbright to-brass text-[#26200e] px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-brass/25 hover:brightness-105 transition-all hover:scale-[1.02] active:scale-95"
             >
               <Plus size={18} />
-              New Tracking Goal
+              Add Grant
             </button>
           )}
         </div>
@@ -294,23 +328,98 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
           {selectedGrant ? (
             <div className="bg-surface rounded-2xl border border-hairline shadow-sm overflow-hidden animate-in fade-in zoom-in-95 duration-300">
               <div className="p-8 border-b border-hairline/60 bg-ink/50">
+                {editingHeaderId === selectedGrant.id && headerDraft ? (
+                  <div className="mb-6 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <input
+                        type="text"
+                        value={headerDraft.name}
+                        onChange={(e) => setHeaderDraft({ ...headerDraft, name: e.target.value })}
+                        placeholder="Grant name"
+                        className="px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-lg font-bold text-ivory placeholder:text-inkfaint placeholder:font-normal outline-none focus:ring-2 focus:ring-teal/40"
+                        autoFocus
+                      />
+                      <input
+                        type="text"
+                        value={headerDraft.funder}
+                        onChange={(e) => setHeaderDraft({ ...headerDraft, funder: e.target.value })}
+                        placeholder="Funder"
+                        className="px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-sm text-parchment placeholder:text-inkfaint outline-none focus:ring-2 focus:ring-teal/40"
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        value={headerDraft.amount}
+                        onChange={(e) => setHeaderDraft({ ...headerDraft, amount: e.target.value })}
+                        placeholder="Award amount"
+                        className="px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-sm text-parchment placeholder:text-inkfaint outline-none focus:ring-2 focus:ring-teal/40"
+                      />
+                      <select
+                        value={headerDraft.status}
+                        onChange={(e) => setHeaderDraft({ ...headerDraft, status: e.target.value as Grant['status'] })}
+                        className="px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-sm text-parchment outline-none focus:ring-2 focus:ring-teal/40"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="active">Active</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                      <label className="flex flex-col gap-1 text-xs text-inkfaint">
+                        Start date
+                        <input
+                          type="date"
+                          value={headerDraft.startDate}
+                          onChange={(e) => setHeaderDraft({ ...headerDraft, startDate: e.target.value })}
+                          className="px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-sm text-parchment outline-none focus:ring-2 focus:ring-teal/40"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-xs text-inkfaint">
+                        End date
+                        <input
+                          type="date"
+                          value={headerDraft.endDate}
+                          onChange={(e) => setHeaderDraft({ ...headerDraft, endDate: e.target.value })}
+                          className="px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-sm text-parchment outline-none focus:ring-2 focus:ring-teal/40"
+                        />
+                      </label>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={saveHeaderEditor}
+                        className="px-4 py-2 bg-teal text-abyss rounded-lg text-xs font-bold hover:brightness-105 transition-all"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => { setEditingHeaderId(null); setHeaderDraft(null); }}
+                        className="px-4 py-2 bg-white/5 text-inkmute rounded-lg text-xs font-bold hover:bg-white/10 transition-all"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
                 <div className="flex justify-between items-start mb-6">
                   <div>
-                    <h3 className="text-2xl font-bold text-ivory mb-1">{selectedGrant.name}</h3>
+                    <h3 className="text-2xl font-bold text-ivory mb-1">{selectedGrant.name || 'Untitled Grant'}</h3>
                     <div className="flex items-center gap-4 text-sm text-inkmute">
-                        <span className="flex items-center gap-1.5"><DollarSign size={14} className="text-inkfaint" /> {selectedGrant.funder}</span>
+                        <span className="flex items-center gap-1.5"><DollarSign size={14} className="text-inkfaint" /> {selectedGrant.funder || 'No funder set'}</span>
                         <span className="w-1.5 h-1.5 rounded-full bg-inkfaint"></span>
                         <span className="flex items-center gap-1.5"><Calendar size={14} className="text-inkfaint" /> {selectedGrant.startDate} - {selectedGrant.endDate}</span>
                     </div>
                   </div>
                   <div className="flex gap-2">
                     {permissions?.canEditGrants && (
-                      <button className="p-2 text-inkfaint hover:text-inkmute hover:bg-white/5 rounded-lg transition-colors">
+                      <button
+                        onClick={() => openHeaderEditor(selectedGrant)}
+                        title="Edit grant details"
+                        className="p-2 text-inkfaint hover:text-inkmute hover:bg-white/5 rounded-lg transition-colors"
+                      >
                         <Edit2 size={18} />
                       </button>
                     )}
                   </div>
                 </div>
+                )}
 
                 {/* Visual Progress Bar: Spent Funds versus Time Elapsed */}
                 {(() => {
@@ -688,7 +797,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                       <div>
                         <h5 className="font-bold text-ivory mb-1">Subgrantee Compliance</h5>
                         <p className="text-sm text-parchment/80 leading-relaxed font-medium">
-                          Partner organizations are averaging **84% compliance**. Nomad Compass recommends requesting additional validation data from {selectedGrant.subgrantees?.[0]?.name || 'partners'} before the quarterly disbursement.
+                          Partner organizations are averaging <strong className="font-bold text-parchment">84% compliance</strong>. Nomad Compass recommends requesting additional validation data from {selectedGrant.subgrantees?.[0]?.name || 'partners'} before the quarterly disbursement.
                         </p>
                       </div>
                     </div>

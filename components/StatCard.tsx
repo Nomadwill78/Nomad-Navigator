@@ -9,11 +9,16 @@ interface StatCardProps {
   trendDirection?: 'up' | 'down' | 'neutral';
   icon: React.ReactNode;
   description?: string;
-  gradientFrom: string;
-  gradientTo: string;
+  /** Which bearing this metric reads on: impact (teal) or governance and money (brass). */
+  accent?: 'impact' | 'governance';
   sparklineData?: { value: number }[];
   subValue?: string;
 }
+
+const ACCENTS = {
+  impact: '#4fc4d3',
+  governance: '#cba85c',
+} as const;
 
 export const StatCard: React.FC<StatCardProps> = ({
   title,
@@ -22,13 +27,11 @@ export const StatCard: React.FC<StatCardProps> = ({
   trendDirection = 'neutral',
   icon,
   description,
-  gradientFrom,
+  accent: accentKey = 'impact',
   sparklineData,
   subValue,
 }) => {
-  // Brass for governance/quality metrics, teal for impact/efficiency
-  const isBrass = /purple|amber|pink|orange/.test(gradientFrom);
-  const accent = isBrass ? '#cba85c' : '#4fc4d3';
+  const accent = ACCENTS[accentKey];
 
   return (
     <div className="relative overflow-hidden rounded-xl p-6 bg-surface border border-hairline transition-all duration-300 hover:border-brass/45 group">
@@ -46,7 +49,7 @@ export const StatCard: React.FC<StatCardProps> = ({
 
           {trend && (
             <div
-              className="flex items-center text-[0.68rem] font-mono2 font-bold px-2 py-1 rounded-full border"
+              className="flex items-center text-[0.6rem] font-mono2 font-bold px-2 py-1 rounded-full border"
               style={
                 trendDirection === 'down'
                   ? { color: '#93a6c2', background: 'rgba(147,166,194,0.08)', borderColor: 'rgba(147,166,194,0.25)' }

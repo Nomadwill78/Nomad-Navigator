@@ -23,6 +23,13 @@ export const KpiSidebar: React.FC<KpiSidebarProps> = ({ kpis }) => {
         </span>
       </div>
 
+      {kpis.length === 0 && (
+        <p className="text-xs text-inkmute leading-relaxed">
+          No indicators yet. Add them under <span className="text-parchment">Manage Data → Key
+          Performance Indicators</span>.
+        </p>
+      )}
+
       <div className="space-y-5">
         {kpis.map((kpi) => {
           const isUp = kpi.trend === 'up';

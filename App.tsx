@@ -9,8 +9,6 @@ import {
   Settings, 
   Sparkles,
   Menu,
-  Bell,
-  Search,
   MapPin,
   Target,
   ShieldCheck,
@@ -18,7 +16,9 @@ import {
   ArrowRight,
   ChevronDown,
   Database,
-  Download
+  Download,
+  CheckCircle2,
+  Circle
 } from 'lucide-react';
 import { exportDashboardPDF } from './src/lib/exportUtils';
 import { 
@@ -51,21 +51,25 @@ import { DemoModeBanner, DemoHint } from './components/DemoTour';
 import { BrandLogo } from './components/BrandLogo';
 import { KpiSidebar } from './components/KpiSidebar';
 import { useAuth } from './src/contexts/AuthContext';
+import { useOrgData } from './src/hooks/useOrgData';
 import { generateImpactReport } from './services/geminiService';
 import { DashboardStats, ProgramMetric, Grant, Opportunity, ROLE_PERMISSIONS } from './types';
 
-// --- Colors & Gradients ---
-// Cartographic chart ramps — teal (impact), brass (funding), parchment (neutral)
+// --- Chart ramps ---
+// Named for what they mean, not for a hue. Teal reads impact, brass reads money
+// and governance, slate stays neutral. See DESIGN.md → Colors → Chart Ramps.
 const COLORS = {
-  blue: ['#4fc4d3', '#6fd2de', '#9ae0e8', '#c4eef2'],
-  green: ['#4fc4d3', '#3faebd', '#2f8b98', '#256e78'],
-  purple: ['#cba85c', '#e7ce88', '#8fa6c4', '#5c7291'],
-  orange: ['#cba85c', '#e7ce88', '#b8905a', '#8a6d3f'],
-  slate: ['#6f86a6', '#93a6c2', '#b7c4d8', '#d8e0ec']
+  impact: ['#4fc4d3', '#6fd2de', '#9ae0e8', '#c4eef2'],
+  funding: ['#cba85c', '#e7ce88', '#b8905a', '#8a6d3f'],
+  fundingDeep: ['#cba85c', '#b8905a', '#8a6d3f', '#6f5926'],
+  neutral: ['#6f86a6', '#93a6c2', '#b7c4d8', '#d8e0ec']
 };
 
-// --- Mock Data ---
-const MOCK_GRANTS: Grant[] = [
+// --- Sample data ---
+// EVERYTHING BELOW IS SAMPLE CONTENT AND IS ONLY EVER SHOWN IN DEMO MODE.
+// A real organization starts empty and fills up from its own entries; sample
+// numbers are never seeded into an org's Firestore data.
+const SAMPLE_GRANTS: Grant[] = [
   {
     id: 'g1',
     name: 'Clean Water Initiative - Phase II',
@@ -118,7 +122,7 @@ const MOCK_GRANTS: Grant[] = [
   }
 ];
 
-const MOCK_PROGRAMS: ProgramMetric[] = [
+const SAMPLE_PROGRAMS: ProgramMetric[] = [
   { id: '1', name: 'Jan', month: 'Jan', peopleServed: 1200, totalCost: 15000, costPerPerson: 12.5 },
   { id: '2', name: 'Feb', month: 'Feb', peopleServed: 1800, totalCost: 18500, costPerPerson: 10.2 },
   { id: '3', name: 'Mar', month: 'Mar', peopleServed: 2200, totalCost: 21000, costPerPerson: 9.5 },
@@ -170,7 +174,7 @@ const DEMO_GRANTS: Grant[] = [
   }
 ];
 
-const MOCK_OPPORTUNITIES: Opportunity[] = [
+const SAMPLE_OPPORTUNITIES: Opportunity[] = [
   {
     id: 'o1',
     funder: 'Bloomberg Philanthropies',
@@ -182,7 +186,7 @@ const MOCK_OPPORTUNITIES: Opportunity[] = [
     whyMatch: 'Matches your current 92% performance in Urban WASH projects and your high SROI in East Africa.'
   },
   {
-    id: 'o1',
+    id: 'o2',
     funder: 'World Health Organization',
     name: 'Community Hygiene Accelerator',
     amount: 200000,
@@ -193,11 +197,11 @@ const MOCK_OPPORTUNITIES: Opportunity[] = [
   }
 ];
 
-const AGGREGATED_STATS: DashboardStats = {
+const SAMPLE_STATS: DashboardStats = {
   totalPeopleServed: 13600,
   totalBudgetSpent: 132500,
   avgCostPerPerson: 9.74,
-  programs: MOCK_PROGRAMS,
+  programs: SAMPLE_PROGRAMS,
   demographics: {
     age: [
       { name: 'Youth (0-17)', value: 35 },
@@ -304,7 +308,7 @@ const AGGREGATED_STATS: DashboardStats = {
 };
 
 const DEMO_STATS: DashboardStats = {
-  ...AGGREGATED_STATS,
+  ...SAMPLE_STATS,
   totalPeopleServed: 54200,
   totalBudgetSpent: 450000,
   avgCostPerPerson: 8.30,
@@ -357,7 +361,6 @@ const DEMO_STATS: DashboardStats = {
 };
 
 // Transform data for sparklines
-const SPARK_COST = MOCK_PROGRAMS.map(p => ({ value: p.totalCost }));
 const SPARK_FINANCIALS_SPENDING = [
   { value: 45000 }, { value: 52000 }, { value: 48000 }, { value: 61000 }, { value: 55000 }, { value: 67000 }
 ];
@@ -366,44 +369,29 @@ const SPARK_FINANCIALS_SOURCES = [
 ];
 
 const App: React.FC = () => {
-  const { user, profile, organization, role, loading, login, logout, createOrg } = useAuth();
+  const {
+    user, profile, organization, role, loading, invitation,
+    login, logout, createOrg, acceptInvitation, resendVerificationEmail,
+  } = useAuth();
   const permissions = role ? ROLE_PERMISSIONS[role] : null;
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeView, setActiveView] = useState<'dashboard' | 'data' | 'grants' | 'analysis' | 'discovery' | 'team'>('dashboard');
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [trajectoryRange, setTrajectoryRange] = useState<'6M' | '1Y' | 'ALL'>('ALL');
 
-  // Initialize from cache or fallback to active starting constants
-  const [stats, setStats] = useState<DashboardStats>(() => {
-    try {
-      const cached = localStorage.getItem('nomad_compass_stats');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (!parsed.saasKpis) {
-          parsed.saasKpis = AGGREGATED_STATS.saasKpis;
-        }
-        return parsed;
-      }
-    } catch (e) {
-      console.error('Failed to parse cached stats:', e);
-    }
-    return AGGREGATED_STATS;
-  });
-
-  const [grants, setGrants] = useState<Grant[]>(() => {
-    try {
-      const cached = localStorage.getItem('nomad_compass_grants');
-      if (cached) {
-        return JSON.parse(cached);
-      }
-    } catch (e) {
-      console.error('Failed to parse cached grants:', e);
-    }
-    return MOCK_GRANTS;
-  });
+  // Grants and metrics live in Firestore under this organization, so every member
+  // of the org sees the same numbers. Demo mode is served from memory and never written.
+  const { stats, grants, setStats, setGrants, syncStatus, syncError } = useOrgData(
+    organization?.id ?? null,
+    isDemoMode,
+    DEMO_STATS,
+    DEMO_GRANTS
+  );
 
   const sparkImpact = (stats.programs || []).map(p => ({ value: p.peopleServed }));
   const sparkRoi = (stats.programs || []).map(p => ({ value: p.costPerPerson }));
+  const hasNoData = !isDemoMode && stats.totalPeopleServed === 0 && (stats.programs || []).length === 0;
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
@@ -423,27 +411,6 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Sync state variables to local storage for persistent data access
-  useEffect(() => {
-    if (!isDemoMode) {
-      try {
-        localStorage.setItem('nomad_compass_stats', JSON.stringify(stats));
-      } catch (e) {
-        console.error('Failed to write stats to localStorage:', e);
-      }
-    }
-  }, [stats, isDemoMode]);
-
-  useEffect(() => {
-    if (!isDemoMode) {
-      try {
-        localStorage.setItem('nomad_compass_grants', JSON.stringify(grants));
-      } catch (e) {
-        console.error('Failed to write grants to localStorage:', e);
-      }
-    }
-  }, [grants, isDemoMode]);
-
   // Stripe donation link. Opens a hosted Stripe Payment Link — no backend
   // needed, so it works on the static Vercel deployment. Create the link in the
   // Stripe Dashboard (Payment Links → let customers choose the amount) and paste
@@ -458,26 +425,6 @@ const App: React.FC = () => {
     }
     window.location.href = DONATION_LINK;
   };
-
-  // Toggle Demo Mode (Loads clean demo metrics of different size, doesn't rewrite persistent cache)
-  useEffect(() => {
-    if (isDemoMode) {
-      setStats(DEMO_STATS);
-      setGrants(DEMO_GRANTS);
-    } else {
-      // Revert to primary cached values or standard ones if no cache is saved yet
-      try {
-        const cachedStats = localStorage.getItem('nomad_compass_stats');
-        const cachedGrants = localStorage.getItem('nomad_compass_grants');
-        setStats(cachedStats ? JSON.parse(cachedStats) : AGGREGATED_STATS);
-        setGrants(cachedGrants ? JSON.parse(cachedGrants) : MOCK_GRANTS);
-      } catch (e) {
-        setStats(AGGREGATED_STATS);
-        setGrants(MOCK_GRANTS);
-      }
-    }
-  }, [isDemoMode]);
-
 
   // Handle Payment Success/Cancel Notifications
   useEffect(() => {
@@ -512,7 +459,16 @@ const App: React.FC = () => {
   }
 
   if (!organization) {
-    return <OnboardingView userEmail={user.email || ''} onCreateOrg={createOrg} />;
+    return (
+      <OnboardingView
+        userEmail={user.email || ''}
+        onCreateOrg={createOrg}
+        invitation={invitation}
+        emailVerified={user.emailVerified}
+        onAcceptInvitation={acceptInvitation}
+        onResendVerification={resendVerificationEmail}
+      />
+    );
   }
 
   const handleGenerateReport = async (frequency?: any) => {
@@ -663,8 +619,8 @@ const App: React.FC = () => {
           {role && ROLE_PERMISSIONS[role].canManageTeam && (
             <NavItem icon={<Users size={20} />} label="Team Management" active={activeView === 'team'} isOpen={isSidebarOpen} onClick={() => setActiveView('team')} />
           )}
-          <NavItem icon={<MapPin size={20} />} label="Geographic Reach" isOpen={isSidebarOpen} />
-          <NavItem icon={<DollarSign size={20} />} label="Financials" isOpen={isSidebarOpen} />
+          <NavItem icon={<MapPin size={20} />} label="Geographic Reach" isOpen={isSidebarOpen} comingSoon />
+          <NavItem icon={<DollarSign size={20} />} label="Financials" isOpen={isSidebarOpen} comingSoon />
           
           <div className="px-3 pt-4 border-t border-hairline/40 mt-4">
             <button
@@ -683,7 +639,7 @@ const App: React.FC = () => {
         </nav>
 
         <div className="p-3 border-t border-hairline/40 bg-abyss">
-           <NavItem icon={<Settings size={20} />} label="Settings" isOpen={isSidebarOpen} />
+           <NavItem icon={<Settings size={20} />} label="Settings" isOpen={isSidebarOpen} comingSoon />
         </div>
       </aside>
 
@@ -700,17 +656,19 @@ const App: React.FC = () => {
             >
               <Menu size={20} />
             </button>
-            <div className="relative hidden md:block group">
-                <Search className="absolute left-3 top-3 text-inkfaint w-4 h-4 group-focus-within:text-teal transition-colors" />
-                <input
-                    type="text"
-                    placeholder="Search metrics..."
-                    className="pl-10 pr-4 py-2.5 bg-ink/70 border border-hairline/60 rounded-lg text-sm text-parchment placeholder:text-inkfaint focus:ring-2 focus:ring-teal/40 focus:border-teal/50 w-64 outline-none transition-all"
-                />
-            </div>
           </div>
 
           <div className="flex gap-3">
+            {syncStatus === 'error' && (
+              <div
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 text-rose-200 text-xs font-semibold rounded-full border border-rose-500/30"
+                title={syncError ?? 'Could not save to the database.'}
+              >
+                <div className="w-1.5 h-1.5 rounded-full bg-rose-400"></div>
+                <span>Not saving</span>
+              </div>
+            )}
+
             {isOnline ? (
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-teal/10 text-teal text-xs font-semibold rounded-full border border-teal/25">
                 <div className="w-1.5 h-1.5 rounded-full bg-teal animate-pulse"></div>
@@ -724,22 +682,30 @@ const App: React.FC = () => {
             )}
 
             {isDemoMode ? (
-              <DemoHint text="Verified by AI" position="bottom">
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-teal/10 text-teal text-xs font-semibold rounded-full border border-teal/25">
-                    <ShieldCheck size={14} />
-                    <span>Verified Data</span>
-                </div>
-              </DemoHint>
+              <div
+                className="flex items-center gap-2 px-3 py-1.5 bg-brass/10 text-brassbright text-xs font-semibold rounded-full border border-brass/25"
+                title="Sample data for exploring the product — never saved to your organization"
+              >
+                <ShieldCheck size={14} />
+                <span>Demo Data</span>
+              </div>
+            ) : stats.dataQuality.level && stats.dataQuality.level !== 'Not set' ? (
+              <div
+                className="flex items-center gap-2 px-3 py-1.5 bg-teal/10 text-teal text-xs font-semibold rounded-full border border-teal/25"
+                title={`Self-reported by your organization · ${stats.dataQuality.method}`}
+              >
+                <ShieldCheck size={14} />
+                <span>Data Status: {stats.dataQuality.level}</span>
+              </div>
             ) : (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-teal/10 text-teal text-xs font-semibold rounded-full border border-teal/25">
-                  <ShieldCheck size={14} />
-                  <span>Verified Data</span>
+              <div
+                className="flex items-center gap-2 px-3 py-1.5 bg-white/5 text-inkfaint text-xs font-semibold rounded-full border border-hairline"
+                title="Set a data quality level in Manage Data once you've entered your numbers"
+              >
+                <ShieldCheck size={14} />
+                <span>Data Status: Not Set</span>
               </div>
             )}
-            <button className="relative p-2 text-inkmute hover:text-parchment hover:bg-white/5 rounded-lg transition-colors">
-              <Bell size={20} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-brass rounded-full ring-2 ring-abyss"></span>
-            </button>
             <div className="flex items-center gap-3 pl-4 border-l border-hairline/50">
                <div className="text-right hidden sm:block">
                   <p className="text-xs font-bold text-parchment">{profile?.displayName}</p>
@@ -767,7 +733,7 @@ const App: React.FC = () => {
           ) : activeView === 'analysis' ? (
             <AnalysisView stats={stats} grants={grants} />
           ) : activeView === 'discovery' ? (
-            <GrantDiscoveryView opportunities={MOCK_OPPORTUNITIES} />
+            <GrantDiscoveryView opportunities={SAMPLE_OPPORTUNITIES} />
           ) : activeView === 'team' ? (
             <TeamManagementView />
           ) : (
@@ -778,7 +744,12 @@ const App: React.FC = () => {
                   <p className="font-mono2 text-[0.62rem] tracking-[0.28em] uppercase text-brass mb-1.5">Bearing · Program Impact</p>
                   <h1 className="font-display text-4xl font-semibold text-ivory tracking-tight">Program Impact</h1>
                   <p className="text-inkmute mt-1.5 flex items-center gap-2 text-sm font-mono2">
-                    FY 2025 · Q1–Q2 <span className="w-1 h-1 rounded-full bg-inkfaint"></span> Updated today
+                    FY 2025 · Q1–Q2 <span className="w-1 h-1 rounded-full bg-inkfaint"></span>{' '}
+                    {isDemoMode
+                      ? 'Demo data'
+                      : stats.dataQuality.lastUpdated && stats.dataQuality.lastUpdated !== '—'
+                      ? `Updated ${stats.dataQuality.lastUpdated}`
+                      : 'No data entered yet'}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
@@ -814,6 +785,56 @@ const App: React.FC = () => {
                   )}
                 </div>
               </div>
+
+              {/* First-run guided path: a new organization starts empty, so tell it
+                  what to do first rather than presenting a full dashboard with nothing
+                  to explain it. Steps drop off the list as they're completed and the
+                  whole checklist disappears once data and a grant both exist. */}
+              {!isDemoMode && (hasNoData || grants.length === 0) && (
+                <div className="bg-surface border border-brass/25 rounded-xl p-6 animate-in fade-in duration-500">
+                  <div className="flex items-start gap-4 mb-5">
+                    <div className="p-3 bg-brass/10 border border-brass/25 rounded-xl text-brassbright shrink-0">
+                      <Database size={22} />
+                    </div>
+                    <div>
+                      <h3 className="font-display text-lg font-semibold text-ivory mb-1">
+                        Complete Your Compass
+                      </h3>
+                      <p className="text-sm text-inkmute leading-relaxed max-w-xl">
+                        A few steps get this dashboard reading real numbers instead of an empty screen.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <ChecklistStep done label="Create organization" />
+                    <ChecklistStep
+                      done={!hasNoData}
+                      label="Add your data"
+                      actionLabel="Add data"
+                      onAction={() => setActiveView('data')}
+                    />
+                    <ChecklistStep
+                      done={grants.length > 0}
+                      label="Track a grant"
+                      actionLabel="Add grant"
+                      onAction={() => setActiveView('grants')}
+                    />
+                    <ChecklistStep
+                      done={false}
+                      label="Generate a report"
+                      actionLabel="Generate"
+                      onAction={handleGenerateReport}
+                    />
+                  </div>
+                  <p className="text-xs text-inkfaint mt-4">
+                    Prefer to look around first?{' '}
+                    <button onClick={() => setIsDemoMode(true)} className="text-brassbright hover:underline font-semibold">
+                      Try Demo Mode
+                    </button>{' '}
+                    — sample data, never saved to your organization.
+                  </p>
+                </div>
+              )}
 
               {/* Theory of Change Banner */}
               <div className="bg-surface rounded-xl p-0 border border-hairline relative overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
@@ -857,8 +878,7 @@ const App: React.FC = () => {
                   trendDirection="up"
                   description="Sustained clean water access"
                   icon={<Target />}
-                  gradientFrom="from-blue-500"
-                  gradientTo="to-indigo-600"
+                  accent="impact"
                   sparklineData={sparkImpact}
                 />
 
@@ -870,8 +890,7 @@ const App: React.FC = () => {
                   trendDirection="up"
                   description={`SROI: $${stats.sroi} social value per $1`}
                   icon={<Scale />}
-                  gradientFrom="from-emerald-500"
-                  gradientTo="to-teal-600"
+                  accent="impact"
                   sparklineData={sparkRoi}
                 />
 
@@ -882,8 +901,7 @@ const App: React.FC = () => {
                   trendDirection="neutral"
                   description={`${stats.dataQuality.method} methodology`}
                   icon={<ShieldCheck />}
-                  gradientFrom="from-purple-500"
-                  gradientTo="to-pink-600"
+                  accent="governance"
                   // No sparkline for quality
                 />
               </div>
@@ -923,12 +941,12 @@ const App: React.FC = () => {
                                 label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                               >
                                 {stats.demographics.age.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={COLORS.blue[index % COLORS.blue.length]} stroke="none" />
+                                  <Cell key={`cell-${index}`} fill={COLORS.impact[index % COLORS.impact.length]} stroke="none" />
                                 ))}
                               </Pie>
                               <Tooltip 
-                                  contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} 
-                                  itemStyle={{color: '#334155', fontWeight: 600}}
+                                  contentStyle={{background: '#0b1c33', borderRadius: '10px', border: '1px solid #24405f', boxShadow: '0 18px 40px -18px rgba(0, 0, 0, 0.7)'}} 
+                                  itemStyle={{color: '#f1e9d6', fontWeight: 600}}
                                 />
                             </PieChart>
                           </ResponsiveContainer>
@@ -944,7 +962,7 @@ const App: React.FC = () => {
                       <div className="flex justify-center gap-4 flex-wrap">
                           {stats.demographics.age.map((item, i) => (
                               <div key={i} className="flex items-center gap-1.5">
-                                  <div className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS.blue[i]}}></div>
+                                  <div className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS.impact[i]}}></div>
                                   <span className="text-[10px] text-inkmute font-mono2 uppercase tracking-wide">{item.name}</span>
                               </div>
                           ))}
@@ -972,11 +990,11 @@ const App: React.FC = () => {
                                   />
                                   <Tooltip 
                                     cursor={{ fill: 'rgba(79,196,211,0.06)' }}
-                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
+                                    contentStyle={{ background: '#0b1c33', borderRadius: '10px', border: '1px solid #24405f', boxShadow: '0 18px 40px -18px rgba(0, 0, 0, 0.7)' }}
                                   />
                                   <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24}>
                                       {stats.demographics.race.map((entry, index) => (
-                                          <Cell key={`cell-${index}`} fill={COLORS.slate[index % COLORS.slate.length]} />
+                                          <Cell key={`cell-${index}`} fill={COLORS.neutral[index % COLORS.neutral.length]} />
                                       ))}
                                       <LabelList dataKey="value" position="right" style={{ fontSize: 10, fill: '#93a6c2', fontWeight: 700 }} />
                                   </Bar>
@@ -998,14 +1016,31 @@ const App: React.FC = () => {
                       <p className="text-sm text-inkmute">Outcomes achieved over time</p>
                     </div>
                     <div className="flex items-center gap-2 bg-ink rounded-lg p-1 border border-hairline">
-                        <button className="px-3 py-1 text-xs font-semibold bg-teal/15 text-teal rounded-md">6M</button>
-                        <button className="px-3 py-1 text-xs font-medium text-inkmute hover:text-parchment">1Y</button>
-                        <button className="px-3 py-1 text-xs font-medium text-inkmute hover:text-parchment">ALL</button>
+                        {(['6M', '1Y', 'ALL'] as const).map((range) => (
+                          <button
+                            key={range}
+                            onClick={() => setTrajectoryRange(range)}
+                            className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                              trajectoryRange === range
+                                ? 'font-semibold bg-teal/15 text-teal'
+                                : 'font-medium text-inkmute hover:text-parchment'
+                            }`}
+                          >
+                            {range}
+                          </button>
+                        ))}
                     </div>
                   </div>
                   <div className="h-72 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={stats.programs || MOCK_PROGRAMS} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <AreaChart
+                        data={
+                          trajectoryRange === 'ALL'
+                            ? stats.programs || []
+                            : (stats.programs || []).slice(-(trajectoryRange === '6M' ? 6 : 12))
+                        }
+                        margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                      >
                         <defs>
                           <linearGradient id="colorServed" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#4fc4d3" stopOpacity={0.2}/>
@@ -1020,7 +1055,7 @@ const App: React.FC = () => {
                         <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#93a6c2', fontSize: 12}} dy={10} />
                         <YAxis axisLine={false} tickLine={false} tick={{fill: '#93a6c2', fontSize: 12}} />
                         <Tooltip 
-                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }} 
+                          contentStyle={{ background: '#0b1c33', borderRadius: '10px', border: '1px solid #24405f', boxShadow: '0 18px 40px -18px rgba(0, 0, 0, 0.7)' }} 
                           cursor={{stroke: '#3a5878', strokeWidth: 1, strokeDasharray: '4 4'}}
                         />
                         <Legend iconType="circle" />
@@ -1081,16 +1116,16 @@ const App: React.FC = () => {
                               paddingAngle={5}
                             >
                               {stats.financials.spending.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS.green[index % COLORS.green.length]} stroke="none" />
+                                <Cell key={`cell-${index}`} fill={COLORS.funding[index % COLORS.funding.length]} stroke="none" />
                               ))}
                             </Pie>
                             <Tooltip 
-                              contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} 
+                              contentStyle={{background: '#0b1c33', borderRadius: '10px', border: '1px solid #24405f', boxShadow: '0 18px 40px -18px rgba(0, 0, 0, 0.7)'}} 
                             />
                           </PieChart>
                         </ResponsiveContainer>
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                           <span className="font-display text-lg font-semibold text-ivory">{stats.financials.spending[0].value}%</span>
+                           <span className="font-display text-lg font-semibold text-ivory">{stats.financials.spending[0]?.value ?? 0}%</span>
                         </div>
                       </div>
                       
@@ -1129,16 +1164,16 @@ const App: React.FC = () => {
                               paddingAngle={5}
                             >
                               {stats.financials.sources.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS.orange[index % COLORS.orange.length]} stroke="none" />
+                                <Cell key={`cell-${index}`} fill={COLORS.fundingDeep[index % COLORS.fundingDeep.length]} stroke="none" />
                               ))}
                             </Pie>
                             <Tooltip 
-                              contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} 
+                              contentStyle={{background: '#0b1c33', borderRadius: '10px', border: '1px solid #24405f', boxShadow: '0 18px 40px -18px rgba(0, 0, 0, 0.7)'}} 
                             />
                           </PieChart>
                         </ResponsiveContainer>
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                           <span className="font-display text-lg font-semibold text-ivory">{stats.financials.sources[0].value}%</span>
+                           <span className="font-display text-lg font-semibold text-ivory">{stats.financials.sources[0]?.value ?? 0}%</span>
                         </div>
                       </div>
 
@@ -1195,7 +1230,7 @@ const App: React.FC = () => {
 
                 {/* KPI Sidebar Column (Spans 1 column on desktop) */}
                 <div className="lg:col-span-1 lg:sticky lg:top-24">
-                  <KpiSidebar kpis={stats.saasKpis || AGGREGATED_STATS.saasKpis} />
+                  <KpiSidebar kpis={stats.saasKpis || []} />
                 </div>
 
               </div> {/* Closes outer dashboard grid */}
@@ -1242,19 +1277,25 @@ const isDataQualityLow = (levelStr: string): boolean => {
 };
 
 // Helper for Sidebar items
-const NavItem: React.FC<{ 
-  icon: React.ReactNode; 
-  label: string; 
-  active?: boolean; 
+const NavItem: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  active?: boolean;
   isOpen: boolean;
   onClick?: () => void;
   alert?: boolean;
-}> = ({ icon, label, active, isOpen, onClick, alert }) => {
+  /** No screen exists behind this item yet — shown disabled with a "Soon" badge rather than looking like a dead link. */
+  comingSoon?: boolean;
+}> = ({ icon, label, active, isOpen, onClick, alert, comingSoon }) => {
   return (
-    <button 
-      onClick={onClick}
+    <button
+      onClick={comingSoon ? undefined : onClick}
+      disabled={comingSoon}
+      title={comingSoon ? `${label} — not built yet` : undefined}
       className={`relative flex items-center gap-3 w-full p-3 rounded-lg transition-all duration-200 group ${
-      active
+      comingSoon
+        ? 'text-inkfaint/60 cursor-not-allowed border border-transparent'
+        : active
         ? 'bg-teal/10 text-ivory border border-teal/25'
         : 'text-inkmute hover:bg-white/5 hover:text-parchment border border-transparent'
     }`}>
@@ -1264,20 +1305,50 @@ const NavItem: React.FC<{
         {/* Subtle dot on the icon itself if sidebar is collapsed */}
         {alert && !isOpen && (
           <span className="absolute -top-1 -right-1 flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-alert opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-alert"></span>
           </span>
         )}
       </span>
       {isOpen && <span className="font-medium text-sm whitespace-nowrap">{label}</span>}
+      {isOpen && comingSoon && (
+        <span className="ml-auto px-1.5 py-0.5 text-[0.6rem] font-mono2 font-bold bg-white/5 text-inkfaint border border-hairline rounded-md uppercase tracking-wide">
+          Soon
+        </span>
+      )}
       {isOpen && alert && (
-        <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold bg-rose-500 text-white rounded-md uppercase tracking-wide animate-pulse">
+        <span className="ml-auto px-1.5 py-0.5 text-[0.6rem] font-mono2 font-bold bg-alert/15 text-alerttext border border-alert/40 rounded-md uppercase tracking-wide">
           Alert
         </span>
       )}
-      {isOpen && !active && !alert && <ArrowRight size={14} className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />}
+      {isOpen && !active && !alert && !comingSoon && <ArrowRight size={14} className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />}
     </button>
   );
 };
+
+const ChecklistStep: React.FC<{
+  done: boolean;
+  label: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}> = ({ done, label, actionLabel, onAction }) => (
+  <div className={`flex items-center justify-between gap-2 p-3 rounded-lg border ${
+    done ? 'bg-teal/5 border-teal/20' : 'bg-ink/40 border-hairline/60'
+  }`}>
+    <div className="flex items-center gap-2 min-w-0">
+      {done ? (
+        <CheckCircle2 size={16} className="text-teal shrink-0" />
+      ) : (
+        <Circle size={16} className="text-inkfaint shrink-0" />
+      )}
+      <span className={`text-xs font-semibold truncate ${done ? 'text-parchment' : 'text-inkmute'}`}>{label}</span>
+    </div>
+    {!done && onAction && (
+      <button onClick={onAction} className="text-[10px] font-bold uppercase tracking-wide text-brassbright hover:underline shrink-0">
+        {actionLabel || 'Go'}
+      </button>
+    )}
+  </div>
+);
 
 export default App;

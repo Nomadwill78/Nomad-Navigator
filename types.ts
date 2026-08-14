@@ -80,13 +80,50 @@ export interface GeneratedReport {
 
 export type ReportFrequency = 'weekly' | 'monthly' | 'quarterly' | 'annual';
 
-export type UserRole = 
-  | 'admin' 
-  | 'grant_coordinator' 
-  | 'impact_analyst' 
-  | 'compliance_officer' 
-  | 'data_entry' 
+/**
+ * THE AUTHORITATIVE ROLE MODEL.
+ *
+ * These six roles are the single source of truth for authorization. `firestore.rules`
+ * and `security_spec.md` both follow this list — if you change it here, change it in
+ * both of those files in the same commit, or the UI and the database will disagree
+ * about who can do what.
+ *
+ * (An older four-role model — admin/editor/viewer/uploader — existed in the security
+ * spec and is now retired. It never matched the app.)
+ */
+export type UserRole =
+  | 'admin'
+  | 'grant_coordinator'
+  | 'impact_analyst'
+  | 'compliance_officer'
+  | 'data_entry'
   | 'viewer';
+
+export const USER_ROLES: UserRole[] = [
+  'admin',
+  'grant_coordinator',
+  'impact_analyst',
+  'compliance_officer',
+  'data_entry',
+  'viewer',
+];
+
+/** One line per role, shown in the invite picker and the members table. */
+export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
+  admin: 'Full system administration',
+  grant_coordinator: 'Manage grant lifecycle',
+  impact_analyst: 'Manage impact metrics',
+  compliance_officer: 'Audit-only access',
+  data_entry: 'Enter raw metric data',
+  viewer: 'Read-only dashboard',
+};
+
+/**
+ * Maximum members per organization, counting accepted members and pending invitations.
+ * Enforced in the UI here and hard-enforced in `firestore.rules` (`memberCount <= 8`).
+ * Changing the limit means changing BOTH — this constant and the number in the rules.
+ */
+export const SEAT_LIMIT = 8;
 
 export interface RolePermission {
   canManageTeam: boolean;
@@ -146,6 +183,28 @@ export interface OrgMember {
   email: string;
   role: UserRole;
   joinedAt: string;
+  /** Firestore document id. Always the member's auth uid. */
+  docId?: string;
+}
+
+/**
+ * A pending invitation lives at `invitations/{lowercased-email}` — a top-level
+ * collection, because the invitee is not yet a member of the org and therefore
+ * cannot read anything underneath it. One pending invitation per email address.
+ *
+ * The document is deleted the moment it is accepted; a member doc replaces it.
+ */
+export interface Invitation {
+  /** Document id — the invitee's email, lowercased and trimmed. */
+  id: string;
+  email: string;
+  orgId: string;
+  orgName: string;
+  role: UserRole;
+  invitedBy: string;
+  invitedByEmail: string;
+  status: 'pending';
+  createdAt: string;
 }
 
 export interface Organization {

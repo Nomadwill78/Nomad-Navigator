@@ -381,10 +381,10 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
             </div>
           )}
           {permissions?.canEditMetrics && (
-            <button className="flex items-center gap-2 bg-gradient-to-b from-brassbright to-brass text-[#26200e] px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-brass/25 hover:brightness-105 transition-all">
-              <Save size={18} />
-              Save Changes
-            </button>
+            <div className="flex items-center gap-1.5 text-xs text-inkfaint font-medium px-1" title="Changes save automatically a moment after you stop typing">
+              <Save size={14} />
+              Autosaves as you type
+            </div>
           )}
         </div>
       </div>
@@ -804,7 +804,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
         <div>
           <h4 className="font-bold text-ivory mb-1">Data Entry Checklist</h4>
           <p className="text-sm text-parchment leading-relaxed max-w-2xl">
-            To generate a high-quality **Grant Readiness Report**, ensure you have entered verified outcomes and financial efficiency ratios. AI analysis performs best when 'Outcomes' and 'Benchmark' fields match your internal audit documents.
+            To generate a high-quality <strong className="font-bold text-ivory">Grant Readiness Report</strong>, ensure you have entered verified outcomes and financial efficiency ratios. AI analysis performs best when 'Outcomes' and 'Benchmark' fields match your internal audit documents.
           </p>
         </div>
       </div>

@@ -1,14 +1,13 @@
 import React from 'react';
-import { 
-  Sparkles, 
-  Target, 
-  Calendar, 
-  DollarSign, 
-  ChevronRight, 
+import {
+  Sparkles,
+  Target,
+  Calendar,
+  DollarSign,
   CheckCircle2,
   AlertCircle,
   TrendingUp,
-  Search
+  FlaskConical
 } from 'lucide-react';
 import { Opportunity } from '../types';
 
@@ -26,19 +25,15 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
           </h2>
           <p className="text-inkmute">Nomad AI found these opportunities that match your mission profile and current KPI performance.</p>
         </div>
-        <div className="flex gap-3">
-          <div className="relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-inkfaint group-focus-within:text-teal transition-colors" size={16} />
-            <input 
-              type="text" 
-              placeholder="Search databases..."
-              className="pl-10 pr-4 py-2 bg-surface border border-hairline rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal/25 transition-all w-64"
-            />
-          </div>
-          <button className="bg-abyss text-ivory px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-surface2 transition-all">
-            Refresh Scan
-          </button>
-        </div>
+      </div>
+
+      <div className="flex items-start gap-3 bg-brass/10 border border-brass/25 rounded-2xl p-4">
+        <FlaskConical size={18} className="text-brassbright shrink-0 mt-0.5" />
+        <p className="text-xs text-inkmute leading-relaxed">
+          <span className="font-bold text-parchment">Preview — not a live matching engine yet.</span>{' '}
+          The opportunities, match scores, and rationale below are illustrative sample content, not
+          results computed against your organization's actual data.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -99,9 +94,12 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
                   <span className="px-3 py-1 bg-white/5 text-inkmute border border-hairline rounded-lg text-[10px] font-mono2 font-bold uppercase tracking-wider">Water &amp; Sanitation</span>
                   <span className="px-3 py-1 bg-white/5 text-inkmute border border-hairline rounded-lg text-[10px] font-mono2 font-bold uppercase tracking-wider">Infrastructure</span>
                 </div>
-                <button className="flex items-center gap-1.5 text-teal font-bold text-xs hover:gap-2 transition-all">
-                  Start AI Draft <ChevronRight size={16} />
-                </button>
+                <span
+                  className="flex items-center gap-1.5 text-inkfaint font-bold text-xs cursor-not-allowed"
+                  title="AI-drafted applications are not built yet"
+                >
+                  Start AI Draft — Coming Soon
+                </span>
               </div>
             </div>
           ))}
@@ -115,7 +113,7 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
               </div>
               <h4 className="text-xl font-bold mb-2 tracking-tight">Strategy Intelligence</h4>
               <p className="text-inkfaint text-sm leading-relaxed mb-6">
-                Based on your **92% success rate** in WASH projects, Nomad AI predicts a high likelihood of approval for community-led infrastructure grants this quarter.
+                Based on your <strong className="font-bold text-parchment">92% success rate</strong> in WASH projects, Nomad AI predicts a high likelihood of approval for community-led infrastructure grants this quarter.
               </p>
               <div className="space-y-3">
                 <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
@@ -149,8 +147,12 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
                 <p className="text-xs text-inkmute leading-relaxed font-medium">Theory of Change document needs updating for 2024 standards.</p>
               </div>
             </div>
-            <button className="w-full mt-6 py-2.5 bg-ink/50 text-ivory rounded-xl text-xs font-bold border border-hairline hover:bg-white/5 transition-colors">
-              Manage Compliance Vault
+            <button
+              disabled
+              title="Compliance vault management is not built yet"
+              className="w-full mt-6 py-2.5 bg-ink/30 text-inkfaint rounded-xl text-xs font-bold border border-hairline cursor-not-allowed"
+            >
+              Manage Compliance Vault — Coming Soon
             </button>
           </div>
         </div>
