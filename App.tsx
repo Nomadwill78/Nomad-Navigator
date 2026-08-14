@@ -54,14 +54,15 @@ import { useAuth } from './src/contexts/AuthContext';
 import { useOrgData } from './src/hooks/useOrgData';
 import { generateImpactReport } from './services/geminiService';
 import { DashboardStats, ProgramMetric, Grant, Opportunity, ROLE_PERMISSIONS } from './types';
+import { Analytics } from '@vercel/analytics/react';
 
 // --- Chart ramps ---
 // Named for what they mean, not for a hue. Teal reads impact, brass reads money
 // and governance, slate stays neutral. See DESIGN.md → Colors → Chart Ramps.
 const COLORS = {
   impact: ['#4fc4d3', '#6fd2de', '#9ae0e8', '#c4eef2'],
+  impactDeep: ['#4fc4d3', '#3faebd', '#2f8b98', '#256e78'],
   funding: ['#cba85c', '#e7ce88', '#b8905a', '#8a6d3f'],
-  fundingDeep: ['#cba85c', '#b8905a', '#8a6d3f', '#6f5926'],
   neutral: ['#6f86a6', '#93a6c2', '#b7c4d8', '#d8e0ec']
 };
 
@@ -606,7 +607,7 @@ const App: React.FC = () => {
             className={`flex items-center gap-3 w-full p-3 rounded-lg transition-all duration-200 group ${
               isDemoMode
                 ? 'bg-brass/10 text-brassbright border border-brass/25'
-                : 'text-inkmute hover:bg-white/5 hover:text-parchment border border-transparent'
+                : 'text-inkmute hover:bg-surface2 hover:text-parchment border border-transparent'
             }`}
           >
             <Sparkles size={20} className={isDemoMode ? 'animate-pulse' : ''} />
@@ -652,7 +653,7 @@ const App: React.FC = () => {
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 text-inkmute hover:text-parchment hover:bg-white/5 rounded-lg transition-all"
+              className="p-2 text-inkmute hover:text-parchment hover:bg-surface2 rounded-lg transition-all"
             >
               <Menu size={20} />
             </button>
@@ -901,7 +902,7 @@ const App: React.FC = () => {
                   trendDirection="neutral"
                   description={`${stats.dataQuality.method} methodology`}
                   icon={<ShieldCheck />}
-                  accent="governance"
+                  accent="funding"
                   // No sparkline for quality
                 />
               </div>
@@ -1116,7 +1117,7 @@ const App: React.FC = () => {
                               paddingAngle={5}
                             >
                               {stats.financials.spending.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS.funding[index % COLORS.funding.length]} stroke="none" />
+                                <Cell key={`cell-${index}`} fill={COLORS.impactDeep[index % COLORS.impactDeep.length]} stroke="none" />
                               ))}
                             </Pie>
                             <Tooltip 
@@ -1164,7 +1165,7 @@ const App: React.FC = () => {
                               paddingAngle={5}
                             >
                               {stats.financials.sources.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS.fundingDeep[index % COLORS.fundingDeep.length]} stroke="none" />
+                                <Cell key={`cell-${index}`} fill={COLORS.funding[index % COLORS.funding.length]} stroke="none" />
                               ))}
                             </Pie>
                             <Tooltip 
@@ -1251,6 +1252,7 @@ const App: React.FC = () => {
         isLoading={isGeneratingReport}
       />
 
+      <Analytics />
     </div>
   );
 };
@@ -1297,7 +1299,7 @@ const NavItem: React.FC<{
         ? 'text-inkfaint/60 cursor-not-allowed border border-transparent'
         : active
         ? 'bg-teal/10 text-ivory border border-teal/25'
-        : 'text-inkmute hover:bg-white/5 hover:text-parchment border border-transparent'
+        : 'text-inkmute hover:bg-surface2 hover:text-parchment border border-transparent'
     }`}>
       {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-0.5 rounded-full bg-brass"></span>}
       <span className="relative">

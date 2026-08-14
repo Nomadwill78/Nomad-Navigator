@@ -91,8 +91,8 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
 
               <div className="pt-6 border-t border-hairline/60 flex justify-between items-center">
                 <div className="flex gap-2">
-                  <span className="px-3 py-1 bg-white/5 text-inkmute border border-hairline rounded-lg text-[10px] font-mono2 font-bold uppercase tracking-wider">Water &amp; Sanitation</span>
-                  <span className="px-3 py-1 bg-white/5 text-inkmute border border-hairline rounded-lg text-[10px] font-mono2 font-bold uppercase tracking-wider">Infrastructure</span>
+                  <span className="px-3 py-1 bg-abyss text-inkmute border border-hairline rounded-lg text-[10px] font-mono2 font-bold uppercase tracking-wider">Water &amp; Sanitation</span>
+                  <span className="px-3 py-1 bg-abyss text-inkmute border border-hairline rounded-lg text-[10px] font-mono2 font-bold uppercase tracking-wider">Infrastructure</span>
                 </div>
                 <span
                   className="flex items-center gap-1.5 text-inkfaint font-bold text-xs cursor-not-allowed"
@@ -108,7 +108,7 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
         <div className="space-y-6">
           <div className="bg-abyss rounded-3xl p-6 text-ivory overflow-hidden relative shadow-2xl">
             <div className="relative z-10">
-              <div className="bg-white/10 w-fit p-3 rounded-2xl mb-4 backdrop-blur-sm">
+              <div className="bg-surface2 w-fit p-3 rounded-2xl mb-4 backdrop-blur-sm">
                 <TrendingUp size={24} className="text-teal" />
               </div>
               <h4 className="text-xl font-bold mb-2 tracking-tight">Strategy Intelligence</h4>
@@ -116,11 +116,11 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
                 Based on your <strong className="font-bold text-parchment">92% success rate</strong> in WASH projects, Nomad AI predicts a high likelihood of approval for community-led infrastructure grants this quarter.
               </p>
               <div className="space-y-3">
-                <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
+                <div className="flex items-center gap-3 bg-surface p-3 rounded-xl border border-hairline">
                   <div className="w-1.5 h-1.5 bg-teal rounded-full animate-pulse" />
                   <span className="text-xs font-medium text-parchment">Top Funder: Bill & Melinda Gates</span>
                 </div>
-                <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
+                <div className="flex items-center gap-3 bg-surface p-3 rounded-xl border border-hairline">
                    <div className="w-1.5 h-1.5 bg-teal rounded-full animate-pulse" />
                    <span className="text-xs font-medium text-parchment">Market Trend: Up 14%</span>
                 </div>

@@ -420,8 +420,8 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
             )}
 
             {uploadError && (
-              <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/25 text-rose-200 text-sm rounded-xl flex items-center gap-3 animate-in fade-in duration-300">
-                <AlertCircle size={18} className="text-rose-500 shrink-0" />
+              <div className="mb-6 p-4 bg-alert/15 border border-alert/35 text-alerttext text-sm rounded-xl flex items-center gap-3 animate-in fade-in duration-300">
+                <AlertCircle size={18} className="text-alert shrink-0" />
                 <span className="font-medium">{uploadError}</span>
               </div>
             )}
@@ -453,7 +453,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                   <p className="text-sm font-bold text-parchment">Drag & drop your CSV file here</p>
                   <p className="text-xs text-inkfaint mt-1">or click to browse from your device</p>
                 </div>
-                <div className="text-[10px] bg-white/5 text-inkmute px-2.5 py-1 rounded-md font-semibold uppercase tracking-wider">
+                <div className="text-[10px] bg-abyss text-inkmute px-2.5 py-1 rounded-md font-semibold uppercase tracking-wider">
                   Supports UTF-8 CSV
                 </div>
               </div>
@@ -475,7 +475,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                     {/* Name mapping */}
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-inkmute uppercase tracking-wider flex items-center gap-1">
-                        Name Field <span className="text-rose-500">*</span>
+                        Name Field <span className="text-brass">*</span>
                       </label>
                       <select 
                         value={mapping.name}
@@ -505,7 +505,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                     {/* People Served mapping */}
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-inkmute uppercase tracking-wider flex items-center gap-1">
-                        People Served <span className="text-rose-500">*</span>
+                        People Served <span className="text-brass">*</span>
                       </label>
                       <select 
                         value={mapping.peopleServed}
@@ -520,7 +520,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
                     {/* Total Cost mapping */}
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-inkmute uppercase tracking-wider flex items-center gap-1">
-                        Total Cost Spent <span className="text-rose-500">*</span>
+                        Total Cost Spent <span className="text-brass">*</span>
                       </label>
                       <select 
                         value={mapping.totalCost}

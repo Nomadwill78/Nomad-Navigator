@@ -233,15 +233,18 @@ export const TeamManagementView: React.FC = () => {
                       ))}
                     </select>
                   ) : (
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-mono2 font-bold uppercase tracking-wider border ${
-                        member.role === 'admin'
-                          ? 'bg-brass/10 text-brassbright border-brass/25'
-                          : member.role === 'viewer'
-                          ? 'bg-ink/50 text-inkfaint border-hairline/70'
-                          : 'bg-white/5 text-inkmute border-hairline'
-                      }`}
-                    >
+                    {/* Two Bearings Rule: teal for the impact role, brass for the money and
+                       governance roles, neutral for the roles that hold no authority. Admin
+                       is the lit face of brass — the only role that can manage the team and
+                       delete grants. */}
+                    <span className={`px-2 py-0.5 rounded-full border text-[10px] font-mono2 font-bold uppercase tracking-[0.16em] ${
+                      member.role === 'admin' ? 'bg-brass/10 border-brass/25 text-brassbright' :
+                      member.role === 'grant_coordinator' ? 'bg-brass/10 border-brass/25 text-brass' :
+                      member.role === 'impact_analyst' ? 'bg-teal/10 border-teal/25 text-teal' :
+                      member.role === 'compliance_officer' ? 'bg-brass/10 border-brass/25 text-brass' :
+                      member.role === 'data_entry' ? 'bg-abyss border-hairline text-inkmute' :
+                      'bg-abyss border-hairline text-inkfaint'
+                    }`}>
                       {member.role.replace(/_/g, ' ')}
                     </span>
                   )}
@@ -260,7 +263,7 @@ export const TeamManagementView: React.FC = () => {
                     {member.userId !== user?.uid && member.userId !== organization?.creatorId && (
                       <button
                         onClick={() => handleDeleteMember(member.docId!)}
-                        className="text-inkfaint hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-500/10"
+                        className="text-inkfaint hover:text-alert transition-colors p-2 rounded-lg hover:bg-alert/15"
                         title="Remove member"
                       >
                         <Trash2 size={16} />
@@ -302,7 +305,7 @@ export const TeamManagementView: React.FC = () => {
                   <td className="px-6 py-4 text-right">
                     <button
                       onClick={() => revokeInvitation(invite.id)}
-                      className="text-inkfaint hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-500/10"
+                      className="text-inkfaint hover:text-alert transition-colors p-2 rounded-lg hover:bg-alert/15"
                       title="Revoke invitation"
                     >
                       <X size={16} />
@@ -394,7 +397,7 @@ export const TeamManagementView: React.FC = () => {
               <div className="flex gap-4 pt-4">
                 <button
                   onClick={() => setIsInviteModalOpen(false)}
-                  className="flex-1 bg-white/5 text-inkmute py-3 rounded-xl font-bold hover:bg-white/10 transition-all"
+                  className="flex-1 bg-abyss text-inkmute py-3 rounded-xl font-bold hover:bg-surface2 transition-all"
                 >
                   Cancel
                 </button>

@@ -191,17 +191,19 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 bg-teal/10 border border-teal/25 rounded-2xl">
-                <p className="text-xs font-bold text-parchment uppercase mb-1">Standard Plan</p>
-                <p className="text-xl font-black text-parchment">
-                  $0<span className="text-xs font-medium text-inkmute">/mo</span>
+              {/* A plan is money, so the active one reads brass; the unavailable
+                  Enterprise tier beside it stays neutral. */}
+              <div className="p-4 bg-brass/10 border border-brass/25 rounded-2xl">
+                <p className="text-xs font-bold text-brassbright uppercase mb-1">Standard Plan</p>
+                <p className="text-xl font-black text-brassbright">
+                  $0<span className="text-xs font-medium text-brass">/mo</span>
                 </p>
                 <ul className="mt-4 space-y-2">
-                  <li className="text-[10px] text-inkmute flex items-center gap-2">
-                    <div className="w-1 h-1 bg-teal rounded-full" /> AI Impact Reporting
+                  <li className="text-[10px] text-brass flex items-center gap-2">
+                    <div className="w-1 h-1 bg-brass rounded-full" /> AI Impact Reporting
                   </li>
-                  <li className="text-[10px] text-inkmute flex items-center gap-2">
-                    <div className="w-1 h-1 bg-teal rounded-full" /> Up to {SEAT_LIMIT} users
+                  <li className="text-[10px] text-brass flex items-center gap-2">
+                    <div className="w-1 h-1 bg-brass rounded-full" /> Up to {SEAT_LIMIT} users
                   </li>
                 </ul>
               </div>
