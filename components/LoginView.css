@@ -311,6 +311,13 @@
 
 /* form */
 .lv-form { display: flex; flex-direction: column; gap: 1rem; text-align: left; }
+.lv-form-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.2rem; }
+.lv-back {
+  background: none; border: none; cursor: pointer;
+  font-family: "Space Mono", monospace; font-size: 0.62rem; letter-spacing: 0.14em;
+  color: var(--lv-brass); text-transform: uppercase;
+}
+.lv-back:hover { color: var(--lv-brass-bright); }
 
 .lv-field label {
   display: block;
@@ -321,6 +328,22 @@
   color: var(--lv-faint);
   margin-bottom: 0.4rem;
 }
+.lv-field-head { display: flex; align-items: baseline; justify-content: space-between; }
+.lv-field-head label { margin-bottom: 0.4rem; }
+.lv-forgot {
+  background: none; border: none; cursor: pointer; font: inherit;
+  font-family: "Inter", sans-serif; font-size: 0.72rem; font-weight: 600;
+  color: var(--lv-brass); text-decoration: underline;
+  text-decoration-color: rgba(203, 168, 92, 0.4); text-underline-offset: 3px;
+}
+.lv-forgot:hover { color: var(--lv-brass-bright); }
+
+.lv-reset-sent {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0.85rem;
+  text-align: left;
+}
+.lv-reset-sent p { font-size: 0.84rem; color: var(--lv-muted); line-height: 1.55; margin: 0; }
+.lv-reset-sent .lv-btn { margin-top: 0.2rem; }
 .lv-input-wrap { position: relative; }
 .lv-input-wrap svg {
   position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%);

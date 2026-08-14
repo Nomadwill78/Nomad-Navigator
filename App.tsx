@@ -47,6 +47,8 @@ import { TeamManagementView } from './components/TeamManagementView';
 import { LoginView } from './components/LoginView';
 import { TrialSignupView } from './components/TrialSignupView';
 import { OnboardingView } from './components/OnboardingView';
+import { SettingsView } from './components/SettingsView';
+import { WelcomeView } from './components/WelcomeView';
 import { DemoModeBanner, DemoHint } from './components/DemoTour';
 import { BrandLogo } from './components/BrandLogo';
 import { KpiSidebar } from './components/KpiSidebar';
@@ -372,11 +374,11 @@ const SPARK_FINANCIALS_SOURCES = [
 const App: React.FC = () => {
   const {
     user, profile, organization, role, loading, invitation,
-    login, logout, createOrg, acceptInvitation, resendVerificationEmail,
+    logout, createOrg, acceptInvitation, resendVerificationEmail, dismissWelcome,
   } = useAuth();
   const permissions = role ? ROLE_PERMISSIONS[role] : null;
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [activeView, setActiveView] = useState<'dashboard' | 'data' | 'grants' | 'analysis' | 'discovery' | 'team'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'data' | 'grants' | 'analysis' | 'discovery' | 'team' | 'settings'>('dashboard');
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [trajectoryRange, setTrajectoryRange] = useState<'6M' | '1Y' | 'ALL'>('ALL');
@@ -470,6 +472,12 @@ const App: React.FC = () => {
         onResendVerification={resendVerificationEmail}
       />
     );
+  }
+
+  // Shown exactly once per account, right after org setup or joining — the
+  // "Complete Your Compass" checklist below picks up from here.
+  if (!profile?.hasSeenWelcome) {
+    return <WelcomeView organizationName={organization.name} onDismiss={dismissWelcome} />;
   }
 
   const handleGenerateReport = async (frequency?: any) => {
@@ -640,7 +648,13 @@ const App: React.FC = () => {
         </nav>
 
         <div className="p-3 border-t border-hairline/40 bg-abyss">
-           <NavItem icon={<Settings size={20} />} label="Settings" isOpen={isSidebarOpen} comingSoon />
+           <NavItem
+             icon={<Settings size={20} />}
+             label="Settings"
+             active={activeView === 'settings'}
+             isOpen={isSidebarOpen}
+             onClick={() => setActiveView('settings')}
+           />
         </div>
       </aside>
 
@@ -709,7 +723,14 @@ const App: React.FC = () => {
             )}
             <div className="flex items-center gap-3 pl-4 border-l border-hairline/50">
                <div className="text-right hidden sm:block">
-                  <p className="text-xs font-bold text-parchment">{profile?.displayName}</p>
+                  <button
+                    onClick={() => setActiveView('settings')}
+                    className="text-xs font-bold text-parchment hover:text-teal transition-colors"
+                    title="Account settings"
+                  >
+                    {profile?.displayName}
+                  </button>
+                  <br />
                   <button
                     onClick={logout}
                     className="text-[10px] text-inkfaint hover:text-brass font-bold uppercase transition-colors"
@@ -717,9 +738,13 @@ const App: React.FC = () => {
                     Sign Out
                   </button>
                </div>
-               <div className="w-10 h-10 bg-gradient-to-br from-surface2 to-surface rounded-full flex items-center justify-center text-brass font-bold border border-brass/40">
+               <button
+                 onClick={() => setActiveView('settings')}
+                 title="Account settings"
+                 className="w-10 h-10 bg-gradient-to-br from-surface2 to-surface rounded-full flex items-center justify-center text-brass font-bold border border-brass/40 hover:border-brass/70 transition-colors shrink-0"
+               >
                    {profile?.displayName?.charAt(0).toUpperCase() || 'U'}
-               </div>
+               </button>
             </div>
           </div>
         </header>
@@ -737,6 +762,8 @@ const App: React.FC = () => {
             <GrantDiscoveryView opportunities={SAMPLE_OPPORTUNITIES} />
           ) : activeView === 'team' ? (
             <TeamManagementView />
+          ) : activeView === 'settings' ? (
+            <SettingsView />
           ) : (
             <>
               {/* Dashboard Header */}

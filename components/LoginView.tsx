@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Mail, Lock, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Mail, Lock, ShieldCheck, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../src/contexts/AuthContext';
+import { describeAuthError } from '../src/lib/authErrors';
 import './LoginView.css';
 
 const C = 130; // compass center
@@ -93,12 +94,13 @@ const CompassRose: React.FC = () => {
 };
 
 export const LoginView: React.FC = () => {
-  const { loginWithEmail, registerWithEmail } = useAuth();
-  const [view, setView] = useState<'login' | 'register'>('login');
+  const { loginWithEmail, registerWithEmail, resetPassword } = useAuth();
+  const [view, setView] = useState<'login' | 'register' | 'reset'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,10 +113,30 @@ export const LoginView: React.FC = () => {
         await registerWithEmail(email, password);
       }
     } catch (err: any) {
-      setError(err.message || 'Authentication failed');
+      setError(describeAuthError(err));
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      await resetPassword(email);
+      setResetSent(true);
+    } catch (err: any) {
+      setError(describeAuthError(err));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const goToView = (next: 'login' | 'register' | 'reset') => {
+    setError(null);
+    setResetSent(false);
+    setView(next);
   };
 
   return (
@@ -174,9 +196,11 @@ export const LoginView: React.FC = () => {
           <span className="lv-corner tl" /><span className="lv-corner tr" />
           <span className="lv-corner bl" /><span className="lv-corner br" />
 
-          <div className="lv-panel-eyebrow">{view === 'login' ? 'Return to your chart' : 'Register your organization'}</div>
+          <div className="lv-panel-eyebrow">
+            {view === 'login' ? 'Return to your chart' : view === 'register' ? 'Register your organization' : 'Recover your bearing'}
+          </div>
           <h2 className="lv-panel-title">
-            {view === 'login' ? 'Sign in to your dashboard' : 'Create your account'}
+            {view === 'login' ? 'Sign in to your dashboard' : view === 'register' ? 'Create your account' : 'Reset your password'}
           </h2>
 
           {error && (
@@ -186,51 +210,101 @@ export const LoginView: React.FC = () => {
             </div>
           )}
 
-          <form className="lv-form" onSubmit={handleSubmit}>
-            <div className="lv-field">
-              <label htmlFor="lv-email">Email address</label>
-              <div className="lv-input-wrap">
-                <Mail size={16} />
-                <input
-                  id="lv-email"
-                  className="lv-input"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@organization.org"
-                />
+          {view === 'reset' ? (
+            resetSent ? (
+              <div className="lv-reset-sent">
+                <CheckCircle2 size={22} className="text-teal" />
+                <p>
+                  If an account exists for <span className="text-parchment">{email}</span>, a reset link
+                  is on its way. Check your inbox and follow the link to choose a new password.
+                </p>
+                <button type="button" className="lv-btn lv-btn-primary" onClick={() => goToView('login')}>
+                  ← Back to sign in
+                </button>
               </div>
-            </div>
+            ) : (
+              <form className="lv-form" onSubmit={handleResetSubmit}>
+                <div className="lv-form-head">
+                  <button type="button" className="lv-back" onClick={() => goToView('login')}>
+                    ← Back to sign in
+                  </button>
+                </div>
 
-            <div className="lv-field">
-              <label htmlFor="lv-pass">Password</label>
-              <div className="lv-input-wrap">
-                <Lock size={16} />
-                <input
-                  id="lv-pass"
-                  className="lv-input"
-                  type="password"
-                  required
-                  minLength={6}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                />
+                <div className="lv-field">
+                  <label htmlFor="lv-reset-email">Email address</label>
+                  <div className="lv-input-wrap">
+                    <Mail size={16} />
+                    <input
+                      id="lv-reset-email"
+                      className="lv-input"
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="name@organization.org"
+                    />
+                  </div>
+                </div>
+
+                <button type="submit" className="lv-btn lv-btn-primary" disabled={isSubmitting}>
+                  {isSubmitting ? <span className="lv-spinner" /> : 'Send reset link'}
+                </button>
+              </form>
+            )
+          ) : (
+            <form className="lv-form" onSubmit={handleSubmit}>
+              <div className="lv-field">
+                <label htmlFor="lv-email">Email address</label>
+                <div className="lv-input-wrap">
+                  <Mail size={16} />
+                  <input
+                    id="lv-email"
+                    className="lv-input"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@organization.org"
+                  />
+                </div>
               </div>
-            </div>
 
-            <button type="submit" className="lv-btn lv-btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? <span className="lv-spinner" /> : view === 'login' ? 'Sign in' : 'Create account'}
-            </button>
+              <div className="lv-field">
+                <div className="lv-field-head">
+                  <label htmlFor="lv-pass">Password</label>
+                  {view === 'login' && (
+                    <button type="button" className="lv-forgot" onClick={() => goToView('reset')}>
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
+                <div className="lv-input-wrap">
+                  <Lock size={16} />
+                  <input
+                    id="lv-pass"
+                    className="lv-input"
+                    type="password"
+                    required
+                    minLength={6}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                  />
+                </div>
+              </div>
 
-            <div className="lv-swap">
-              {view === 'login' ? "New to Compass? " : 'Already have an account? '}
-              <button type="button" onClick={() => setView(view === 'login' ? 'register' : 'login')}>
-                {view === 'login' ? 'Create an account' : 'Sign in'}
+              <button type="submit" className="lv-btn lv-btn-primary" disabled={isSubmitting}>
+                {isSubmitting ? <span className="lv-spinner" /> : view === 'login' ? 'Sign in' : 'Create account'}
               </button>
-            </div>
-          </form>
+
+              <div className="lv-swap">
+                {view === 'login' ? "New to Compass? " : 'Already have an account? '}
+                <button type="button" onClick={() => goToView(view === 'login' ? 'register' : 'login')}>
+                  {view === 'login' ? 'Create an account' : 'Sign in'}
+                </button>
+              </div>
+            </form>
+          )}
 
           <div className="lv-foot">
             <ShieldCheck size={13} />
