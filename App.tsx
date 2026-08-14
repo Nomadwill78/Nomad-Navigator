@@ -46,6 +46,7 @@ import { GrantDiscoveryView } from './components/GrantDiscoveryView';
 import { TeamManagementView } from './components/TeamManagementView';
 import { LoginView } from './components/LoginView';
 import { TrialSignupView } from './components/TrialSignupView';
+import { SalesPageView } from './components/SalesPageView';
 import { OnboardingView } from './components/OnboardingView';
 import { SettingsView } from './components/SettingsView';
 import { WelcomeView } from './components/WelcomeView';
@@ -447,6 +448,12 @@ const App: React.FC = () => {
       (window.location.pathname.replace(/\/+$/, '') === '/free-trial' ||
        new URLSearchParams(window.location.search).has('trial'))) {
     return <TrialSignupView />;
+  }
+
+  // Public pricing / sales page — no login required
+  if (typeof window !== 'undefined' &&
+      window.location.pathname.replace(/\/+$/, '') === '/pricing') {
+    return <SalesPageView />;
   }
 
   if (loading) {
