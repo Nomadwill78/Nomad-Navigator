@@ -233,10 +233,10 @@ export const TeamManagementView: React.FC = () => {
                       ))}
                     </select>
                   ) : (
-                    {/* Two Bearings Rule: teal for the impact role, brass for the money and
-                       governance roles, neutral for the roles that hold no authority. Admin
-                       is the lit face of brass — the only role that can manage the team and
-                       delete grants. */}
+                    // Two Bearings Rule: teal for the impact role, brass for the money and
+                    // governance roles, neutral for the roles that hold no authority. Admin
+                    // is the lit face of brass — the only role that can manage the team and
+                    // delete grants.
                     <span className={`px-2 py-0.5 rounded-full border text-[10px] font-mono2 font-bold uppercase tracking-[0.16em] ${
                       member.role === 'admin' ? 'bg-brass/10 border-brass/25 text-brassbright' :
                       member.role === 'grant_coordinator' ? 'bg-brass/10 border-brass/25 text-brass' :
