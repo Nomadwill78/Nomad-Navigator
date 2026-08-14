@@ -24,8 +24,8 @@ export const DemoModeBanner: React.FC<DemoModeBannerProps> = ({ isActive, onClos
                 <Sparkles size={20} className="text-teal animate-pulse" />
               </div>
               <div>
-                <h4 className="font-bold text-sm">Demo Mode Active</h4>
-                <p className="text-xs text-inkfaint">Explore all features with pre-populated, verified impact data.</p>
+                <h4 className="font-bold text-sm">Demo Mode — sample nonprofit data</h4>
+                <p className="text-xs text-inkfaint">Explore every feature with made-up numbers. Nothing here is saved to your organization.</p>
               </div>
             </div>
             <div className="flex items-center gap-2">

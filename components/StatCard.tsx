@@ -45,7 +45,7 @@ export const StatCard: React.FC<StatCardProps> = ({
 
           {trend && (
             <div
-              className="flex items-center text-[0.68rem] font-mono2 font-bold px-2 py-1 rounded-full border"
+              className="flex items-center text-[0.6rem] font-mono2 font-bold px-2 py-1 rounded-full border"
               style={
                 trendDirection === 'down'
                   ? { color: '#93a6c2', background: 'rgba(147,166,194,0.08)', borderColor: 'rgba(147,166,194,0.25)' }

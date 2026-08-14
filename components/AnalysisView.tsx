@@ -45,7 +45,10 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ stats, grants }) => 
   const getAnalysisData = () => {
     if (dimension === 'grant') {
       return grants.map(g => ({
-        name: g.id === 'g1' ? 'Phase II' : 'Sanitation', // Short names
+        // Derived from the grant's own name — a chart label under a bar has
+        // limited width, so this takes the first word rather than truncating
+        // mid-word.
+        name: g.name?.split(' ')[0] || 'Untitled',
         fullName: g.name,
         value: metric === 'impact' 
           ? g.kpis.reduce((acc, k) => acc + k.current, 0)
@@ -83,8 +86,11 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ stats, grants }) => 
         <div>
           <h2 className="text-2xl font-bold text-ivory tracking-tight">Advanced Analytics</h2>
           <p className="text-inkmute">Cross-reference program impact against funding portfolios.</p>
+          <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 bg-brass/10 text-brassbright border border-brass/25 rounded-full text-[10px] font-bold uppercase tracking-wider">
+            <Info size={12} /> Preview feature — weighting is illustrative, not audited
+          </div>
         </div>
-        
+
         <div className="flex flex-wrap items-center gap-3">
           {/* Metric Selector */}
           <div className="flex items-center gap-2 bg-surface border border-hairline rounded-xl p-1 shadow-sm">
@@ -223,7 +229,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ stats, grants }) => 
          <div className="relative z-10">
             <h4 className="font-bold text-lg mb-2">Analysis Calibration</h4>
             <p className="text-inkfaint text-sm leading-relaxed max-w-2xl">
-               Varied data analysis uses weighted aggregation from your **Grant Metrics** and **Program Stats**. Cross-referencing {dimension} against {metric} identifies marginal utility—allowing you to shift focus to higher-ROI interventions before the NEXT reporting cycle.
+               Varied data analysis uses weighted aggregation from your <strong className="font-bold text-parchment">Grant Metrics</strong> and <strong className="font-bold text-parchment">Program Stats</strong>. Cross-referencing {dimension} against {metric} identifies marginal utility—allowing you to shift focus to higher-ROI interventions before the next reporting cycle.
             </p>
          </div>
       </div>

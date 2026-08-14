@@ -1,6 +1,29 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // =========================================================================
+    // Nomad Compass — Firestore security rules
+    //
+    // AUTHORITATIVE ROLE MODEL (six roles). This list must stay identical to
+    // `UserRole` in types.ts and to the table in security_spec.md:
+    //
+    //   admin               manage team, grants, metrics, delete, export
+    //   grant_coordinator   grants + export
+    //   impact_analyst      metrics + export
+    //   compliance_officer  export only (read/audit)
+    //   data_entry          metrics only
+    //   viewer              read only
+    //
+    // The older four-role model (admin/editor/viewer/uploader) is RETIRED.
+    //
+    // ISOLATION MODEL: all organization data is nested under
+    // /organizations/{orgId}/…, and every read and write below is gated on
+    // membership of that org. There is no collection-group access, and
+    // /organizations is not listable, so an org can only be reached by a member
+    // who already knows its id.
+    // =========================================================================
+
     // Default Deny
     match /{document=**} {
       allow read, write: if false;
@@ -8,7 +31,17 @@ service cloud.firestore {
 
     // --- Helpers ---
     function isSignedIn() {
-      return request.auth != null && request.auth.token.email_verified == true;
+      return request.auth != null;
+    }
+
+    // Email-based trust (invitation matching) requires a PROVEN address —
+    // otherwise anyone could sign up as someone else and claim their invitation.
+    function hasVerifiedEmail() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function authEmail() {
+      return request.auth.token.email.lower();
     }
 
     function isValidId(id) {
@@ -30,70 +63,164 @@ service cloud.firestore {
       return isOrgMember(orgId) && getMember(orgId).role in roles;
     }
 
+    // The invitation that would let this user join `orgId`, if any.
+    function inviteRef() {
+      return /databases/$(database)/documents/invitations/$(authEmail());
+    }
+
+    function hasPendingInvite(orgId) {
+      return hasVerifiedEmail() &&
+             exists(inviteRef()) &&
+             get(inviteRef()).data.orgId == orgId &&
+             get(inviteRef()).data.status == 'pending';
+    }
+
     // --- Entity Validators ---
     function isValidOrganization(data) {
       return data.keys().hasAll(['name', 'creatorId', 'createdAt', 'memberCount']) &&
              data.keys().size() == 4 &&
              data.name is string && data.name.size() > 0 && data.name.size() < 256 &&
-             data.creatorId == request.auth.uid &&
-             (data.memberCount is int || data.memberCount is number) && data.memberCount >= 0 && data.memberCount <= 8;
+             (data.memberCount is int || data.memberCount is number) &&
+             data.memberCount >= 0 && data.memberCount <= 8;
+    }
+
+    function isValidRole(role) {
+      return role in ['admin', 'grant_coordinator', 'impact_analyst', 'compliance_officer', 'data_entry', 'viewer'];
     }
 
     function isValidOrgMember(data) {
       return data.keys().hasAll(['userId', 'email', 'role', 'joinedAt']) &&
              data.keys().size() == 4 &&
-             data.userId is string && data.userId.size() >= 0 &&
+             data.userId is string &&
              data.email is string && data.email.size() > 0 &&
-             data.role in ['admin', 'grant_coordinator', 'impact_analyst', 'compliance_officer', 'data_entry', 'viewer'];
+             isValidRole(data.role);
     }
 
     function isValidGrant(data) {
-      return data.name is string && data.name.size() > 0 &&
-             data.funder is string && data.funder.size() > 0 &&
+      return data.name is string && data.name.size() > 0 && data.name.size() < 300 &&
+             data.funder is string && data.funder.size() > 0 && data.funder.size() < 300 &&
              data.amount is number && data.amount >= 0;
+    }
+
+    function isValidInvitation(data) {
+      return data.keys().hasAll(['email', 'orgId', 'orgName', 'role', 'invitedBy', 'invitedByEmail', 'status', 'createdAt']) &&
+             data.keys().size() == 8 &&
+             data.email is string && data.email.size() > 3 && data.email.size() < 200 &&
+             data.orgId is string && data.orgId.size() > 0 &&
+             data.orgName is string && data.orgName.size() < 256 &&
+             isValidRole(data.role) &&
+             data.invitedBy == request.auth.uid &&
+             data.status == 'pending';
     }
 
     // --- Matches ---
 
     match /organizations/{orgId} {
-      allow get: if isOrgMember(orgId);
-      allow create: if isSignedIn() && isValidOrganization(incoming()) && isValidId(orgId);
-      allow update: if hasRole(orgId, ['admin']) && 
-                      isValidOrganization(incoming()) &&
-                      incoming().creatorId == existing().creatorId; // Immutable creator
-      
+      // `get` only — never `list`. Orgs are not enumerable.
+      // An invitee must be able to read the org they were invited to: the join
+      // transaction reads memberCount before claiming a seat, and the name is
+      // shown on the join screen. Scoped to the single org named in their invitation.
+      allow get: if isOrgMember(orgId) || hasPendingInvite(orgId);
+
+      allow create: if isSignedIn() &&
+                       isValidOrganization(incoming()) &&
+                       incoming().creatorId == request.auth.uid &&
+                       isValidId(orgId);
+
+      allow update: if
+        // Admins may edit the org, but never reassign its creator.
+        (hasRole(orgId, ['admin']) &&
+         isValidOrganization(incoming()) &&
+         incoming().creatorId == existing().creatorId)
+        ||
+        // An invited user claiming their seat may increment memberCount by
+        // exactly one, and touch nothing else. This is what lets a join
+        // complete atomically without granting the invitee org-edit rights.
+        (hasPendingInvite(orgId) &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['memberCount']) &&
+         incoming().memberCount == existing().memberCount + 1 &&
+         incoming().memberCount <= 8);
+
+      // Members are keyed by auth uid — the same key the app reads to resolve a
+      // role. Nothing else may create a membership document.
       match /members/{userId} {
         allow read: if isOrgMember(orgId);
-        allow create: if (
-          (isSignedIn() && userId == request.auth.uid && getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.creatorId == request.auth.uid) ||
-          (hasRole(orgId, ['admin']))
-        ) && isValidOrgMember(incoming()) && 
-          getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.memberCount <= 8;
-        
-        allow update: if hasRole(orgId, ['admin']) && isValidOrgMember(incoming()) &&
-                      incoming().userId == existing().userId;
-        
-        allow delete: if hasRole(orgId, ['admin']) && userId != request.auth.uid;
+
+        allow create: if isValidOrgMember(incoming()) &&
+          incoming().userId == userId &&
+          getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.memberCount <= 8 &&
+          (
+            // 1. The org creator seeding themselves as the first admin.
+            (isSignedIn() && userId == request.auth.uid &&
+             getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.creatorId == request.auth.uid)
+            ||
+            // 2. An invitee claiming their own seat, at exactly the role they
+            //    were invited to. They cannot invent a role for themselves.
+            (userId == request.auth.uid &&
+             hasPendingInvite(orgId) &&
+             incoming().role == get(inviteRef()).data.role &&
+             incoming().email.lower() == authEmail())
+            ||
+            // 3. An existing admin adding someone directly.
+            (hasRole(orgId, ['admin']))
+          );
+
+        // Role changes are admin-only, and an admin cannot change their own role
+        // (which is what stops the last admin from demoting the org into a
+        // state with no administrator).
+        allow update: if hasRole(orgId, ['admin']) &&
+                         isValidOrgMember(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         userId != request.auth.uid;
+
+        allow delete: if hasRole(orgId, ['admin']) &&
+                         userId != request.auth.uid &&
+                         userId != get(/databases/$(database)/documents/organizations/$(orgId)).data.creatorId;
       }
 
+      // Grants: read by any member, written by admin + grant_coordinator.
       match /grants/{grantId} {
-        allow list: if isOrgMember(orgId);
-        allow get: if isOrgMember(orgId);
-        allow create: if hasRole(orgId, ['admin', 'grant_coordinator']) && isValidGrant(incoming());
-        allow update: if hasRole(orgId, ['admin', 'grant_coordinator']) && isValidGrant(incoming());
+        allow get, list: if isOrgMember(orgId);
+        allow create, update: if hasRole(orgId, ['admin', 'grant_coordinator']) && isValidGrant(incoming());
+        // Matches ROLE_PERMISSIONS.canDeleteGrants — admin only.
         allow delete: if hasRole(orgId, ['admin']);
       }
 
-      // Metrics subcollection (if any)
+      // Metrics: the dashboard document lives at metrics/dashboard.
+      // Written by the roles whose UI permission is canEditMetrics.
       match /metrics/{metricId} {
-        allow read: if isOrgMember(orgId);
+        allow get, list: if isOrgMember(orgId);
         allow write: if hasRole(orgId, ['admin', 'impact_analyst', 'data_entry']);
       }
     }
 
+    // A user profile is private to that user. (Previously any signed-in user
+    // could read every profile, which exposed emails and org membership.)
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && userId == request.auth.uid;
+      allow read, write: if isSignedIn() && userId == request.auth.uid;
+    }
+
+    // Invitations. Document id is the invitee's lowercased email, which is what
+    // makes "is this invitation mine?" a cheap, spoof-proof id comparison.
+    match /invitations/{inviteEmail} {
+      // The invitee reads their own; org admins read/list their org's.
+      allow get: if isSignedIn() &&
+                    (inviteEmail == authEmail() || hasRole(resource.data.orgId, ['admin']));
+      allow list: if isSignedIn() && hasRole(resource.data.orgId, ['admin']);
+
+      // Only an admin of the target org may invite, the id must match the
+      // email in the payload, and the org must have a seat free.
+      allow create: if isValidInvitation(incoming()) &&
+                       inviteEmail == incoming().email &&
+                       hasRole(incoming().orgId, ['admin']) &&
+                       get(/databases/$(database)/documents/organizations/$(incoming().orgId)).data.memberCount < 8;
+
+      // Invitations are immutable: revoke and re-issue rather than edit.
+      allow update: if false;
+
+      // Deleted when revoked by an admin, or consumed by the invitee on accept.
+      allow delete: if isSignedIn() &&
+                       (inviteEmail == authEmail() || hasRole(resource.data.orgId, ['admin']));
     }
 
     // Public free-trial signups. Anyone may submit a request (create only);

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged, signOut } from 'firebase/auth';
+import { User, onAuthStateChanged, signOut, sendEmailVerification, reload } from 'firebase/auth';
 import { 
   doc, 
   getDoc, 
@@ -12,8 +12,12 @@ import {
   serverTimestamp 
 } from 'firebase/firestore';
 import { auth, db, signInWithGoogle, getRedirectResult } from '../lib/firebase';
-import { UserProfile, Organization, OrgMember, UserRole } from '../../types';
+import { UserProfile, Organization, OrgMember, UserRole, Invitation, SEAT_LIMIT } from '../../types';
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
+import { clearLegacyLocalData } from '../lib/orgData';
+
+/** Invitations are keyed by the invitee's email, normalised the same way everywhere. */
+export const inviteId = (email: string) => email.trim().toLowerCase();
 
 interface AuthContextType {
   user: User | null;
@@ -21,11 +25,15 @@ interface AuthContextType {
   organization: Organization | null;
   role: UserRole | null;
   loading: boolean;
+  /** A pending invitation addressed to this user's email, if they have no org yet. */
+  invitation: Invitation | null;
   login: () => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerWithEmail: (email: string, pass: string) => Promise<void>;
   logout: () => Promise<void>;
   createOrg: (name: string) => Promise<void>;
+  acceptInvitation: () => Promise<void>;
+  resendVerificationEmail: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -35,6 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
+  const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -122,6 +131,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  /**
+   * Look for an invitation addressed to this user, but only while they have no
+   * organization — that is the only moment it matters. The document id is the
+   * lowercased email, so this is a single `get`, not a query: no index, and the
+   * security rule is a simple id comparison.
+   */
+  useEffect(() => {
+    let cancelled = false;
+
+    const findInvitation = async () => {
+      if (!user?.email || profile?.currentOrgId) {
+        if (!cancelled) setInvitation(null);
+        return;
+      }
+      try {
+        const snap = await getDoc(doc(db, 'invitations', inviteId(user.email)));
+        if (cancelled) return;
+        setInvitation(snap.exists() ? ({ ...(snap.data() as Invitation), id: snap.id }) : null);
+      } catch (error) {
+        // A missing invitation is the common case, not a failure worth surfacing.
+        console.debug('No pending invitation found:', error);
+        if (!cancelled) setInvitation(null);
+      }
+    };
+
+    findInvitation();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.email, profile?.currentOrgId]);
+
   const login = async () => {
     try {
       await signInWithGoogle();
@@ -138,7 +178,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const registerWithEmail = async (email: string, pass: string) => {
     const { createUserWithEmailAndPassword } = await import('../lib/firebase');
-    await createUserWithEmailAndPassword(auth, email, pass);
+    const credential = await createUserWithEmailAndPassword(auth, email, pass);
+    // Accepting an invitation is an email-based trust decision, so the address has
+    // to be proven. Send the verification mail at signup rather than stranding the
+    // user at the join screen with no way forward.
+    try {
+      await sendEmailVerification(credential.user);
+    } catch (error) {
+      console.error('Could not send verification email:', error);
+    }
+  };
+
+  const resendVerificationEmail = async () => {
+    if (!auth.currentUser) throw new Error('You need to be signed in first.');
+    await sendEmailVerification(auth.currentUser);
   };
 
   const logout = () => signOut(auth);
@@ -170,15 +223,68 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         transaction.update(profileRef, { currentOrgId: orgId });
       });
+      clearLegacyLocalData();
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `organizations/${orgId}`);
     }
   };
 
+  /**
+   * Completes the join: creates the member document keyed by auth uid (which is
+   * what the rest of the app looks up), points the user profile at the org,
+   * bumps the seat count, and consumes the invitation — all atomically, so a
+   * half-joined member can't exist.
+   */
+  const acceptInvitation = async () => {
+    if (!user || !invitation) return;
+
+    // Re-check with the server; the user may have clicked the verification link
+    // in another tab since this page loaded.
+    await reload(user);
+    if (!auth.currentUser?.emailVerified) {
+      throw new Error(
+        'Please verify your email address first, then try again. We sent a link to ' + user.email + '.'
+      );
+    }
+    if (!user.email) {
+      throw new Error('Your account has no email address, so this invitation cannot be matched.');
+    }
+
+    const orgRef = doc(db, 'organizations', invitation.orgId);
+
+    await runTransaction(db, async (transaction) => {
+      const orgSnap = await transaction.get(orgRef);
+      if (!orgSnap.exists()) {
+        throw new Error('That organization no longer exists. Ask your administrator to re-invite you.');
+      }
+
+      const currentCount = (orgSnap.data().memberCount as number) ?? 0;
+      if (currentCount >= SEAT_LIMIT) {
+        throw new Error(
+          `${invitation.orgName} has no seats left (limit ${SEAT_LIMIT}). Ask an administrator to free one up.`
+        );
+      }
+
+      transaction.set(doc(db, `organizations/${invitation.orgId}/members`, user.uid), {
+        userId: user.uid,
+        email: user.email,
+        role: invitation.role,
+        joinedAt: new Date().toISOString(),
+      });
+      transaction.update(orgRef, { memberCount: currentCount + 1 });
+      transaction.update(doc(db, 'users', user.uid), { currentOrgId: invitation.orgId });
+      transaction.delete(doc(db, 'invitations', invitation.id));
+    });
+
+    clearLegacyLocalData();
+    setInvitation(null);
+  };
+
   return (
-    <AuthContext.Provider value={{ 
-      user, profile, organization, role, loading, 
-      login, loginWithEmail, registerWithEmail, logout, createOrg 
+    <AuthContext.Provider value={{
+      user, profile, organization, role, loading, invitation,
+      login, loginWithEmail, registerWithEmail, logout, createOrg,
+      acceptInvitation, resendVerificationEmail
     }}>
       {children}
     </AuthContext.Provider>
