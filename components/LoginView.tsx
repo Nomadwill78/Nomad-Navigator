@@ -14,23 +14,6 @@ function rot(deg: number, x: number, y: number): [number, number] {
 
 const pts = (arr: [number, number][]) => arr.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
 
-/** Firebase's raw error codes aren't something a nonprofit admin should have to parse. */
-function describeAuthError(err: any): string {
-  switch (err?.code) {
-    case 'auth/unauthorized-domain':
-      return "Google sign-in isn't available from this address yet. Please use email and password, or contact support.";
-    case 'auth/popup-blocked':
-      return 'Your browser blocked the Google sign-in window. Allow pop-ups for this site and try again.';
-    case 'auth/popup-closed-by-user':
-    case 'auth/cancelled-popup-request':
-      return 'Google sign-in was closed before finishing. Try again.';
-    case 'auth/network-request-failed':
-      return "Couldn't reach Google. Check your connection and try again.";
-    default:
-      return err?.message || 'Google sign-in failed. Please try again.';
-  }
-}
-
 const CompassRose: React.FC = () => {
   // graduated degree ring: a tick every 5°, longest at the cardinals
   const ticks = Array.from({ length: 72 }, (_, i) => {
@@ -110,26 +93,12 @@ const CompassRose: React.FC = () => {
 };
 
 export const LoginView: React.FC = () => {
-  const { login, loginWithEmail, registerWithEmail } = useAuth();
+  const { loginWithEmail, registerWithEmail } = useAuth();
   const [view, setView] = useState<'login' | 'register'>('login');
-  const [method, setMethod] = useState<'choice' | 'email'>('choice');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
-
-  const handleGoogleLogin = async () => {
-    setError(null);
-    setIsGoogleSubmitting(true);
-    try {
-      await login();
-    } catch (err: any) {
-      setError(describeAuthError(err));
-      setIsGoogleSubmitting(false);
-    }
-    // On success, signInWithRedirect navigates away — no need to clear isGoogleSubmitting.
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -205,11 +174,9 @@ export const LoginView: React.FC = () => {
           <span className="lv-corner tl" /><span className="lv-corner tr" />
           <span className="lv-corner bl" /><span className="lv-corner br" />
 
-          <div className="lv-panel-eyebrow">{method === 'email' ? (view === 'login' ? 'Return to your chart' : 'Register your organization') : 'Set your bearing'}</div>
+          <div className="lv-panel-eyebrow">{view === 'login' ? 'Return to your chart' : 'Register your organization'}</div>
           <h2 className="lv-panel-title">
-            {method === 'email'
-              ? (view === 'login' ? 'Sign in to your dashboard' : 'Create your account')
-              : 'Welcome to Compass'}
+            {view === 'login' ? 'Sign in to your dashboard' : 'Create your account'}
           </h2>
 
           {error && (
@@ -219,82 +186,51 @@ export const LoginView: React.FC = () => {
             </div>
           )}
 
-          {method === 'choice' ? (
-            <div className="lv-stack">
-              <button className="lv-btn lv-btn-google" onClick={handleGoogleLogin} disabled={isGoogleSubmitting}>
-                {isGoogleSubmitting ? (
-                  <span className="lv-spinner" />
-                ) : (
-                  <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.56c2.08-1.92 3.28-4.74 3.28-8.09Z" />
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.98.66-2.24 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z" />
-                    <path fill="#FBBC05" d="M5.84 14.11a6.6 6.6 0 0 1 0-4.22V7.05H2.18a11 11 0 0 0 0 9.9l3.66-2.84Z" />
-                    <path fill="#EA4335" d="M12 4.75c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 1.44 14.97.5 12 .5A11 11 0 0 0 2.18 7.05l3.66 2.84C6.71 6.68 9.14 4.75 12 4.75Z" />
-                  </svg>
-                )}
-                {isGoogleSubmitting ? 'Connecting…' : 'Continue with Google'}
-              </button>
+          <form className="lv-form" onSubmit={handleSubmit}>
+            <div className="lv-field">
+              <label htmlFor="lv-email">Email address</label>
+              <div className="lv-input-wrap">
+                <Mail size={16} />
+                <input
+                  id="lv-email"
+                  className="lv-input"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@organization.org"
+                />
+              </div>
+            </div>
 
-              <div className="lv-or"><span>or</span></div>
+            <div className="lv-field">
+              <label htmlFor="lv-pass">Password</label>
+              <div className="lv-input-wrap">
+                <Lock size={16} />
+                <input
+                  id="lv-pass"
+                  className="lv-input"
+                  type="password"
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                />
+              </div>
+            </div>
 
-              <button className="lv-btn lv-btn-ghost" onClick={() => setMethod('email')}>
-                <Mail size={17} />
-                Continue with email
+            <button type="submit" className="lv-btn lv-btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? <span className="lv-spinner" /> : view === 'login' ? 'Sign in' : 'Create account'}
+            </button>
+
+            <div className="lv-swap">
+              {view === 'login' ? "New to Compass? " : 'Already have an account? '}
+              <button type="button" onClick={() => setView(view === 'login' ? 'register' : 'login')}>
+                {view === 'login' ? 'Create an account' : 'Sign in'}
               </button>
             </div>
-          ) : (
-            <form className="lv-form" onSubmit={handleSubmit}>
-              <div className="lv-form-head">
-                <button type="button" className="lv-back" onClick={() => setMethod('choice')}>
-                  ← All options
-                </button>
-              </div>
-
-              <div className="lv-field">
-                <label htmlFor="lv-email">Email address</label>
-                <div className="lv-input-wrap">
-                  <Mail size={16} />
-                  <input
-                    id="lv-email"
-                    className="lv-input"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@organization.org"
-                  />
-                </div>
-              </div>
-
-              <div className="lv-field">
-                <label htmlFor="lv-pass">Password</label>
-                <div className="lv-input-wrap">
-                  <Lock size={16} />
-                  <input
-                    id="lv-pass"
-                    className="lv-input"
-                    type="password"
-                    required
-                    minLength={6}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                  />
-                </div>
-              </div>
-
-              <button type="submit" className="lv-btn lv-btn-primary" disabled={isSubmitting}>
-                {isSubmitting ? <span className="lv-spinner" /> : view === 'login' ? 'Sign in' : 'Create account'}
-              </button>
-
-              <div className="lv-swap">
-                {view === 'login' ? "New to Compass? " : 'Already have an account? '}
-                <button type="button" onClick={() => setView(view === 'login' ? 'register' : 'login')}>
-                  {view === 'login' ? 'Create an account' : 'Sign in'}
-                </button>
-              </div>
-            </form>
-          )}
+          </form>
 
           <div className="lv-foot">
             <ShieldCheck size={13} />
