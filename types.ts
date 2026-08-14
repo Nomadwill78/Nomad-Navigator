@@ -220,6 +220,8 @@ export interface UserProfile {
   email: string;
   displayName: string;
   currentOrgId?: string;
+  /** True once this account has dismissed the one-time welcome step. */
+  hasSeenWelcome?: boolean;
 }
 
 export interface GrantKPI {

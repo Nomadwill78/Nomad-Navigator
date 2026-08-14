@@ -33,6 +33,11 @@ interface AuthContextType {
   createOrg: (name: string) => Promise<void>;
   acceptInvitation: () => Promise<void>;
   resendVerificationEmail: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  updateDisplayName: (name: string) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  /** Marks the one-time welcome step as seen, so it doesn't show again on this account. */
+  dismissWelcome: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -173,6 +178,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await sendEmailVerification(auth.currentUser);
   };
 
+  const resetPassword = async (email: string) => {
+    const { sendPasswordResetEmail } = await import('../lib/firebase');
+    await sendPasswordResetEmail(auth, email);
+  };
+
+  const updateDisplayName = async (name: string) => {
+    if (!auth.currentUser) throw new Error('You need to be signed in first.');
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error('Please enter a name.');
+    await setDoc(doc(db, 'users', auth.currentUser.uid), { displayName: trimmed }, { merge: true });
+  };
+
+  /**
+   * Firebase requires a recent sign-in before it will accept a password
+   * change, so this re-proves identity with the current password first —
+   * the same reason `acceptInvitation` re-checks emailVerified live rather
+   * than trusting a stale client value.
+   */
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    const user = auth.currentUser;
+    if (!user || !user.email) throw new Error('You need to be signed in first.');
+    const { EmailAuthProvider, reauthenticateWithCredential, updatePassword } = await import('../lib/firebase');
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+    await updatePassword(user, newPassword);
+  };
+
+  const dismissWelcome = async () => {
+    if (!auth.currentUser) return;
+    await setDoc(doc(db, 'users', auth.currentUser.uid), { hasSeenWelcome: true }, { merge: true });
+  };
+
   const logout = () => signOut(auth);
 
   const createOrg = async (name: string) => {
@@ -263,7 +300,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider value={{
       user, profile, organization, role, loading, invitation,
       loginWithEmail, registerWithEmail, logout, createOrg,
-      acceptInvitation, resendVerificationEmail
+      acceptInvitation, resendVerificationEmail, resetPassword,
+      updateDisplayName, changePassword, dismissWelcome
     }}>
       {children}
     </AuthContext.Provider>
