@@ -340,7 +340,10 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                   if (diff > 12) {
                     burnStatus = {
                       label: "High Burn Rate",
-                      color: "text-rose-300 bg-rose-500/10 border-rose-500/25",
+                      // Overspend is money awaiting a decision, not an error, so it stays
+                      // brass rather than taking the Alert red. It carries a heavier wash
+                      // and border than the underspend case to rank the two.
+                      color: "text-brassbright bg-brass/15 border-brass/40",
                       desc: "Warning: Funds are being spent significantly faster than time elapsed."
                     };
                   } else if (diff < -15) {
@@ -521,7 +524,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                   {permissions?.canDeleteGrants && (
                                     <button 
                                       onClick={() => handleDeleteKPI(selectedGrant.id, kpi.id)}
-                                      className="p-1.5 text-inkfaint hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                      className="p-1.5 text-inkfaint hover:text-alert hover:bg-alert/15 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                                     >
                                       <Trash2 size={14} />
                                     </button>
@@ -632,7 +635,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                           </div>
                                           <button 
                                             onClick={() => handleDeleteSubgranteeKPI(selectedGrant.id, sub.id, kpi.id)}
-                                            className="text-inkfaint hover:text-red-500 p-1 opacity-0 group-hover/kpi:opacity-100 transition-opacity"
+                                            className="text-inkfaint hover:text-alert p-1 opacity-0 group-hover/kpi:opacity-100 transition-opacity"
                                           >
                                             <Trash2 size={12} />
                                           </button>

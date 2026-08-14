@@ -9,8 +9,9 @@ interface StatCardProps {
   trendDirection?: 'up' | 'down' | 'neutral';
   icon: React.ReactNode;
   description?: string;
-  gradientFrom: string;
-  gradientTo: string;
+  /** Two Bearings Rule: 'impact' draws the card in Signal Teal, 'funding' in
+   *  Lamplit Brass for money, governance, and quality metrics. */
+  accent?: 'impact' | 'funding';
   sparklineData?: { value: number }[];
   subValue?: string;
 }
@@ -22,13 +23,11 @@ export const StatCard: React.FC<StatCardProps> = ({
   trendDirection = 'neutral',
   icon,
   description,
-  gradientFrom,
+  accent: accentName = 'impact',
   sparklineData,
   subValue,
 }) => {
-  // Brass for governance/quality metrics, teal for impact/efficiency
-  const isBrass = /purple|amber|pink|orange/.test(gradientFrom);
-  const accent = isBrass ? '#cba85c' : '#4fc4d3';
+  const accent = accentName === 'funding' ? '#cba85c' : '#4fc4d3';
 
   return (
     <div className="relative overflow-hidden rounded-xl p-6 bg-surface border border-hairline transition-all duration-300 hover:border-brass/45 group">

@@ -50,15 +50,17 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onCreateOrg, use
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <div className="p-4 bg-blue-500/10 border border-blue-500/25 rounded-2xl">
-                    <p className="text-xs font-bold text-blue-200 uppercase mb-1">Standard Plan</p>
-                    <p className="text-xl font-black text-blue-200">$0<span className="text-xs font-medium text-blue-300">/mo</span></p>
+                 {/* A plan is money, so the active one reads brass; the unavailable
+                     Enterprise tier beside it stays neutral. */}
+                 <div className="p-4 bg-brass/10 border border-brass/25 rounded-2xl">
+                    <p className="text-xs font-bold text-brassbright uppercase mb-1">Standard Plan</p>
+                    <p className="text-xl font-black text-brassbright">$0<span className="text-xs font-medium text-brass">/mo</span></p>
                     <ul className="mt-4 space-y-2">
-                       <li className="text-[10px] text-blue-300 flex items-center gap-2">
-                          <div className="w-1 h-1 bg-blue-400 rounded-full" /> AI Impact Reporting
+                       <li className="text-[10px] text-brass flex items-center gap-2">
+                          <div className="w-1 h-1 bg-brass rounded-full" /> AI Impact Reporting
                        </li>
-                       <li className="text-[10px] text-blue-300 flex items-center gap-2">
-                          <div className="w-1 h-1 bg-blue-400 rounded-full" /> Up to 8 users
+                       <li className="text-[10px] text-brass flex items-center gap-2">
+                          <div className="w-1 h-1 bg-brass rounded-full" /> Up to 8 users
                        </li>
                     </ul>
                  </div>
@@ -72,7 +74,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onCreateOrg, use
               <button 
                 onClick={handleSubmit}
                 disabled={!orgName.trim() || isSubmitting}
-                className="w-full bg-abyss text-white py-4 rounded-2xl font-black text-lg hover:bg-surface2 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full bg-abyss text-parchment py-4 rounded-2xl font-black text-lg hover:bg-surface2 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
                   <>
