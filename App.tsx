@@ -18,7 +18,8 @@ import {
   Database,
   Download,
   CheckCircle2,
-  Circle
+  Circle,
+  CreditCard
 } from 'lucide-react';
 import { exportDashboardPDF } from './src/lib/exportUtils';
 import { 
@@ -44,6 +45,7 @@ import { GrantTrackingView } from './components/GrantTrackingView';
 import { AnalysisView } from './components/AnalysisView';
 import { GrantDiscoveryView } from './components/GrantDiscoveryView';
 import { TeamManagementView } from './components/TeamManagementView';
+import { BillingView } from './components/BillingView';
 import { LoginView } from './components/LoginView';
 import { TrialSignupView } from './components/TrialSignupView';
 import { SalesPageView } from './components/SalesPageView';
@@ -379,7 +381,7 @@ const App: React.FC = () => {
   } = useAuth();
   const permissions = role ? ROLE_PERMISSIONS[role] : null;
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [activeView, setActiveView] = useState<'dashboard' | 'data' | 'grants' | 'analysis' | 'discovery' | 'team' | 'settings'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'data' | 'grants' | 'analysis' | 'discovery' | 'team' | 'billing' | 'settings'>('dashboard');
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [trajectoryRange, setTrajectoryRange] = useState<'6M' | '1Y' | 'ALL'>('ALL');
@@ -439,6 +441,12 @@ const App: React.FC = () => {
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (params.get('payment') === 'cancel') {
       alert('Payment was cancelled.');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (params.get('checkout') === 'success') {
+      alert("You're subscribed! It may take a moment for your new plan to appear.");
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (params.get('checkout') === 'cancel') {
+      alert('Checkout was cancelled — your plan has not changed.');
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
@@ -635,6 +643,9 @@ const App: React.FC = () => {
           {role && ROLE_PERMISSIONS[role].canManageTeam && (
             <NavItem icon={<Users size={20} />} label="Team Management" active={activeView === 'team'} isOpen={isSidebarOpen} onClick={() => setActiveView('team')} />
           )}
+          {role && ROLE_PERMISSIONS[role].canManageTeam && (
+            <NavItem icon={<CreditCard size={20} />} label="Billing" active={activeView === 'billing'} isOpen={isSidebarOpen} onClick={() => setActiveView('billing')} />
+          )}
           <NavItem icon={<MapPin size={20} />} label="Geographic Reach" isOpen={isSidebarOpen} comingSoon />
           <NavItem icon={<DollarSign size={20} />} label="Financials" isOpen={isSidebarOpen} comingSoon />
           
@@ -769,6 +780,8 @@ const App: React.FC = () => {
             <GrantDiscoveryView opportunities={SAMPLE_OPPORTUNITIES} />
           ) : activeView === 'team' ? (
             <TeamManagementView />
+          ) : activeView === 'billing' ? (
+            <BillingView />
           ) : activeView === 'settings' ? (
             <SettingsView />
           ) : (

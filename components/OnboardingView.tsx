@@ -9,7 +9,7 @@ import {
   AlertCircle,
   ShieldCheck,
 } from 'lucide-react';
-import { Invitation, ROLE_DESCRIPTIONS, SEAT_LIMIT } from '../types';
+import { Invitation, ROLE_DESCRIPTIONS } from '../types';
 
 interface OnboardingViewProps {
   onCreateOrg: (name: string) => void;
@@ -194,7 +194,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
               {/* A plan is money, so the active one reads brass; the unavailable
                   Enterprise tier beside it stays neutral. */}
               <div className="p-4 bg-brass/10 border border-brass/25 rounded-2xl">
-                <p className="text-xs font-bold text-brassbright uppercase mb-1">Standard Plan</p>
+                <p className="text-xs font-bold text-brassbright uppercase mb-1">Free Trial</p>
                 <p className="text-xl font-black text-brassbright">
                   $0<span className="text-xs font-medium text-brass">/mo</span>
                 </p>
@@ -203,7 +203,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                     <div className="w-1 h-1 bg-brass rounded-full" /> AI Impact Reporting
                   </li>
                   <li className="text-[10px] text-brass flex items-center gap-2">
-                    <div className="w-1 h-1 bg-brass rounded-full" /> Up to {SEAT_LIMIT} users
+                    <div className="w-1 h-1 bg-brass rounded-full" /> Pick a plan anytime after signup
                   </li>
                 </ul>
               </div>

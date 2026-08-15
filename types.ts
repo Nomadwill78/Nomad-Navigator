@@ -118,13 +118,6 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   viewer: 'Read-only dashboard',
 };
 
-/**
- * Maximum members per organization, counting accepted members and pending invitations.
- * Enforced in the UI here and hard-enforced in `firestore.rules` (`memberCount <= 8`).
- * Changing the limit means changing BOTH — this constant and the number in the rules.
- */
-export const SEAT_LIMIT = 8;
-
 export interface RolePermission {
   canManageTeam: boolean;
   canEditGrants: boolean;
@@ -213,6 +206,43 @@ export interface Organization {
   creatorId: string;
   createdAt: string;
   memberCount: number;
+}
+
+/**
+ * THE AUTHORITATIVE PLAN MODEL. Matches the tiers on the /pricing page.
+ * `firestore.rules` and `server.ts` both follow this list — if you change a
+ * seat limit here, change it in both of those places in the same commit.
+ */
+export type PlanId = 'trial' | 'starter' | 'growth' | 'pro';
+
+export const PLAN_SEAT_LIMITS: Record<PlanId, number> = {
+  trial: 8,
+  starter: 3,
+  growth: 8,
+  pro: 20,
+};
+
+export const PLAN_LABELS: Record<PlanId, string> = {
+  trial: 'Trial',
+  starter: 'Compass Starter',
+  growth: 'Compass Growth',
+  pro: 'Compass Pro',
+};
+
+/**
+ * Lives at `organizations/{orgId}/billing/subscription`. Written once
+ * client-side (the trial default, at org creation) and after that only by
+ * the server's Stripe webhook via firebase-admin — there is no client path
+ * to change your own plan. See firestore.rules.
+ */
+export interface OrgBilling {
+  plan: PlanId;
+  status: 'trialing' | 'active' | 'past_due' | 'canceled';
+  seatLimit: number;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  currentPeriodEnd?: string;
+  updatedAt: string;
 }
 
 export interface UserProfile {

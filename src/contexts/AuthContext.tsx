@@ -12,7 +12,7 @@ import {
   serverTimestamp 
 } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
-import { UserProfile, Organization, OrgMember, UserRole, Invitation, SEAT_LIMIT } from '../../types';
+import { UserProfile, Organization, OrgMember, UserRole, Invitation, OrgBilling, PLAN_SEAT_LIMITS } from '../../types';
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { clearLegacyLocalData } from '../lib/orgData';
 
@@ -25,6 +25,8 @@ interface AuthContextType {
   organization: Organization | null;
   role: UserRole | null;
   loading: boolean;
+  /** The current organization's plan and seat limit. Null until the trial doc syncs. */
+  billing: OrgBilling | null;
   /** A pending invitation addressed to this user's email, if they have no org yet. */
   invitation: Invitation | null;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
@@ -47,6 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
+  const [billing, setBilling] = useState<OrgBilling | null>(null);
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -54,14 +57,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let profileUnsubscribe: (() => void) | undefined;
     let orgUnsubscribe: (() => void) | undefined;
     let memberUnsubscribe: (() => void) | undefined;
+    let billingUnsubscribe: (() => void) | undefined;
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
-      
+
       // Cleanup previous observers
       if (profileUnsubscribe) profileUnsubscribe();
       if (orgUnsubscribe) orgUnsubscribe();
       if (memberUnsubscribe) memberUnsubscribe();
+      if (billingUnsubscribe) billingUnsubscribe();
 
       if (user) {
         setLoading(true);
@@ -84,6 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (profileData.currentOrgId) {
               if (orgUnsubscribe) orgUnsubscribe();
               if (memberUnsubscribe) memberUnsubscribe();
+              if (billingUnsubscribe) billingUnsubscribe();
 
               const orgRef = doc(db, 'organizations', profileData.currentOrgId);
               orgUnsubscribe = onSnapshot(orgRef, (osnap) => {
@@ -98,9 +104,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   setRole((msnap.data() as OrgMember).role);
                 }
               });
+
+              const billingRef = doc(db, `organizations/${profileData.currentOrgId}/billing`, 'subscription');
+              billingUnsubscribe = onSnapshot(billingRef, (bsnap) => {
+                setBilling(bsnap.exists() ? (bsnap.data() as OrgBilling) : null);
+              });
             } else {
               setOrganization(null);
               setRole(null);
+              setBilling(null);
             }
           }
           setLoading(false);
@@ -112,6 +124,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(null);
         setOrganization(null);
         setRole(null);
+        setBilling(null);
         setLoading(false);
       }
     });
@@ -121,6 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (profileUnsubscribe) profileUnsubscribe();
       if (orgUnsubscribe) orgUnsubscribe();
       if (memberUnsubscribe) memberUnsubscribe();
+      if (billingUnsubscribe) billingUnsubscribe();
     };
   }, []);
 
@@ -221,6 +235,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await runTransaction(db, async (transaction) => {
         const orgRef = doc(db, 'organizations', orgId);
         const memberRef = doc(db, `organizations/${orgId}/members`, user.uid);
+        const billingRef = doc(db, `organizations/${orgId}/billing`, 'subscription');
         const profileRef = doc(db, 'users', user.uid);
 
         transaction.set(orgRef, {
@@ -235,6 +250,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email: userEmail,
           role: 'admin',
           joinedAt: serverTimestamp()
+        });
+
+        // Every org starts on the trial plan — no card required. An admin
+        // upgrades from the Billing screen whenever they're ready.
+        transaction.set(billingRef, {
+          plan: 'trial',
+          status: 'trialing',
+          seatLimit: PLAN_SEAT_LIMITS.trial,
+          updatedAt: new Date().toISOString(),
         });
 
         transaction.update(profileRef, { currentOrgId: orgId });
@@ -267,6 +291,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const orgRef = doc(db, 'organizations', invitation.orgId);
+    const billingRef = doc(db, `organizations/${invitation.orgId}/billing`, 'subscription');
 
     await runTransaction(db, async (transaction) => {
       const orgSnap = await transaction.get(orgRef);
@@ -274,10 +299,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('That organization no longer exists. Ask your administrator to re-invite you.');
       }
 
+      const billingSnap = await transaction.get(billingRef);
+      // Grandfather in orgs from before the billing model shipped, same as firestore.rules' orgSeatLimit().
+      const seatLimit = billingSnap.exists() ? (billingSnap.data().seatLimit as number) : 8;
+
       const currentCount = (orgSnap.data().memberCount as number) ?? 0;
-      if (currentCount >= SEAT_LIMIT) {
+      if (currentCount >= seatLimit) {
         throw new Error(
-          `${invitation.orgName} has no seats left (limit ${SEAT_LIMIT}). Ask an administrator to free one up.`
+          `${invitation.orgName} has no seats left (limit ${seatLimit}). Ask an administrator to free one up.`
         );
       }
 
@@ -298,7 +327,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <AuthContext.Provider value={{
-      user, profile, organization, role, loading, invitation,
+      user, profile, organization, role, loading, billing, invitation,
       loginWithEmail, registerWithEmail, logout, createOrg,
       acceptInvitation, resendVerificationEmail, resetPassword,
       updateDisplayName, changePassword, dismissWelcome

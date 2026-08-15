@@ -13,10 +13,10 @@ import {
   query,
   where,
 } from 'firebase/firestore';
-import { OrgMember, UserRole, Invitation, USER_ROLES, ROLE_DESCRIPTIONS, SEAT_LIMIT } from '../types';
+import { OrgMember, UserRole, Invitation, USER_ROLES, ROLE_DESCRIPTIONS, PLAN_LABELS } from '../types';
 
 export const TeamManagementView: React.FC = () => {
-  const { user, organization, role } = useAuth();
+  const { user, organization, role, billing } = useAuth();
   const [members, setMembers] = useState<OrgMember[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -27,6 +27,8 @@ export const TeamManagementView: React.FC = () => {
 
   const isAdmin = role === 'admin';
   const seatsUsed = members.length + invitations.length;
+  // Grandfathered default matches firestore.rules' orgSeatLimit() while the billing doc is still loading.
+  const seatLimit = billing?.seatLimit ?? 8;
 
   useEffect(() => {
     if (!organization) return;
@@ -69,8 +71,8 @@ export const TeamManagementView: React.FC = () => {
       setInviteError('That person is already a member of this organization.');
       return;
     }
-    if (seatsUsed >= SEAT_LIMIT) {
-      setInviteError(`All ${SEAT_LIMIT} seats are taken. Remove a member or revoke an invitation first.`);
+    if (seatsUsed >= seatLimit) {
+      setInviteError(`All ${seatLimit} seats are taken. Remove a member, revoke an invitation, or upgrade your plan first.`);
       return;
     }
 
@@ -146,11 +148,11 @@ export const TeamManagementView: React.FC = () => {
             <Users className="text-teal" /> Team Management
           </h2>
           <p className="text-inkmute">
-            Manage your organization's users and permissions. (Limit: {SEAT_LIMIT} seats, including
-            pending invitations)
+            {billing ? PLAN_LABELS[billing.plan] : 'Trial'} plan — limit: {seatLimit} seats, including
+            pending invitations.
           </p>
         </div>
-        {isAdmin && seatsUsed < SEAT_LIMIT && (
+        {isAdmin && seatsUsed < seatLimit && (
           <button
             onClick={() => {
               setInviteError(null);
@@ -170,12 +172,12 @@ export const TeamManagementView: React.FC = () => {
           </div>
           <p className="text-xs font-bold text-inkfaint uppercase tracking-widest mb-1">Seats Used</p>
           <p className="text-3xl font-black text-ivory">
-            {seatsUsed} <span className="text-inkfaint text-xl">/ {SEAT_LIMIT}</span>
+            {seatsUsed} <span className="text-inkfaint text-xl">/ {seatLimit}</span>
           </p>
           <div className="mt-4 h-2 w-full bg-abyss border border-hairline/50 rounded-full overflow-hidden">
             <div
               className="h-full bg-teal transition-all duration-500"
-              style={{ width: `${Math.min(100, (seatsUsed / SEAT_LIMIT) * 100)}%` }}
+              style={{ width: `${Math.min(100, (seatsUsed / seatLimit) * 100)}%` }}
             />
           </div>
           {invitations.length > 0 && (
