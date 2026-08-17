@@ -1,0 +1,35 @@
+name: Deploy Firestore rules
+
+# firestore.rules only takes effect once it's published to the actual
+# Firestore database — merging to GitHub does nothing on its own. This
+# closes that gap: any change to firestore.rules (or its database target
+# in firebase.json) on main deploys automatically.
+on:
+  push:
+    branches: [main]
+    paths:
+      - firestore.rules
+      - firebase.json
+      - .firebaserc
+  workflow_dispatch: {}
+
+jobs:
+  deploy-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - run: npm ci
+
+      - name: Deploy Firestore rules
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT" > /tmp/firebase-service-account.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/firebase-service-account.json
+          npx firebase-tools deploy --only firestore:rules --project gen-lang-client-0112088178
+          rm -f /tmp/firebase-service-account.json
