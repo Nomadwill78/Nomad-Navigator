@@ -2,13 +2,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { DashboardStats, Grant } from '../../types';
 import {
   EMPTY_STATS,
-  persistGrants,
+  createGrant as createGrantRemote,
+  deleteGrant as deleteGrantRemote,
   persistStats,
   readCachedGrants,
   readCachedStats,
   subscribeToGrants,
   subscribeToStats,
+  updateGrant as updateGrantRemote,
 } from '../lib/orgData';
+import { generateId } from '../lib/id';
 
 export type SyncStatus = 'loading' | 'live' | 'cached' | 'error' | 'demo';
 
@@ -16,7 +19,12 @@ interface UseOrgDataResult {
   stats: DashboardStats;
   grants: Grant[];
   setStats: (stats: DashboardStats) => void;
-  setGrants: (grants: Grant[]) => void;
+  /** Writes a brand-new grant immediately (not debounced) and returns its id. */
+  createGrant: (grant: Omit<Grant, 'id'>) => Promise<string>;
+  /** Debounced partial write scoped to exactly one grant. */
+  updateGrant: (grantId: string, changes: Partial<Grant>) => void;
+  /** Removes exactly one grant. Never touches any other grant. */
+  deleteGrant: (grantId: string) => void;
   syncStatus: SyncStatus;
   syncError: string | null;
 }
@@ -28,12 +36,14 @@ const WRITE_DEBOUNCE_MS = 700;
  * The single source of truth for an organization's grants and metrics.
  *
  * Reads come from Firestore in real time, so two people in the same org see the
- * same numbers. Writes are debounced (the KPI inputs fire on every keystroke)
- * and diffed. While a local edit is in flight we ignore incoming snapshots for
- * that slice, so the server echo can't yank the cursor out of an input.
+ * same numbers. Grant writes are entity-scoped: each grant has its own debounce
+ * timer and its own "pending" flag, so an in-flight edit to Grant A can never
+ * suppress or clobber an incoming update to Grant B — the failure mode of the
+ * old whole-array diff-and-batch design.
  *
  * Demo mode is held entirely in memory: `demoStats`/`demoGrants` are served and
- * every write is dropped, so exploring the demo can never touch real data.
+ * every write is applied to local state only, so exploring the demo can never
+ * touch real data.
  */
 export function useOrgData(
   orgId: string | null,
@@ -46,12 +56,23 @@ export function useOrgData(
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('loading');
   const [syncError, setSyncError] = useState<string | null>(null);
 
-  // Last state the server confirmed — the baseline persistGrants diffs against.
-  const serverGrants = useRef<Grant[]>([]);
   const statsPending = useRef(false);
-  const grantsPending = useRef(false);
   const statsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const grantsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Grant ids with an edit in flight (debounce pending or write in progress) —
+  // per-grant, not global, so a snapshot echo for a DIFFERENT grant is never held back.
+  const pendingGrantIds = useRef<Set<string>>(new Set());
+  // Changes queued per grant, merged shallowly across rapid successive edits so a
+  // fast KPI keystroke followed immediately by a spentAmount edit doesn't drop one.
+  const pendingChanges = useRef<Map<string, Partial<Grant>>>(new Map());
+  const grantTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  const clearAllGrantTimers = () => {
+    grantTimers.current.forEach((t) => clearTimeout(t));
+    grantTimers.current.clear();
+    pendingChanges.current.clear();
+    pendingGrantIds.current.clear();
+  };
 
   // --- Subscribe ----------------------------------------------------------
   useEffect(() => {
@@ -59,9 +80,7 @@ export function useOrgData(
 
     // Paint the cached copy immediately so an offline reload isn't a blank screen.
     setStatsState(readCachedStats(orgId));
-    const cachedGrants = readCachedGrants(orgId);
-    setGrantsState(cachedGrants);
-    serverGrants.current = cachedGrants;
+    setGrantsState(readCachedGrants(orgId));
     setSyncStatus(navigator.onLine ? 'loading' : 'cached');
 
     const unsubStats = subscribeToStats(
@@ -82,9 +101,15 @@ export function useOrgData(
     const unsubGrants = subscribeToGrants(
       orgId,
       (next) => {
-        serverGrants.current = next;
-        if (grantsPending.current) return;
-        setGrantsState(next);
+        setGrantsState((current) => {
+          if (pendingGrantIds.current.size === 0) return next;
+          // Keep the in-progress local version of any grant with an edit in
+          // flight; take the server's version of everything else. This is what
+          // lets another user's concurrent edit to a different grant come
+          // straight through instead of being blocked by our own pending edit.
+          const currentById = new Map(current.map((g) => [g.id, g]));
+          return next.map((g) => (pendingGrantIds.current.has(g.id) ? currentById.get(g.id) ?? g : g));
+        });
         setSyncStatus('live');
         setSyncError(null);
       },
@@ -111,16 +136,14 @@ export function useOrgData(
     }
     if (orgId) {
       setStatsState(readCachedStats(orgId));
-      const cached = readCachedGrants(orgId);
-      setGrantsState(cached);
-      serverGrants.current = cached;
+      setGrantsState(readCachedGrants(orgId));
       setSyncStatus(navigator.onLine ? 'loading' : 'cached');
     }
     // demoStats/demoGrants are module constants; re-running on identity is unnecessary
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDemoMode, orgId]);
 
-  // --- Writes -------------------------------------------------------------
+  // --- Stats write ----------------------------------------------------------
   const setStats = useCallback(
     (next: DashboardStats) => {
       setStatsState(next);
@@ -145,40 +168,93 @@ export function useOrgData(
     [orgId, isDemoMode]
   );
 
-  const setGrants = useCallback(
-    (next: Grant[]) => {
-      setGrantsState(next);
-      if (isDemoMode || !orgId) return;
+  // --- Grant writes -----------------------------------------------------
+  const createGrant = useCallback(
+    async (grant: Omit<Grant, 'id'>): Promise<string> => {
+      if (isDemoMode) {
+        const id = generateId();
+        setGrantsState((cur) => [...cur, { ...grant, id }]);
+        return id;
+      }
+      if (!orgId) throw new Error('No active organization.');
 
-      grantsPending.current = true;
-      if (grantsTimer.current) clearTimeout(grantsTimer.current);
-      grantsTimer.current = setTimeout(async () => {
-        try {
-          await persistGrants(orgId, next, serverGrants.current);
-          serverGrants.current = next;
-          setSyncError(null);
-          setSyncStatus('live');
-        } catch (error) {
-          console.error('Failed to save grants:', error);
-          setSyncStatus('error');
-          setSyncError(describeError(error));
-        } finally {
-          grantsPending.current = false;
-        }
-      }, WRITE_DEBOUNCE_MS);
+      try {
+        const id = await createGrantRemote(orgId, grant);
+        setSyncError(null);
+        setSyncStatus('live');
+        return id;
+      } catch (error) {
+        console.error('Failed to create grant:', error);
+        setSyncStatus('error');
+        setSyncError(describeError(error));
+        throw error;
+      }
     },
     [orgId, isDemoMode]
   );
 
-  // Flush timers on unmount so a pending edit isn't silently dropped.
+  const updateGrant = useCallback(
+    (grantId: string, changes: Partial<Grant>) => {
+      setGrantsState((cur) => cur.map((g) => (g.id === grantId ? { ...g, ...changes } : g)));
+      if (isDemoMode || !orgId) return; // demo edits are throwaway, already applied above
+
+      pendingGrantIds.current.add(grantId);
+      pendingChanges.current.set(grantId, { ...pendingChanges.current.get(grantId), ...changes });
+
+      const existingTimer = grantTimers.current.get(grantId);
+      if (existingTimer) clearTimeout(existingTimer);
+
+      const timer = setTimeout(async () => {
+        grantTimers.current.delete(grantId);
+        const toWrite = pendingChanges.current.get(grantId);
+        pendingChanges.current.delete(grantId);
+        if (!toWrite) return;
+        try {
+          await updateGrantRemote(orgId, grantId, toWrite);
+          setSyncError(null);
+          setSyncStatus('live');
+        } catch (error) {
+          console.error('Failed to save grant:', error);
+          setSyncStatus('error');
+          setSyncError(describeError(error));
+        } finally {
+          pendingGrantIds.current.delete(grantId);
+        }
+      }, WRITE_DEBOUNCE_MS);
+      grantTimers.current.set(grantId, timer);
+    },
+    [orgId, isDemoMode]
+  );
+
+  const deleteGrant = useCallback(
+    (grantId: string) => {
+      setGrantsState((cur) => cur.filter((g) => g.id !== grantId));
+      if (isDemoMode || !orgId) return;
+
+      const existingTimer = grantTimers.current.get(grantId);
+      if (existingTimer) clearTimeout(existingTimer);
+      grantTimers.current.delete(grantId);
+      pendingChanges.current.delete(grantId);
+      pendingGrantIds.current.delete(grantId);
+
+      deleteGrantRemote(orgId, grantId).catch((error) => {
+        console.error('Failed to delete grant:', error);
+        setSyncStatus('error');
+        setSyncError(describeError(error));
+      });
+    },
+    [orgId, isDemoMode]
+  );
+
+  // Clear timers on unmount so nothing fires against an org the component has left.
   useEffect(() => {
     return () => {
       if (statsTimer.current) clearTimeout(statsTimer.current);
-      if (grantsTimer.current) clearTimeout(grantsTimer.current);
+      clearAllGrantTimers();
     };
   }, []);
 
-  return { stats, grants, setStats, setGrants, syncStatus, syncError };
+  return { stats, grants, setStats, createGrant, updateGrant, deleteGrant, syncStatus, syncError };
 }
 
 function describeError(error: unknown): string {

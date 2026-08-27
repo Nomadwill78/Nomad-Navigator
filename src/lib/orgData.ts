@@ -1,13 +1,15 @@
 import {
   collection,
+  deleteDoc,
   doc,
   onSnapshot,
   setDoc,
-  writeBatch,
+  updateDoc,
   Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { DashboardStats, Grant } from '../../types';
+import { validateGrant } from './grantValidation';
 
 /**
  * Organization-scoped data access.
@@ -23,6 +25,11 @@ import { DashboardStats, Grant } from '../../types';
  *
  * localStorage is used ONLY as an offline mirror of what the server last sent,
  * keyed per organization. It is never the source of truth.
+ *
+ * Grants are written one document at a time (createGrant/updateGrant/deleteGrant)
+ * rather than as a diffed whole-array batch. That's what makes "editing Grant A"
+ * and "editing Grant B" independent operations instead of two writers racing to
+ * rewrite the same collection snapshot.
  */
 
 /** A brand-new organization starts empty. No sample numbers are ever seeded into real orgs. */
@@ -101,6 +108,19 @@ function sanitizeGrant(grant: Grant): Grant {
   };
 }
 
+/**
+ * `updateDoc` rejects `undefined` the same way `setDoc` does, but a partial
+ * update legitimately has no reason to touch every key — so unlike
+ * `sanitizeGrant`, this drops absent keys instead of defaulting them.
+ */
+function stripUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  const result: Partial<T> = {};
+  for (const key of Object.keys(obj) as (keyof T)[]) {
+    if (obj[key] !== undefined) result[key] = obj[key];
+  }
+  return result;
+}
+
 /** Merge a server document over the empty shape so a partial doc can't crash a chart. */
 function hydrateStats(raw: Partial<DashboardStats> | undefined): DashboardStats {
   if (!raw) return EMPTY_STATS;
@@ -159,30 +179,33 @@ export async function persistStats(orgId: string, stats: DashboardStats): Promis
 }
 
 /**
- * Writes only what actually changed between `previous` and `next`, and deletes
- * grants that disappeared. The views hand us the whole array, so diffing here
- * keeps them unchanged while avoiding a full rewrite on every keystroke.
+ * Creates one new grant document with a Firestore-generated id — never a
+ * client-side timestamp, which can collide across two rapid adds or two users
+ * adding at once. Throws (without writing) if `grant` fails runtime validation.
  */
-export async function persistGrants(orgId: string, next: Grant[], previous: Grant[]): Promise<void> {
-  const batch = writeBatch(db);
-  const previousById = new Map(previous.map((g) => [g.id, g]));
-  let writes = 0;
+export async function createGrant(orgId: string, grant: Omit<Grant, 'id'>): Promise<string> {
+  const invalid = validateGrant(grant);
+  if (invalid) throw new Error(invalid);
 
-  for (const grant of next) {
-    const before = previousById.get(grant.id);
-    if (!before || JSON.stringify(before) !== JSON.stringify(grant)) {
-      batch.set(grantDoc(orgId, grant.id), sanitizeGrant(grant) as unknown as Record<string, unknown>);
-      writes++;
-    }
-  }
+  const ref = doc(grantsCollection(orgId));
+  await setDoc(ref, sanitizeGrant({ ...grant, id: ref.id }) as unknown as Record<string, unknown>);
+  return ref.id;
+}
 
-  const nextIds = new Set(next.map((g) => g.id));
-  for (const grant of previous) {
-    if (!nextIds.has(grant.id)) {
-      batch.delete(grantDoc(orgId, grant.id));
-      writes++;
-    }
-  }
+/**
+ * Updates exactly one grant document with exactly the keys in `changes`.
+ * Because this touches only `grantId`'s document, two people editing two
+ * different grants never contend, and neither write can clobber the other's
+ * grant the way the old whole-array diff could.
+ */
+export async function updateGrant(orgId: string, grantId: string, changes: Partial<Grant>): Promise<void> {
+  const invalid = validateGrant(changes);
+  if (invalid) throw new Error(invalid);
 
-  if (writes > 0) await batch.commit();
+  await updateDoc(grantDoc(orgId, grantId), stripUndefined(changes as Record<string, unknown>));
+}
+
+/** Deletes exactly one grant document. Never touches any other grant. */
+export async function deleteGrant(orgId: string, grantId: string): Promise<void> {
+  await deleteDoc(grantDoc(orgId, grantId));
 }
