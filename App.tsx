@@ -388,7 +388,7 @@ const App: React.FC = () => {
 
   // Grants and metrics live in Firestore under this organization, so every member
   // of the org sees the same numbers. Demo mode is served from memory and never written.
-  const { stats, grants, setStats, setGrants, syncStatus, syncError } = useOrgData(
+  const { stats, grants, setStats, createGrant, updateGrant, deleteGrant, syncStatus, syncError } = useOrgData(
     organization?.id ?? null,
     isDemoMode,
     DEMO_STATS,
@@ -773,7 +773,7 @@ const App: React.FC = () => {
           {activeView === 'data' ? (
             <DataManagementView stats={stats} onUpdate={setStats} />
           ) : activeView === 'grants' ? (
-            <GrantTrackingView grants={grants} onUpdateGrants={setGrants} />
+            <GrantTrackingView grants={grants} onCreateGrant={createGrant} onUpdateGrant={updateGrant} onDeleteGrant={deleteGrant} />
           ) : activeView === 'analysis' ? (
             <AnalysisView stats={stats} grants={grants} />
           ) : activeView === 'discovery' ? (

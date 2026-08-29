@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { DashboardStats, Grant } from '../../types';
+import { resolveKpiStatus } from './kpiStatus';
 
 // Helper to flatten nested objects for CSV export
 function flattenObject(ob: any, prefix = ''): any {
@@ -435,7 +436,9 @@ export function exportGrantPortfolioPDF(grants: Grant[]) {
         doc.setFont('Helvetica', 'normal');
         doc.setFontSize(8.5);
         doc.setTextColor(71, 85, 105);
-        doc.text(`• ${kpi.name}: ${kpi.current.toLocaleString()} / ${kpi.target.toLocaleString()} ${kpi.unit} (${((kpi.current/kpi.target)*100).toFixed(0)}% achieved)`, margin + 8, y);
+        const { label, progressPercent } = resolveKpiStatus(kpi.current, kpi.target);
+        const achieved = kpi.target > 0 ? `${progressPercent.toFixed(0)}% achieved` : label;
+        doc.text(`• ${kpi.name}: ${kpi.current.toLocaleString()} / ${kpi.target.toLocaleString()} ${kpi.unit} (${achieved})`, margin + 8, y);
         y += 5;
       });
     }

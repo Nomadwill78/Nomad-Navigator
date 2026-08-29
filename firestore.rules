@@ -118,10 +118,28 @@ service cloud.firestore {
              isValidRole(data.role);
     }
 
-    function isValidGrant(data) {
+    // Validates the whole resulting grant document (Firestore rules evaluate
+    // `request.resource.data` as the full post-write document, so this runs the
+    // same checks whether the write is a `create` or a partial `update`).
+    //
+    // KNOWN GAP: rules has no `list.every(predicate)` — there's no way to walk
+    // `kpis`/`subgrantees` here and validate each entry's own shape (name,
+    // numeric target/current, etc.) without hardcoding a fixed max index or
+    // adding a Cloud Function. That per-element validation is enforced by the
+    // TypeScript types and by validateGrant() in src/lib/grantValidation.ts —
+    // this layer is a backstop against a malformed document shape reaching the
+    // database at all, not a guarantee about every nested value.
+    function isValidGrant(data, grantId) {
       return data.name is string && data.name.size() > 0 && data.name.size() < 300 &&
              data.funder is string && data.funder.size() > 0 && data.funder.size() < 300 &&
-             data.amount is number && data.amount >= 0;
+             data.amount is number && data.amount >= 0 &&
+             (!('spentAmount' in data) || (data.spentAmount is number && data.spentAmount >= 0)) &&
+             data.startDate is string && data.startDate.matches('^\\d{4}-\\d{2}-\\d{2}$') &&
+             data.endDate is string && data.endDate.matches('^\\d{4}-\\d{2}-\\d{2}$') &&
+             data.status in ['active', 'pending', 'completed'] &&
+             data.kpis is list && data.kpis.size() <= 200 &&
+             (!('subgrantees' in data) || (data.subgrantees is list && data.subgrantees.size() <= 200)) &&
+             data.id == grantId;
     }
 
     function isValidInvitation(data) {
@@ -221,7 +239,7 @@ service cloud.firestore {
       // Grants: read by any member, written by admin + grant_coordinator.
       match /grants/{grantId} {
         allow get, list: if isOrgMember(orgId);
-        allow create, update: if hasRole(orgId, ['admin', 'grant_coordinator']) && isValidGrant(incoming());
+        allow create, update: if hasRole(orgId, ['admin', 'grant_coordinator']) && isValidGrant(incoming(), grantId);
         // Matches ROLE_PERMISSIONS.canDeleteGrants — admin only.
         allow delete: if hasRole(orgId, ['admin']);
       }

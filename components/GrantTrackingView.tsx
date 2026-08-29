@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { 
-  Plus, 
-  Trash2, 
-  Target, 
-  ChevronRight, 
-  Calendar, 
-  DollarSign, 
-  TrendingUp, 
+import {
+  Plus,
+  Trash2,
+  Target,
+  ChevronRight,
+  Calendar,
+  DollarSign,
+  TrendingUp,
   TrendingDown,
   CheckCircle2,
   Clock,
@@ -21,54 +21,64 @@ import {
 import { Grant, GrantKPI, Subgrantee, SubgranteeKPI, ROLE_PERMISSIONS } from '../types';
 import { useAuth } from '../src/contexts/AuthContext';
 import { exportGrantPortfolioPDF, exportToCSV, exportToJSON } from '../src/lib/exportUtils';
+import { resolveKpiStatus, KpiStatus } from '../src/lib/kpiStatus';
+import { generateId } from '../src/lib/id';
+import { draftIncompleteReason } from '../src/lib/grantValidation';
 
 interface GrantTrackingViewProps {
   grants: Grant[];
-  onUpdateGrants: (grants: Grant[]) => void;
+  onCreateGrant: (grant: Omit<Grant, 'id'>) => Promise<string>;
+  onUpdateGrant: (grantId: string, changes: Partial<Grant>) => void;
+  onDeleteGrant: (grantId: string) => void;
 }
 
-const getTrendIndicator = (current: number, target: number) => {
-  const progress = current / target;
-  if (progress >= 1) return { icon: <TrendingUp size={12} />, color: 'text-teal', bg: 'bg-teal/10', label: 'Target Met' };
-  if (progress >= 0.5) return { icon: <ArrowRight size={12} />, color: 'text-teal', bg: 'bg-teal/10', label: 'On Track' };
-  return { icon: <TrendingDown size={12} />, color: 'text-brass', bg: 'bg-brass/10', label: 'Below Target' };
+/** Icon/color per resolved KPI state — replaces the old current/target division. */
+const KPI_STATUS_STYLES: Record<KpiStatus, { icon: React.ReactNode; color: string; bg: string }> = {
+  no_target: { icon: <Target size={12} />, color: 'text-inkfaint', bg: 'bg-white/5' },
+  not_started: { icon: <Clock size={12} />, color: 'text-inkfaint', bg: 'bg-white/5' },
+  behind: { icon: <TrendingDown size={12} />, color: 'text-brass', bg: 'bg-brass/10' },
+  on_track: { icon: <ArrowRight size={12} />, color: 'text-teal', bg: 'bg-teal/10' },
+  met: { icon: <TrendingUp size={12} />, color: 'text-teal', bg: 'bg-teal/10' },
+  exceeded: { icon: <TrendingUp size={12} />, color: 'text-teal', bg: 'bg-teal/10' },
 };
 
-export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, onUpdateGrants }) => {
+type HeaderDraft = {
+  name: string; funder: string; amount: string; startDate: string; endDate: string; status: Grant['status'];
+};
+
+export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, onCreateGrant, onUpdateGrant, onDeleteGrant }) => {
   const { role } = useAuth();
   const permissions = role ? ROLE_PERMISSIONS[role] : null;
 
-  const [isAddingGrant, setIsAddingGrant] = useState(false);
   const [selectedGrantId, setSelectedGrantId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'kpis' | 'subgrantees'>('kpis');
-  const [editingHeaderId, setEditingHeaderId] = useState<string | null>(null);
-  const [headerDraft, setHeaderDraft] = useState<{
-    name: string; funder: string; amount: string; startDate: string; endDate: string; status: Grant['status'];
-  } | null>(null);
+  // 'new' means a not-yet-persisted draft is being edited; an id means an existing grant's header is.
+  const [editingHeaderId, setEditingHeaderId] = useState<string | 'new' | null>(null);
+  const [headerDraft, setHeaderDraft] = useState<HeaderDraft | null>(null);
+  const [draftError, setDraftError] = useState<string | null>(null);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
 
   const handleAddGrant = () => {
     // Left genuinely blank rather than filled with plausible-looking numbers —
-    // a new grant should look obviously unfinished, not like real data.
+    // a new grant should look obviously unfinished, not like real data. It also
+    // isn't written to Firestore yet: it's a local draft until required fields
+    // are complete and the user saves it (see saveHeaderEditor).
     const today = new Date().toISOString().split('T')[0];
-    const newGrant: Grant = {
-      id: Date.now().toString(),
+    setSelectedGrantId(null);
+    setDraftError(null);
+    setEditingHeaderId('new');
+    setHeaderDraft({
       name: '',
       funder: '',
-      amount: 0,
-      spentAmount: 0,
+      amount: '',
       startDate: today,
       endDate: new Date(Date.now() + 31536000000).toISOString().split('T')[0],
       status: 'pending',
-      kpis: [],
-      subgrantees: []
-    };
-    onUpdateGrants([...grants, newGrant]);
-    setIsAddingGrant(false);
-    setSelectedGrantId(newGrant.id);
-    openHeaderEditor(newGrant);
+    });
   };
 
   const openHeaderEditor = (grant: Grant) => {
+    setDraftError(null);
     setEditingHeaderId(grant.id);
     setHeaderDraft({
       name: grant.name,
@@ -80,149 +90,215 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
     });
   };
 
-  const saveHeaderEditor = () => {
-    if (!editingHeaderId || !headerDraft) return;
+  const cancelHeaderEditor = () => {
+    setEditingHeaderId(null);
+    setHeaderDraft(null);
+    setDraftError(null);
+  };
+
+  const saveHeaderEditor = async () => {
+    if (!headerDraft) return;
+    const name = headerDraft.name.trim();
+    const funder = headerDraft.funder.trim();
     const parsedAmount = Number(headerDraft.amount);
-    onUpdateGrants(grants.map(g => g.id === editingHeaderId ? {
-      ...g,
-      name: headerDraft.name.trim() || 'Untitled Grant',
-      funder: headerDraft.funder.trim(),
-      amount: Number.isFinite(parsedAmount) ? Math.max(0, parsedAmount) : g.amount,
+    const amount = Number.isFinite(parsedAmount) ? Math.max(0, parsedAmount) : 0;
+
+    const incomplete = draftIncompleteReason({ name, funder, amount });
+    if (incomplete) {
+      setDraftError(incomplete);
+      return;
+    }
+
+    if (editingHeaderId === 'new') {
+      setIsSavingDraft(true);
+      setDraftError(null);
+      try {
+        const newId = await onCreateGrant({
+          name,
+          funder,
+          amount,
+          startDate: headerDraft.startDate,
+          endDate: headerDraft.endDate,
+          status: headerDraft.status,
+          kpis: [],
+          subgrantees: [],
+          spentAmount: 0,
+        });
+        setEditingHeaderId(null);
+        setHeaderDraft(null);
+        setSelectedGrantId(newId);
+      } catch (error) {
+        setDraftError(error instanceof Error ? error.message : 'Could not save this grant. Please try again.');
+      } finally {
+        setIsSavingDraft(false);
+      }
+      return;
+    }
+
+    if (!editingHeaderId) return;
+    onUpdateGrant(editingHeaderId, {
+      name,
+      funder,
+      amount,
       startDate: headerDraft.startDate,
       endDate: headerDraft.endDate,
       status: headerDraft.status,
-    } : g));
+    });
     setEditingHeaderId(null);
     setHeaderDraft(null);
+    setDraftError(null);
+  };
+
+  const renderHeaderForm = () => {
+    if (!headerDraft) return null;
+    return (
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <input
+            type="text"
+            value={headerDraft.name}
+            onChange={(e) => setHeaderDraft({ ...headerDraft, name: e.target.value })}
+            placeholder="Grant name"
+            className="px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-lg font-bold text-ivory placeholder:text-inkfaint placeholder:font-normal outline-none focus:ring-2 focus:ring-teal/40"
+            autoFocus
+          />
+          <input
+            type="text"
+            value={headerDraft.funder}
+            onChange={(e) => setHeaderDraft({ ...headerDraft, funder: e.target.value })}
+            placeholder="Funder"
+            className="px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-sm text-parchment placeholder:text-inkfaint outline-none focus:ring-2 focus:ring-teal/40"
+          />
+          <input
+            type="number"
+            min={0}
+            value={headerDraft.amount}
+            onChange={(e) => setHeaderDraft({ ...headerDraft, amount: e.target.value })}
+            placeholder="Award amount"
+            className="px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-sm text-parchment placeholder:text-inkfaint outline-none focus:ring-2 focus:ring-teal/40"
+          />
+          <select
+            value={headerDraft.status}
+            onChange={(e) => setHeaderDraft({ ...headerDraft, status: e.target.value as Grant['status'] })}
+            className="px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-sm text-parchment outline-none focus:ring-2 focus:ring-teal/40"
+          >
+            <option value="pending">Pending</option>
+            <option value="active">Active</option>
+            <option value="completed">Completed</option>
+          </select>
+          <label className="flex flex-col gap-1 text-xs text-inkfaint">
+            Start date
+            <input
+              type="date"
+              value={headerDraft.startDate}
+              onChange={(e) => setHeaderDraft({ ...headerDraft, startDate: e.target.value })}
+              className="px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-sm text-parchment outline-none focus:ring-2 focus:ring-teal/40"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-inkfaint">
+            End date
+            <input
+              type="date"
+              value={headerDraft.endDate}
+              onChange={(e) => setHeaderDraft({ ...headerDraft, endDate: e.target.value })}
+              className="px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-sm text-parchment outline-none focus:ring-2 focus:ring-teal/40"
+            />
+          </label>
+        </div>
+        {draftError && (
+          <p className="text-xs font-semibold text-alert bg-alert/10 border border-alert/25 rounded-lg px-3 py-2">{draftError}</p>
+        )}
+        <div className="flex gap-3">
+          <button
+            onClick={saveHeaderEditor}
+            disabled={isSavingDraft}
+            className="px-4 py-2 bg-teal text-abyss rounded-lg text-xs font-bold hover:brightness-105 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isSavingDraft ? 'Saving…' : editingHeaderId === 'new' ? 'Save Grant' : 'Save'}
+          </button>
+          <button
+            onClick={cancelHeaderEditor}
+            className="px-4 py-2 bg-white/5 text-inkmute rounded-lg text-xs font-bold hover:bg-white/10 transition-all"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const handleDeleteGrant = (grant: Grant) => {
+    if (!confirm(`Delete "${grant.name || 'this grant'}"? This cannot be undone.`)) return;
+    if (selectedGrantId === grant.id) setSelectedGrantId(null);
+    onDeleteGrant(grant.id);
   };
 
   const handleUpdateKPI = (grantId: string, kpiId: string, updates: Partial<GrantKPI>) => {
-    const updatedGrants = grants.map(g => {
-      if (g.id === grantId) {
-        return {
-          ...g,
-          kpis: g.kpis.map(k => k.id === kpiId ? { ...k, ...updates } : k)
-        };
-      }
-      return g;
-    });
-    onUpdateGrants(updatedGrants);
+    const grant = grants.find(g => g.id === grantId);
+    if (!grant) return;
+    onUpdateGrant(grantId, { kpis: grant.kpis.map(k => k.id === kpiId ? { ...k, ...updates } : k) });
   };
 
   const handleAddKPI = (grantId: string) => {
-    const updatedGrants = grants.map(g => {
-      if (g.id === grantId) {
-        const newKpi: GrantKPI = {
-          id: Date.now().toString(),
-          name: 'New Impact Metric',
-          target: 1000,
-          current: 0,
-          unit: 'people'
-        };
-        return { ...g, kpis: [...g.kpis, newKpi] };
-      }
-      return g;
-    });
-    onUpdateGrants(updatedGrants);
+    const grant = grants.find(g => g.id === grantId);
+    if (!grant) return;
+    const newKpi: GrantKPI = { id: generateId(), name: 'New Impact Metric', target: 1000, current: 0, unit: 'people' };
+    onUpdateGrant(grantId, { kpis: [...grant.kpis, newKpi] });
   };
 
   const handleDeleteKPI = (grantId: string, kpiId: string) => {
-    onUpdateGrants(grants.map(g => g.id === grantId ? { ...g, kpis: g.kpis.filter(k => k.id !== kpiId) } : g));
+    const grant = grants.find(g => g.id === grantId);
+    if (!grant) return;
+    onUpdateGrant(grantId, { kpis: grant.kpis.filter(k => k.id !== kpiId) });
   };
 
   const handleDeleteSubgranteeKPI = (grantId: string, subgranteeId: string, kpiId: string) => {
-    onUpdateGrants(grants.map(g => {
-      if (g.id === grantId) {
-        return {
-          ...g,
-          subgrantees: g.subgrantees?.map(sub => {
-            if (sub.id === subgranteeId) {
-              return { ...sub, kpis: sub.kpis.filter(k => k.id !== kpiId) };
-            }
-            return sub;
-          })
-        };
-      }
-      return g;
-    }));
+    const grant = grants.find(g => g.id === grantId);
+    if (!grant) return;
+    const subgrantees = (grant.subgrantees ?? []).map(sub =>
+      sub.id === subgranteeId ? { ...sub, kpis: sub.kpis.filter(k => k.id !== kpiId) } : sub
+    );
+    onUpdateGrant(grantId, { subgrantees });
   };
 
   const handleAddSubgrantee = (grantId: string) => {
-    const updatedGrants = grants.map(g => {
-      if (g.id === grantId) {
-        const newSub: Subgrantee = {
-          id: Date.now().toString(),
-          name: "Local Partner Org",
-          allocatedAmount: 10000,
-          status: 'active',
-          kpis: [{ id: '1', name: 'Reach Target', target: 500, current: 0, unit: 'people' }]
-        };
-        return { ...g, subgrantees: [...(g.subgrantees || []), newSub] };
-      }
-      return g;
-    });
-    onUpdateGrants(updatedGrants);
+    const grant = grants.find(g => g.id === grantId);
+    if (!grant) return;
+    const newSub: Subgrantee = {
+      id: generateId(),
+      name: "Local Partner Org",
+      allocatedAmount: 10000,
+      status: 'active',
+      kpis: [{ id: generateId(), name: 'Reach Target', target: 500, current: 0, unit: 'people' }]
+    };
+    onUpdateGrant(grantId, { subgrantees: [...(grant.subgrantees || []), newSub] });
   };
 
   const handleUpdateSubgranteeKPI = (grantId: string, subgranteeId: string, kpiId: string, updates: Partial<SubgranteeKPI>) => {
-    const updatedGrants = grants.map(g => {
-      if (g.id === grantId) {
-        return {
-          ...g,
-          subgrantees: g.subgrantees?.map(sub => {
-            if (sub.id === subgranteeId) {
-              return {
-                ...sub,
-                kpis: sub.kpis.map(k => k.id === kpiId ? { ...k, ...updates } : k)
-              };
-            }
-            return sub;
-          })
-        };
-      }
-      return g;
-    });
-    onUpdateGrants(updatedGrants);
+    const grant = grants.find(g => g.id === grantId);
+    if (!grant) return;
+    const subgrantees = (grant.subgrantees ?? []).map(sub =>
+      sub.id === subgranteeId ? { ...sub, kpis: sub.kpis.map(k => k.id === kpiId ? { ...k, ...updates } : k) } : sub
+    );
+    onUpdateGrant(grantId, { subgrantees });
   };
 
   const handleAddSubgranteeKPI = (grantId: string, subgranteeId: string) => {
-    const updatedGrants = grants.map(g => {
-      if (g.id === grantId) {
-        return {
-          ...g,
-          subgrantees: g.subgrantees?.map(sub => {
-            if (sub.id === subgranteeId) {
-              const newKpi: SubgranteeKPI = {
-                id: Date.now().toString(),
-                name: 'New Metric',
-                target: 100,
-                current: 0,
-                unit: 'units'
-              };
-              return { ...sub, kpis: [...sub.kpis, newKpi] };
-            }
-            return sub;
-          })
-        };
-      }
-      return g;
+    const grant = grants.find(g => g.id === grantId);
+    if (!grant) return;
+    const subgrantees = (grant.subgrantees ?? []).map(sub => {
+      if (sub.id !== subgranteeId) return sub;
+      const newKpi: SubgranteeKPI = { id: generateId(), name: 'New Metric', target: 100, current: 0, unit: 'units' };
+      return { ...sub, kpis: [...sub.kpis, newKpi] };
     });
-    onUpdateGrants(updatedGrants);
+    onUpdateGrant(grantId, { subgrantees });
   };
 
   const handleUpdateSubgrantee = (grantId: string, subgranteeId: string, updates: Partial<Subgrantee>) => {
-    const updatedGrants = grants.map(g => {
-      if (g.id === grantId) {
-        return {
-          ...g,
-          subgrantees: g.subgrantees?.map(sub => 
-            sub.id === subgranteeId ? { ...sub, ...updates } : sub
-          )
-        };
-      }
-      return g;
-    });
-    onUpdateGrants(updatedGrants);
+    const grant = grants.find(g => g.id === grantId);
+    if (!grant) return;
+    const subgrantees = (grant.subgrantees ?? []).map(sub => sub.id === subgranteeId ? { ...sub, ...updates } : sub);
+    onUpdateGrant(grantId, { subgrantees });
   };
 
   const selectedGrant = grants.find(g => g.id === selectedGrantId);
@@ -237,7 +313,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
         <div className="flex flex-wrap items-center gap-3">
           {permissions?.canExportData && (
             <div className="flex items-center gap-2 bg-surface border border-hairline rounded-xl p-1 shadow-sm">
-              <button 
+              <button
                 onClick={() => exportGrantPortfolioPDF(grants)}
                 className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-inkmute hover:text-teal hover:bg-ink/50 rounded-lg transition-all"
                 title="Export entire portfolio as PDF Report"
@@ -245,7 +321,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                 <Download size={14} />
                 PDF
               </button>
-              <button 
+              <button
                 onClick={() => exportToCSV(grants, 'nomad-compass-grants')}
                 className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-inkmute hover:text-teal hover:bg-ink/50 rounded-lg transition-all"
                 title="Export entire portfolio as CSV"
@@ -253,7 +329,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                 <Download size={14} />
                 CSV
               </button>
-              <button 
+              <button
                 onClick={() => exportToJSON(grants, 'nomad-compass-grants')}
                 className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-inkmute hover:text-teal hover:bg-ink/50 rounded-lg transition-all"
                 title="Export entire portfolio as JSON"
@@ -264,7 +340,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
             </div>
           )}
           {permissions?.canEditGrants && (
-            <button 
+            <button
               onClick={handleAddGrant}
               className="flex items-center gap-2 bg-gradient-to-b from-brassbright to-brass text-[#26200e] px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-brass/25 hover:brightness-105 transition-all hover:scale-[1.02] active:scale-95"
             >
@@ -290,8 +366,8 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                 key={grant.id}
                 onClick={() => setSelectedGrantId(grant.id)}
                 className={`w-full text-left p-4 rounded-2xl border transition-all ${
-                  selectedGrantId === grant.id 
-                    ? 'bg-surface border-teal/40 shadow-md ring-1 ring-teal/25' 
+                  selectedGrantId === grant.id
+                    ? 'bg-surface border-teal/40 shadow-md ring-1 ring-teal/25'
                     : 'bg-surface border-hairline hover:border-hairline shadow-sm'
                 }`}
               >
@@ -307,7 +383,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                 </div>
                 <h4 className="font-bold text-parchment line-clamp-1">{grant.name}</h4>
                 <p className="text-xs text-inkmute mb-3">{grant.funder}</p>
-                
+
                 <div className="flex items-center gap-4 text-[10px] text-inkfaint font-medium">
                   <div className="flex items-center gap-1">
                     <Calendar size={12} />
@@ -325,78 +401,19 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
 
         {/* Grant Detail */}
         <div className="lg:col-span-2">
-          {selectedGrant ? (
+          {editingHeaderId === 'new' ? (
+            <div className="bg-surface rounded-2xl border border-hairline shadow-sm overflow-hidden animate-in fade-in zoom-in-95 duration-300 p-8">
+              <h3 className="text-lg font-bold text-ivory mb-1">New Grant</h3>
+              <p className="text-sm text-inkmute mb-6">
+                This stays local — it won't become an official organizational record until the required fields are filled in and you save it.
+              </p>
+              {renderHeaderForm()}
+            </div>
+          ) : selectedGrant ? (
             <div className="bg-surface rounded-2xl border border-hairline shadow-sm overflow-hidden animate-in fade-in zoom-in-95 duration-300">
               <div className="p-8 border-b border-hairline/60 bg-ink/50">
                 {editingHeaderId === selectedGrant.id && headerDraft ? (
-                  <div className="mb-6 space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <input
-                        type="text"
-                        value={headerDraft.name}
-                        onChange={(e) => setHeaderDraft({ ...headerDraft, name: e.target.value })}
-                        placeholder="Grant name"
-                        className="px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-lg font-bold text-ivory placeholder:text-inkfaint placeholder:font-normal outline-none focus:ring-2 focus:ring-teal/40"
-                        autoFocus
-                      />
-                      <input
-                        type="text"
-                        value={headerDraft.funder}
-                        onChange={(e) => setHeaderDraft({ ...headerDraft, funder: e.target.value })}
-                        placeholder="Funder"
-                        className="px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-sm text-parchment placeholder:text-inkfaint outline-none focus:ring-2 focus:ring-teal/40"
-                      />
-                      <input
-                        type="number"
-                        min={0}
-                        value={headerDraft.amount}
-                        onChange={(e) => setHeaderDraft({ ...headerDraft, amount: e.target.value })}
-                        placeholder="Award amount"
-                        className="px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-sm text-parchment placeholder:text-inkfaint outline-none focus:ring-2 focus:ring-teal/40"
-                      />
-                      <select
-                        value={headerDraft.status}
-                        onChange={(e) => setHeaderDraft({ ...headerDraft, status: e.target.value as Grant['status'] })}
-                        className="px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-sm text-parchment outline-none focus:ring-2 focus:ring-teal/40"
-                      >
-                        <option value="pending">Pending</option>
-                        <option value="active">Active</option>
-                        <option value="completed">Completed</option>
-                      </select>
-                      <label className="flex flex-col gap-1 text-xs text-inkfaint">
-                        Start date
-                        <input
-                          type="date"
-                          value={headerDraft.startDate}
-                          onChange={(e) => setHeaderDraft({ ...headerDraft, startDate: e.target.value })}
-                          className="px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-sm text-parchment outline-none focus:ring-2 focus:ring-teal/40"
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1 text-xs text-inkfaint">
-                        End date
-                        <input
-                          type="date"
-                          value={headerDraft.endDate}
-                          onChange={(e) => setHeaderDraft({ ...headerDraft, endDate: e.target.value })}
-                          className="px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-sm text-parchment outline-none focus:ring-2 focus:ring-teal/40"
-                        />
-                      </label>
-                    </div>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={saveHeaderEditor}
-                        className="px-4 py-2 bg-teal text-abyss rounded-lg text-xs font-bold hover:brightness-105 transition-all"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => { setEditingHeaderId(null); setHeaderDraft(null); }}
-                        className="px-4 py-2 bg-white/5 text-inkmute rounded-lg text-xs font-bold hover:bg-white/10 transition-all"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
+                  <div className="mb-6">{renderHeaderForm()}</div>
                 ) : (
                 <div className="flex justify-between items-start mb-6">
                   <div>
@@ -415,6 +432,15 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                         className="p-2 text-inkfaint hover:text-inkmute hover:bg-white/5 rounded-lg transition-colors"
                       >
                         <Edit2 size={18} />
+                      </button>
+                    )}
+                    {permissions?.canDeleteGrants && (
+                      <button
+                        onClick={() => handleDeleteGrant(selectedGrant)}
+                        title="Delete grant"
+                        className="p-2 text-inkfaint hover:text-alert hover:bg-alert/15 rounded-lg transition-colors"
+                      >
+                        <Trash2 size={18} />
                       </button>
                     )}
                   </div>
@@ -491,8 +517,8 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                             </span>
                           </div>
                           <div className="h-2.5 w-full bg-abyss border border-hairline/50 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-brass rounded-full transition-all duration-500" 
+                            <div
+                              className="h-full bg-brass rounded-full transition-all duration-500"
                               style={{ width: `${fundsSpentPercent}%` }}
                             />
                           </div>
@@ -501,13 +527,12 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                               <span className="text-[10px] text-inkfaint font-bold uppercase">Update Spent:</span>
                               <div className="flex items-center gap-1 bg-ink/50 border border-hairline rounded-lg px-2 py-0.5 max-w-[140px]">
                                 <span className="text-xs text-inkfaint font-bold">$</span>
-                                <input 
-                                  type="number" 
+                                <input
+                                  type="number"
                                   value={spentAmount}
                                   onChange={(e) => {
                                     const val = Math.min(Math.max(0, parseInt(e.target.value) || 0), totalAmount);
-                                    const updatedGrants = grants.map(g => g.id === selectedGrant.id ? { ...g, spentAmount: val } : g);
-                                    onUpdateGrants(updatedGrants);
+                                    onUpdateGrant(selectedGrant.id, { spentAmount: val });
                                   }}
                                   className="bg-transparent font-semibold text-parchment text-xs outline-none w-full"
                                 />
@@ -527,7 +552,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                             </span>
                           </div>
                           <div className="h-2.5 w-full bg-abyss border border-hairline/50 rounded-full overflow-hidden">
-                            <div 
+                            <div
                               className="h-full bg-inkmute rounded-full transition-all duration-500"
                               style={{ width: `${timeElapsedPercent}%` }}
                             />
@@ -548,13 +573,13 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                 })()}
 
                 <div className="flex gap-2 p-1 bg-abyss border border-hairline rounded-xl w-fit">
-                   <button 
+                   <button
                      onClick={() => setActiveTab('kpis')}
                      className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'kpis' ? 'bg-surface text-ivory shadow-sm' : 'text-inkmute hover:text-parchment'}`}
                    >
                      General Performance
                    </button>
-                   <button 
+                   <button
                      onClick={() => setActiveTab('subgrantees')}
                      className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'subgrantees' ? 'bg-surface text-ivory shadow-sm' : 'text-inkmute hover:text-parchment'}`}
                    >
@@ -571,7 +596,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                          <Target size={16} className="text-teal" /> Core KPIs
                        </h4>
                        {permissions?.canEditGrants && (
-                         <button 
+                         <button
                            onClick={() => handleAddKPI(selectedGrant.id)}
                            className="text-xs font-bold text-teal hover:text-teal flex items-center gap-1"
                          >
@@ -582,31 +607,32 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
 
                     <div className="space-y-6">
                       {selectedGrant.kpis.map(kpi => {
-                        const progress = Math.min((kpi.current / kpi.target) * 100, 100);
-                        const trend = getTrendIndicator(kpi.current, kpi.target);
+                        const kpiStatus = resolveKpiStatus(kpi.current, kpi.target);
+                        const badge = KPI_STATUS_STYLES[kpiStatus.status];
+                        const progress = Math.min(kpiStatus.progressPercent, 100);
                         return (
                           <div key={kpi.id} className="space-y-4 p-5 bg-ink/50 rounded-2xl border border-hairline/60 group">
                             <div className="flex justify-between items-start">
                                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
                                  <div className="col-span-1 md:col-span-2 flex items-center gap-3">
-                                   <input 
-                                     type="text" 
+                                   <input
+                                     type="text"
                                      value={kpi.name}
                                      onChange={(e) => handleUpdateKPI(selectedGrant.id, kpi.id, { name: e.target.value })}
                                      className="flex-1 bg-transparent font-bold text-parchment text-sm border-b border-transparent hover:border-hairline focus:border-teal/40 outline-none transition-colors"
                                    />
-                                   <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${trend.bg} ${trend.color} text-[10px] font-bold uppercase tracking-wider`}>
-                                     {trend.icon}
-                                     <span>{trend.label}</span>
+                                   <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${badge.bg} ${badge.color} text-[10px] font-bold uppercase tracking-wider`}>
+                                     {badge.icon}
+                                     <span>{kpiStatus.label}</span>
                                    </div>
                                  </div>
                                  <div>
                                    <label className="text-[10px] text-inkfaint uppercase font-bold block mb-1">Current Progress</label>
                                    <div className="flex items-center gap-2">
-                                     <input 
-                                       type="number" 
+                                     <input
+                                       type="number"
                                        value={kpi.current}
-                                       onChange={(e) => handleUpdateKPI(selectedGrant.id, kpi.id, { current: parseInt(e.target.value) || 0 })}
+                                       onChange={(e) => handleUpdateKPI(selectedGrant.id, kpi.id, { current: Math.max(0, parseInt(e.target.value) || 0) })}
                                        className="w-full bg-transparent border-b border-hairline/60 hover:border-hairline focus:border-teal/40 focus:bg-surface px-2 py-1 text-sm font-bold text-parchment outline-none transition-all"
                                      />
                                    </div>
@@ -614,14 +640,14 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                  <div>
                                    <label className="text-[10px] text-inkfaint uppercase font-bold block mb-1">Target & Unit</label>
                                    <div className="flex items-center gap-2">
-                                     <input 
-                                       type="number" 
+                                     <input
+                                       type="number"
                                        value={kpi.target}
-                                       onChange={(e) => handleUpdateKPI(selectedGrant.id, kpi.id, { target: parseInt(e.target.value) || 1 })}
+                                       onChange={(e) => handleUpdateKPI(selectedGrant.id, kpi.id, { target: Math.max(0, parseInt(e.target.value) || 0) })}
                                        className="w-24 bg-transparent border-b border-hairline/60 hover:border-hairline focus:border-teal/40 focus:bg-surface px-2 py-1 text-sm font-bold text-parchment outline-none transition-all"
                                      />
-                                     <input 
-                                       type="text" 
+                                     <input
+                                       type="text"
                                        value={kpi.unit}
                                        onChange={(e) => handleUpdateKPI(selectedGrant.id, kpi.id, { unit: e.target.value })}
                                        className="flex-1 bg-transparent border-b border-hairline/60 hover:border-hairline focus:border-teal/40 focus:bg-surface px-2 py-1 text-sm font-bold text-parchment outline-none transition-all"
@@ -631,23 +657,21 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                </div>
                                <div className="flex flex-col items-end gap-3 ml-4">
                                   {permissions?.canDeleteGrants && (
-                                    <button 
+                                    <button
                                       onClick={() => handleDeleteKPI(selectedGrant.id, kpi.id)}
                                       className="p-1.5 text-inkfaint hover:text-alert hover:bg-alert/15 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                                     >
                                       <Trash2 size={14} />
                                     </button>
                                   )}
-                                  <span className={`text-sm font-bold ${progress >= 100 ? 'text-teal' : 'text-teal'}`}>
-                                    {progress.toFixed(0)}%
+                                  <span className="text-sm font-bold text-teal">
+                                    {kpiStatus.progressPercent.toFixed(0)}%
                                   </span>
                                </div>
                             </div>
                             <div className="h-2 w-full bg-abyss border border-hairline/50 rounded-full overflow-hidden">
-                               <div 
-                                 className={`h-full rounded-full transition-all duration-500 ease-out ${
-                                   progress >= 100 ? 'bg-teal' : 'bg-teal'
-                                 }`}
+                               <div
+                                 className="h-full rounded-full transition-all duration-500 ease-out bg-teal"
                                  style={{ width: `${progress}%` }}
                                ></div>
                             </div>
@@ -662,7 +686,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                        <h4 className="font-bold text-parchment flex items-center gap-2 text-sm uppercase tracking-wider">
                          <Users size={16} className="text-brass" /> Partner Performance
                        </h4>
-                       <button 
+                       <button
                          onClick={() => handleAddSubgrantee(selectedGrant.id)}
                          className="text-xs font-bold text-brassbright hover:text-brassbright flex items-center gap-1 border border-brass/25 px-3 py-1.5 rounded-lg bg-brass/10"
                        >
@@ -681,7 +705,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                           <div key={sub.id} className="p-5 border border-hairline rounded-2xl bg-surface shadow-sm hover:border-hairline transition-all">
                              <div className="flex justify-between items-start mb-4">
                                <div className="flex-1 space-y-2 mr-4">
-                                 <input 
+                                 <input
                                    type="text"
                                    value={sub.name}
                                    onChange={(e) => handleUpdateSubgrantee(selectedGrant.id, sub.id, { name: e.target.value })}
@@ -692,10 +716,10 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                    <label className="text-[10px] font-bold text-inkfaint uppercase tracking-widest">Allocation</label>
                                    <div className="flex items-center gap-1 bg-ink/50 border border-hairline/60 rounded px-2 py-0.5">
                                       <DollarSign size={10} className="text-inkfaint" />
-                                      <input 
+                                      <input
                                         type="number"
                                         value={sub.allocatedAmount}
-                                        onChange={(e) => handleUpdateSubgrantee(selectedGrant.id, sub.id, { allocatedAmount: parseInt(e.target.value) || 0 })}
+                                        onChange={(e) => handleUpdateSubgrantee(selectedGrant.id, sub.id, { allocatedAmount: Math.max(0, parseInt(e.target.value) || 0) })}
                                         className="bg-transparent font-semibold text-parchment text-xs outline-none w-24"
                                       />
                                    </div>
@@ -709,40 +733,41 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                              <div className="space-y-6">
                                <div className="flex items-center justify-between">
                                  <p className="text-[10px] font-bold text-inkfaint uppercase tracking-widest">Performance Metrics</p>
-                                 <button 
+                                 <button
                                    onClick={() => handleAddSubgranteeKPI(selectedGrant.id, sub.id)}
                                    className="text-[10px] font-bold text-brassbright hover:text-brassbright flex items-center gap-1"
                                  >
                                    <Plus size={12} /> Add Metric
                                  </button>
                                </div>
-                               
+
                                {sub.kpis.map(kpi => {
-                                 const progress = Math.min((kpi.current / kpi.target) * 100, 100);
-                                 const trend = getTrendIndicator(kpi.current, kpi.target);
+                                 const kpiStatus = resolveKpiStatus(kpi.current, kpi.target);
+                                 const badge = KPI_STATUS_STYLES[kpiStatus.status];
+                                 const progress = Math.min(kpiStatus.progressPercent, 100);
                                  return (
                                    <div key={kpi.id} className="space-y-3 p-3 bg-ink/50 rounded-xl border border-hairline/60 group/kpi">
                                       <div className="grid grid-cols-2 gap-3 mb-2">
                                         <div className="col-span-2 flex justify-between items-center">
                                           <div className="flex items-center gap-2 flex-1">
-                                            <input 
-                                              type="text" 
+                                            <input
+                                              type="text"
                                               value={kpi.name}
                                               onChange={(e) => handleUpdateSubgranteeKPI(selectedGrant.id, sub.id, kpi.id, { name: e.target.value })}
                                               className="flex-1 bg-transparent font-bold text-parchment text-xs border-b border-transparent hover:border-hairline focus:border-teal outline-none transition-colors"
                                               placeholder="KPI Name"
                                             />
                                             <div className="flex items-center gap-2">
-                                              <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md ${trend.bg} ${trend.color} text-[0.6rem] font-bold uppercase`}>
-                                                {trend.icon}
-                                                <span className="hidden sm:inline">{trend.label}</span>
+                                              <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md ${badge.bg} ${badge.color} text-[0.6rem] font-bold uppercase`}>
+                                                {badge.icon}
+                                                <span className="hidden sm:inline">{kpiStatus.label}</span>
                                               </div>
-                                              <span className={`text-[10px] font-bold ${progress >= 100 ? 'text-teal' : 'text-brassbright'}`}>
-                                                {progress.toFixed(0)}%
+                                              <span className="text-[10px] font-bold text-brassbright">
+                                                {kpiStatus.progressPercent.toFixed(0)}%
                                               </span>
                                             </div>
                                           </div>
-                                          <button 
+                                          <button
                                             onClick={() => handleDeleteSubgranteeKPI(selectedGrant.id, sub.id, kpi.id)}
                                             className="text-inkfaint hover:text-alert p-1 opacity-0 group-hover/kpi:opacity-100 transition-opacity"
                                           >
@@ -751,24 +776,24 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                         </div>
                                         <div>
                                           <label className="text-[0.6rem] text-inkfaint uppercase font-bold block mb-1">Current</label>
-                                          <input 
-                                            type="number" 
+                                          <input
+                                            type="number"
                                             value={kpi.current}
-                                            onChange={(e) => handleUpdateSubgranteeKPI(selectedGrant.id, sub.id, kpi.id, { current: parseInt(e.target.value) || 0 })}
+                                            onChange={(e) => handleUpdateSubgranteeKPI(selectedGrant.id, sub.id, kpi.id, { current: Math.max(0, parseInt(e.target.value) || 0) })}
                                             className="w-full bg-transparent border-b border-hairline/60 hover:border-hairline focus:border-teal focus:bg-surface px-2 py-1 text-xs font-semibold outline-none transition-all"
                                           />
                                         </div>
                                         <div>
                                           <label className="text-[0.6rem] text-inkfaint uppercase font-bold block mb-1">Target / Unit</label>
                                           <div className="flex items-center gap-1">
-                                            <input 
-                                              type="number" 
+                                            <input
+                                              type="number"
                                               value={kpi.target}
-                                              onChange={(e) => handleUpdateSubgranteeKPI(selectedGrant.id, sub.id, kpi.id, { target: parseInt(e.target.value) || 1 })}
+                                              onChange={(e) => handleUpdateSubgranteeKPI(selectedGrant.id, sub.id, kpi.id, { target: Math.max(0, parseInt(e.target.value) || 0) })}
                                               className="w-16 bg-transparent border-b border-hairline/60 hover:border-hairline focus:border-teal focus:bg-surface px-2 py-1 text-xs font-semibold outline-none transition-all"
                                             />
-                                            <input 
-                                              type="text" 
+                                            <input
+                                              type="text"
                                               value={kpi.unit}
                                               onChange={(e) => handleUpdateSubgranteeKPI(selectedGrant.id, sub.id, kpi.id, { unit: e.target.value })}
                                               className="flex-1 bg-transparent border-b border-hairline/60 hover:border-hairline focus:border-teal focus:bg-surface px-2 py-1 text-xs font-semibold outline-none transition-all"
@@ -777,9 +802,9 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                           </div>
                                         </div>
                                       </div>
-                                      
+
                                       <div className="h-1.5 w-full bg-abyss border border-hairline/50 rounded-full overflow-hidden">
-                                        <div 
+                                        <div
                                           className={`h-full transition-all duration-500 ease-out ${progress >= 100 ? 'bg-teal' : 'bg-brass'}`}
                                           style={{ width: `${progress}%` }}
                                         ></div>
