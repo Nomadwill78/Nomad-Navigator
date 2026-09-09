@@ -101,6 +101,21 @@ function sanitizeGrant(grant: Grant): Grant {
   };
 }
 
+/**
+ * The client-persistence-layer backstop: even if the UI's own validation is
+ * bypassed (a bug, a direct call, a browser console), an incomplete grant
+ * must not reach Firestore. `firestore.rules`' `isValidGrant` enforces the
+ * same rule server-side; this is the second, independent layer, not a
+ * replacement for it.
+ */
+function isCompleteGrant(grant: Grant): boolean {
+  return (
+    typeof grant.name === 'string' && grant.name.trim().length > 0 &&
+    typeof grant.funder === 'string' && grant.funder.trim().length > 0 &&
+    typeof grant.amount === 'number' && Number.isFinite(grant.amount) && grant.amount > 0
+  );
+}
+
 /** Merge a server document over the empty shape so a partial doc can't crash a chart. */
 function hydrateStats(raw: Partial<DashboardStats> | undefined): DashboardStats {
   if (!raw) return EMPTY_STATS;
@@ -164,6 +179,17 @@ export async function persistStats(orgId: string, stats: DashboardStats): Promis
  * keeps them unchanged while avoiding a full rewrite on every keystroke.
  */
 export async function persistGrants(orgId: string, next: Grant[], previous: Grant[]): Promise<void> {
+  const incomplete = next.filter((g) => !isCompleteGrant(g));
+  if (incomplete.length > 0) {
+    // Fail loudly and save nothing in this batch, rather than silently
+    // dropping the incomplete grant(s) or letting Firestore's security
+    // rules be the only thing that notices. The caller's syncStatus/
+    // syncError surfaces this as a visible "Not saving" state.
+    throw new Error(
+      `Cannot save: ${incomplete.length} grant(s) are missing a name, funder, or an award amount greater than zero.`
+    );
+  }
+
   const batch = writeBatch(db);
   const previousById = new Map(previous.map((g) => [g.id, g]));
   let writes = 0;

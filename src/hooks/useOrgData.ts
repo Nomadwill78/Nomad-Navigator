@@ -19,6 +19,11 @@ interface UseOrgDataResult {
   setGrants: (grants: Grant[]) => void;
   syncStatus: SyncStatus;
   syncError: string | null;
+  /** True while a debounced edit hasn't been written to Firestore yet — the
+   * window in which a refresh or closed tab would lose that edit. Reactive
+   * (unlike the internal statsPending/grantsPending refs), so it can drive
+   * a "Saving…" indicator and a beforeunload warning. */
+  hasPendingWrites: boolean;
 }
 
 /** How long to wait after the last keystroke before writing to Firestore. */
@@ -52,6 +57,12 @@ export function useOrgData(
   const grantsPending = useRef(false);
   const statsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const grantsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Reactive mirror of the two *Pending refs above, purely so the UI (the
+  // save-status badge, the beforeunload guard) can see when an edit is
+  // still sitting in the debounce window and hasn't reached Firestore yet.
+  const [statsPendingUI, setStatsPendingUI] = useState(false);
+  const [grantsPendingUI, setGrantsPendingUI] = useState(false);
 
   // --- Subscribe ----------------------------------------------------------
   useEffect(() => {
@@ -127,6 +138,7 @@ export function useOrgData(
       if (isDemoMode || !orgId) return; // demo edits are throwaway
 
       statsPending.current = true;
+      setStatsPendingUI(true);
       if (statsTimer.current) clearTimeout(statsTimer.current);
       statsTimer.current = setTimeout(async () => {
         try {
@@ -139,6 +151,7 @@ export function useOrgData(
           setSyncError(describeError(error));
         } finally {
           statsPending.current = false;
+          setStatsPendingUI(false);
         }
       }, WRITE_DEBOUNCE_MS);
     },
@@ -151,6 +164,7 @@ export function useOrgData(
       if (isDemoMode || !orgId) return;
 
       grantsPending.current = true;
+      setGrantsPendingUI(true);
       if (grantsTimer.current) clearTimeout(grantsTimer.current);
       grantsTimer.current = setTimeout(async () => {
         try {
@@ -164,6 +178,7 @@ export function useOrgData(
           setSyncError(describeError(error));
         } finally {
           grantsPending.current = false;
+          setGrantsPendingUI(false);
         }
       }, WRITE_DEBOUNCE_MS);
     },
@@ -178,7 +193,15 @@ export function useOrgData(
     };
   }, []);
 
-  return { stats, grants, setStats, setGrants, syncStatus, syncError };
+  return {
+    stats,
+    grants,
+    setStats,
+    setGrants,
+    syncStatus,
+    syncError,
+    hasPendingWrites: statsPendingUI || grantsPendingUI,
+  };
 }
 
 function describeError(error: unknown): string {

@@ -28,10 +28,19 @@ interface GrantTrackingViewProps {
 }
 
 const getTrendIndicator = (current: number, target: number) => {
-  const progress = current / target;
+  // A target of 0 (or not-yet-set) has no meaningful ratio — treat it as
+  // "not started" rather than computing NaN/Infinity from current / 0.
+  const progress = target > 0 ? current / target : 0;
   if (progress >= 1) return { icon: <TrendingUp size={12} />, color: 'text-teal', bg: 'bg-teal/10', label: 'Target Met' };
   if (progress >= 0.5) return { icon: <ArrowRight size={12} />, color: 'text-teal', bg: 'bg-teal/10', label: 'On Track' };
   return { icon: <TrendingDown size={12} />, color: 'text-brass', bg: 'bg-brass/10', label: 'Below Target' };
+};
+
+/** Shared by every KPI progress bar so current/target never produces NaN or Infinity. */
+const kpiProgressPercent = (current: number, target: number): number => {
+  if (!Number.isFinite(target) || target <= 0) return 0;
+  if (!Number.isFinite(current)) return 0;
+  return Math.min((current / target) * 100, 100);
 };
 
 export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, onUpdateGrants }) => {
@@ -45,13 +54,50 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
   const [headerDraft, setHeaderDraft] = useState<{
     name: string; funder: string; amount: string; startDate: string; endDate: string; status: Grant['status'];
   } | null>(null);
+  const [headerError, setHeaderError] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // A brand-new grant lives here, ONLY in local state, until it passes
+  // validation on Save. This is what stops an incomplete grant from ever
+  // reaching Firestore — nothing here is handed to onUpdateGrants (which
+  // persists) until saveHeaderEditor confirms it's valid.
+  const [draftGrant, setDraftGrant] = useState<Grant | null>(null);
+  const displayGrants = draftGrant ? [...grants, draftGrant] : grants;
+
+  /** Required-field validation for a grant header, run before every create or edit is persisted. */
+  const validateGrantFields = (
+    name: string, funder: string, amountRaw: string, startDate: string, endDate: string
+  ): string | null => {
+    if (!name.trim()) return 'Grant name is required.';
+    if (!funder.trim()) return 'Funder is required.';
+    const amount = Number(amountRaw);
+    if (!Number.isFinite(amount) || amount <= 0) return 'Award amount must be greater than zero.';
+    const start = new Date(startDate).getTime();
+    const end = new Date(endDate).getTime();
+    if (!startDate || Number.isNaN(start)) return 'Start date is invalid.';
+    if (!endDate || Number.isNaN(end)) return 'End date is invalid.';
+    if (end <= start) return 'End date must be after the start date.';
+    return null;
+  };
+
+  /** Applies an update to one grant by id — routed to the unsaved draft if
+   * that's the grant being touched, otherwise persisted via onUpdateGrants. */
+  const updateGrantById = (grantId: string, updater: (g: Grant) => Grant) => {
+    if (draftGrant && draftGrant.id === grantId) {
+      setDraftGrant(updater(draftGrant));
+      return;
+    }
+    onUpdateGrants(grants.map(g => (g.id === grantId ? updater(g) : g)));
+  };
 
   const handleAddGrant = () => {
     // Left genuinely blank rather than filled with plausible-looking numbers —
-    // a new grant should look obviously unfinished, not like real data.
+    // a new grant should look obviously unfinished, not like real data. It's
+    // held in draftGrant (local-only) rather than passed to onUpdateGrants,
+    // so this blank shell never touches Firestore.
     const today = new Date().toISOString().split('T')[0];
     const newGrant: Grant = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       name: '',
       funder: '',
       amount: 0,
@@ -62,10 +108,17 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
       kpis: [],
       subgrantees: []
     };
-    onUpdateGrants([...grants, newGrant]);
+    setDraftGrant(newGrant);
     setIsAddingGrant(false);
     setSelectedGrantId(newGrant.id);
+    setHeaderError(null);
     openHeaderEditor(newGrant);
+  };
+
+  const handleDeleteGrant = (grantId: string) => {
+    onUpdateGrants(grants.filter(g => g.id !== grantId));
+    if (selectedGrantId === grantId) setSelectedGrantId(null);
+    setConfirmDeleteId(null);
   };
 
   const openHeaderEditor = (grant: Grant) => {
@@ -82,150 +135,135 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
 
   const saveHeaderEditor = () => {
     if (!editingHeaderId || !headerDraft) return;
-    const parsedAmount = Number(headerDraft.amount);
-    onUpdateGrants(grants.map(g => g.id === editingHeaderId ? {
-      ...g,
-      name: headerDraft.name.trim() || 'Untitled Grant',
+
+    const error = validateGrantFields(
+      headerDraft.name, headerDraft.funder, headerDraft.amount, headerDraft.startDate, headerDraft.endDate
+    );
+    if (error) {
+      setHeaderError(error);
+      return;
+    }
+
+    const fields = {
+      name: headerDraft.name.trim(),
       funder: headerDraft.funder.trim(),
-      amount: Number.isFinite(parsedAmount) ? Math.max(0, parsedAmount) : g.amount,
+      amount: Number(headerDraft.amount),
       startDate: headerDraft.startDate,
       endDate: headerDraft.endDate,
       status: headerDraft.status,
-    } : g));
+    };
+
+    if (draftGrant && draftGrant.id === editingHeaderId) {
+      // First moment this grant is valid — the only place a brand-new
+      // grant is handed to onUpdateGrants and actually persisted.
+      onUpdateGrants([...grants, { ...draftGrant, ...fields }]);
+      setDraftGrant(null);
+    } else {
+      onUpdateGrants(grants.map(g => (g.id === editingHeaderId ? { ...g, ...fields } : g)));
+    }
+
     setEditingHeaderId(null);
     setHeaderDraft(null);
+    setHeaderError(null);
+  };
+
+  const cancelHeaderEditor = () => {
+    // Discard an unsaved new grant entirely, rather than leaving a blank
+    // one selected with nowhere to go.
+    if (draftGrant && draftGrant.id === editingHeaderId) {
+      setDraftGrant(null);
+      setSelectedGrantId(null);
+    }
+    setEditingHeaderId(null);
+    setHeaderDraft(null);
+    setHeaderError(null);
   };
 
   const handleUpdateKPI = (grantId: string, kpiId: string, updates: Partial<GrantKPI>) => {
-    const updatedGrants = grants.map(g => {
-      if (g.id === grantId) {
-        return {
-          ...g,
-          kpis: g.kpis.map(k => k.id === kpiId ? { ...k, ...updates } : k)
-        };
-      }
-      return g;
-    });
-    onUpdateGrants(updatedGrants);
+    updateGrantById(grantId, (g) => ({
+      ...g,
+      kpis: g.kpis.map(k => k.id === kpiId ? { ...k, ...updates } : k)
+    }));
   };
 
   const handleAddKPI = (grantId: string) => {
-    const updatedGrants = grants.map(g => {
-      if (g.id === grantId) {
-        const newKpi: GrantKPI = {
-          id: Date.now().toString(),
-          name: 'New Impact Metric',
-          target: 1000,
-          current: 0,
-          unit: 'people'
-        };
-        return { ...g, kpis: [...g.kpis, newKpi] };
-      }
-      return g;
+    updateGrantById(grantId, (g) => {
+      const newKpi: GrantKPI = {
+        id: crypto.randomUUID(),
+        name: 'New Impact Metric',
+        target: 1000,
+        current: 0,
+        unit: 'people'
+      };
+      return { ...g, kpis: [...g.kpis, newKpi] };
     });
-    onUpdateGrants(updatedGrants);
   };
 
   const handleDeleteKPI = (grantId: string, kpiId: string) => {
-    onUpdateGrants(grants.map(g => g.id === grantId ? { ...g, kpis: g.kpis.filter(k => k.id !== kpiId) } : g));
+    updateGrantById(grantId, (g) => ({ ...g, kpis: g.kpis.filter(k => k.id !== kpiId) }));
   };
 
   const handleDeleteSubgranteeKPI = (grantId: string, subgranteeId: string, kpiId: string) => {
-    onUpdateGrants(grants.map(g => {
-      if (g.id === grantId) {
-        return {
-          ...g,
-          subgrantees: g.subgrantees?.map(sub => {
-            if (sub.id === subgranteeId) {
-              return { ...sub, kpis: sub.kpis.filter(k => k.id !== kpiId) };
-            }
-            return sub;
-          })
-        };
-      }
-      return g;
+    updateGrantById(grantId, (g) => ({
+      ...g,
+      subgrantees: g.subgrantees?.map(sub =>
+        sub.id === subgranteeId ? { ...sub, kpis: sub.kpis.filter(k => k.id !== kpiId) } : sub
+      )
     }));
   };
 
   const handleAddSubgrantee = (grantId: string) => {
-    const updatedGrants = grants.map(g => {
-      if (g.id === grantId) {
-        const newSub: Subgrantee = {
-          id: Date.now().toString(),
-          name: "Local Partner Org",
-          allocatedAmount: 10000,
-          status: 'active',
-          kpis: [{ id: '1', name: 'Reach Target', target: 500, current: 0, unit: 'people' }]
-        };
-        return { ...g, subgrantees: [...(g.subgrantees || []), newSub] };
-      }
-      return g;
+    updateGrantById(grantId, (g) => {
+      const newSub: Subgrantee = {
+        id: crypto.randomUUID(),
+        name: "Local Partner Org",
+        allocatedAmount: 10000,
+        status: 'active',
+        kpis: [{ id: crypto.randomUUID(), name: 'Reach Target', target: 500, current: 0, unit: 'people' }]
+      };
+      return { ...g, subgrantees: [...(g.subgrantees || []), newSub] };
     });
-    onUpdateGrants(updatedGrants);
   };
 
   const handleUpdateSubgranteeKPI = (grantId: string, subgranteeId: string, kpiId: string, updates: Partial<SubgranteeKPI>) => {
-    const updatedGrants = grants.map(g => {
-      if (g.id === grantId) {
-        return {
-          ...g,
-          subgrantees: g.subgrantees?.map(sub => {
-            if (sub.id === subgranteeId) {
-              return {
-                ...sub,
-                kpis: sub.kpis.map(k => k.id === kpiId ? { ...k, ...updates } : k)
-              };
-            }
-            return sub;
-          })
-        };
-      }
-      return g;
-    });
-    onUpdateGrants(updatedGrants);
+    updateGrantById(grantId, (g) => ({
+      ...g,
+      subgrantees: g.subgrantees?.map(sub => {
+        if (sub.id === subgranteeId) {
+          return { ...sub, kpis: sub.kpis.map(k => k.id === kpiId ? { ...k, ...updates } : k) };
+        }
+        return sub;
+      })
+    }));
   };
 
   const handleAddSubgranteeKPI = (grantId: string, subgranteeId: string) => {
-    const updatedGrants = grants.map(g => {
-      if (g.id === grantId) {
-        return {
-          ...g,
-          subgrantees: g.subgrantees?.map(sub => {
-            if (sub.id === subgranteeId) {
-              const newKpi: SubgranteeKPI = {
-                id: Date.now().toString(),
-                name: 'New Metric',
-                target: 100,
-                current: 0,
-                unit: 'units'
-              };
-              return { ...sub, kpis: [...sub.kpis, newKpi] };
-            }
-            return sub;
-          })
-        };
-      }
-      return g;
-    });
-    onUpdateGrants(updatedGrants);
+    updateGrantById(grantId, (g) => ({
+      ...g,
+      subgrantees: g.subgrantees?.map(sub => {
+        if (sub.id === subgranteeId) {
+          const newKpi: SubgranteeKPI = {
+            id: crypto.randomUUID(),
+            name: 'New Metric',
+            target: 100,
+            current: 0,
+            unit: 'units'
+          };
+          return { ...sub, kpis: [...sub.kpis, newKpi] };
+        }
+        return sub;
+      })
+    }));
   };
 
   const handleUpdateSubgrantee = (grantId: string, subgranteeId: string, updates: Partial<Subgrantee>) => {
-    const updatedGrants = grants.map(g => {
-      if (g.id === grantId) {
-        return {
-          ...g,
-          subgrantees: g.subgrantees?.map(sub => 
-            sub.id === subgranteeId ? { ...sub, ...updates } : sub
-          )
-        };
-      }
-      return g;
-    });
-    onUpdateGrants(updatedGrants);
+    updateGrantById(grantId, (g) => ({
+      ...g,
+      subgrantees: g.subgrantees?.map(sub => (sub.id === subgranteeId ? { ...sub, ...updates } : sub))
+    }));
   };
 
-  const selectedGrant = grants.find(g => g.id === selectedGrantId);
+  const selectedGrant = displayGrants.find(g => g.id === selectedGrantId);
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
@@ -279,13 +317,13 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
         {/* Grant List */}
         <div className="lg:col-span-1 space-y-4">
           <h3 className="text-xs font-bold text-inkfaint uppercase tracking-widest px-2">Active Portfolios</h3>
-          {grants.length === 0 ? (
+          {displayGrants.length === 0 ? (
             <div className="p-12 text-center bg-surface rounded-2xl border border-dashed border-hairline">
                <Target className="mx-auto text-inkfaint mb-3" size={32} />
                <p className="text-inkfaint text-sm">No grants tracked yet.</p>
             </div>
           ) : (
-            grants.map(grant => (
+            displayGrants.map(grant => (
               <button
                 key={grant.id}
                 onClick={() => setSelectedGrantId(grant.id)}
@@ -382,6 +420,11 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                         />
                       </label>
                     </div>
+                    {headerError && (
+                      <p className="text-xs font-bold text-alert bg-alert/10 border border-alert/30 rounded-lg px-3 py-2">
+                        {headerError}
+                      </p>
+                    )}
                     <div className="flex gap-3">
                       <button
                         onClick={saveHeaderEditor}
@@ -390,7 +433,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                         Save
                       </button>
                       <button
-                        onClick={() => { setEditingHeaderId(null); setHeaderDraft(null); }}
+                        onClick={cancelHeaderEditor}
                         className="px-4 py-2 bg-white/5 text-inkmute rounded-lg text-xs font-bold hover:bg-white/10 transition-all"
                       >
                         Cancel
@@ -417,8 +460,39 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                         <Edit2 size={18} />
                       </button>
                     )}
+                    {permissions?.canDeleteGrants && !(draftGrant && draftGrant.id === selectedGrant.id) && (
+                      <button
+                        onClick={() => setConfirmDeleteId(selectedGrant.id)}
+                        title="Delete grant"
+                        className="p-2 text-inkfaint hover:text-alert hover:bg-alert/15 rounded-lg transition-colors"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
                   </div>
                 </div>
+                )}
+
+                {confirmDeleteId === selectedGrant.id && (
+                  <div className="mb-6 p-4 bg-alert/10 border border-alert/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <p className="text-sm font-semibold text-parchment">
+                      Delete "{selectedGrant.name || 'Untitled Grant'}" permanently? This cannot be undone.
+                    </p>
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        onClick={() => handleDeleteGrant(selectedGrant.id)}
+                        className="px-3 py-1.5 bg-alert/20 text-alert border border-alert/40 rounded-lg text-xs font-bold hover:bg-alert/30 transition-all"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="px-3 py-1.5 bg-white/5 text-inkmute rounded-lg text-xs font-bold hover:bg-white/10 transition-all"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                 )}
 
                 {/* Visual Progress Bar: Spent Funds versus Time Elapsed */}
@@ -506,8 +580,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                   value={spentAmount}
                                   onChange={(e) => {
                                     const val = Math.min(Math.max(0, parseInt(e.target.value) || 0), totalAmount);
-                                    const updatedGrants = grants.map(g => g.id === selectedGrant.id ? { ...g, spentAmount: val } : g);
-                                    onUpdateGrants(updatedGrants);
+                                    updateGrantById(selectedGrant.id, (g) => ({ ...g, spentAmount: val }));
                                   }}
                                   className="bg-transparent font-semibold text-parchment text-xs outline-none w-full"
                                 />
@@ -582,7 +655,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
 
                     <div className="space-y-6">
                       {selectedGrant.kpis.map(kpi => {
-                        const progress = Math.min((kpi.current / kpi.target) * 100, 100);
+                        const progress = kpiProgressPercent(kpi.current, kpi.target);
                         const trend = getTrendIndicator(kpi.current, kpi.target);
                         return (
                           <div key={kpi.id} className="space-y-4 p-5 bg-ink/50 rounded-2xl border border-hairline/60 group">
@@ -718,7 +791,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                </div>
                                
                                {sub.kpis.map(kpi => {
-                                 const progress = Math.min((kpi.current / kpi.target) * 100, 100);
+                                 const progress = kpiProgressPercent(kpi.current, kpi.target);
                                  const trend = getTrendIndicator(kpi.current, kpi.target);
                                  return (
                                    <div key={kpi.id} className="space-y-3 p-3 bg-ink/50 rounded-xl border border-hairline/60 group/kpi">

@@ -388,7 +388,7 @@ const App: React.FC = () => {
 
   // Grants and metrics live in Firestore under this organization, so every member
   // of the org sees the same numbers. Demo mode is served from memory and never written.
-  const { stats, grants, setStats, setGrants, syncStatus, syncError } = useOrgData(
+  const { stats, grants, setStats, setGrants, syncStatus, syncError, hasPendingWrites } = useOrgData(
     organization?.id ?? null,
     isDemoMode,
     DEMO_STATS,
@@ -416,6 +416,19 @@ const App: React.FC = () => {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  // Warn before closing/refreshing while a debounced grant or metrics edit
+  // hasn't reached Firestore yet — there is no durable offline queue behind
+  // it, so that edit would otherwise be silently lost.
+  useEffect(() => {
+    if (!hasPendingWrites) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasPendingWrites]);
 
   // Stripe donation link. Opens a hosted Stripe Payment Link — no backend
   // needed, so it works on the static Vercel deployment. Create the link in the
@@ -702,15 +715,28 @@ const App: React.FC = () => {
               </div>
             )}
 
+            {isOnline && hasPendingWrites && syncStatus !== 'error' && (
+              <div
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-brass/10 text-brassbright text-xs font-semibold rounded-full border border-brass/25"
+                title="Your last change is queued and hasn't been written to the database yet."
+              >
+                <div className="w-1.5 h-1.5 rounded-full bg-brassbright animate-pulse"></div>
+                <span>Saving…</span>
+              </div>
+            )}
+
             {isOnline ? (
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-teal/10 text-teal text-xs font-semibold rounded-full border border-teal/25">
                 <div className="w-1.5 h-1.5 rounded-full bg-teal animate-pulse"></div>
                 <span>Online</span>
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-brass/10 text-brassbright text-xs font-semibold rounded-full border border-brass/25">
+              <div
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-brass/10 text-brassbright text-xs font-semibold rounded-full border border-brass/25"
+                title={hasPendingWrites ? "You have an unsaved change made while offline — it is not yet saved and could be lost if you close this tab." : undefined}
+              >
                 <div className="w-1.5 h-1.5 rounded-full bg-brass"></div>
-                <span>Working Offline (Cached)</span>
+                <span>{hasPendingWrites ? 'Offline — change not yet saved' : 'Working Offline (Cached)'}</span>
               </div>
             )}
 

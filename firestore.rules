@@ -121,7 +121,9 @@ service cloud.firestore {
     function isValidGrant(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() < 300 &&
              data.funder is string && data.funder.size() > 0 && data.funder.size() < 300 &&
-             data.amount is number && data.amount >= 0;
+             // Award amount must be a real, positive number — a grant worth
+             // exactly $0 is not a valid award. Previously this allowed >= 0.
+             data.amount is number && data.amount > 0;
     }
 
     function isValidInvitation(data) {
