@@ -1,0 +1,30 @@
+name: Repository Auditor Checks
+
+on:
+  pull_request:
+    paths:
+      - 'tools/repo-auditor/**'
+      - '.github/workflows/repo-auditor.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/repo-auditor/**'
+      - '.github/workflows/repo-auditor.yml'
+
+jobs:
+  test-auditor:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/repo-auditor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install auditor
+        run: python -m pip install -e . pytest
+      - name: Compile Python sources
+        run: python -m compileall -q auditor tests
+      - name: Run unit tests
+        run: pytest -q

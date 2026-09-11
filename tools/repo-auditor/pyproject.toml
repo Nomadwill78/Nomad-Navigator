@@ -1,0 +1,15 @@
+[project]
+name = "nomad-repo-auditor"
+version = "0.1.0"
+description = "Autonomous repository assurance agent for Nomad Compass and other repositories."
+requires-python = ">=3.10"
+dependencies = [
+  "openai-agents>=0.2.0",
+  "pydantic>=2.0",
+]
+
+[project.scripts]
+nomad-audit = "auditor.cli:main"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
