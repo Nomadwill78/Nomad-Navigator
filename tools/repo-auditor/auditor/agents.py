@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from agents import Agent, Runner
+from agents import Runner
 from agents.run import RunConfig
 from agents.sandbox import Manifest, SandboxAgent, SandboxRunConfig
 from agents.sandbox.capabilities import Shell
@@ -40,7 +40,7 @@ def build_auditor(repo_dir: Path, model: str | None = None) -> SandboxAgent[None
     product = _specialist("Product UX Specialist", PRODUCT_INSTRUCTIONS, model)
     production = _specialist("Production Specialist", PRODUCTION_INSTRUCTIONS, model)
 
-    lead = SandboxAgent(
+    return SandboxAgent(
         name="Nomad Compass Repository Assurance Lead",
         model=model,
         instructions=LEAD_INSTRUCTIONS + "\n\n" + REPORT_SCHEMA,
@@ -65,7 +65,6 @@ def build_auditor(repo_dir: Path, model: str | None = None) -> SandboxAgent[None
             ),
         ],
     )
-    return lead
 
 
 async def run_audit(repo_dir: Path, model: str | None = None) -> str:
