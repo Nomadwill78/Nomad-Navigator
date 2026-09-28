@@ -132,7 +132,7 @@ service cloud.firestore {
     function isValidGrant(data, grantId) {
       return data.name is string && data.name.size() > 0 && data.name.size() < 300 &&
              data.funder is string && data.funder.size() > 0 && data.funder.size() < 300 &&
-             data.amount is number && data.amount >= 0 &&
+             data.amount is number && data.amount > 0 &&
              (!('spentAmount' in data) || (data.spentAmount is number && data.spentAmount >= 0)) &&
              data.startDate is string && data.startDate.matches('^\\d{4}-\\d{2}-\\d{2}$') &&
              data.endDate is string && data.endDate.matches('^\\d{4}-\\d{2}-\\d{2}$') &&
