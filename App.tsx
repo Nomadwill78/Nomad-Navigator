@@ -388,7 +388,7 @@ const App: React.FC = () => {
 
   // Grants and metrics live in Firestore under this organization, so every member
   // of the org sees the same numbers. Demo mode is served from memory and never written.
-  const { stats, grants, setStats, createGrant, updateGrant, deleteGrant, syncStatus, syncError } = useOrgData(
+  const { stats, grants, setStats, createGrant, updateGrant, deleteGrant, syncStatus, syncError, hasUnsavedChanges, retrySync } = useOrgData(
     organization?.id ?? null,
     isDemoMode,
     DEMO_STATS,
@@ -692,16 +692,6 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex gap-3">
-            {syncStatus === 'error' && (
-              <div
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 text-rose-200 text-xs font-semibold rounded-full border border-rose-500/30"
-                title={syncError ?? 'Could not save to the database.'}
-              >
-                <div className="w-1.5 h-1.5 rounded-full bg-rose-400"></div>
-                <span>Not saving</span>
-              </div>
-            )}
-
             {isOnline ? (
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-teal/10 text-teal text-xs font-semibold rounded-full border border-teal/25">
                 <div className="w-1.5 h-1.5 rounded-full bg-teal animate-pulse"></div>
@@ -766,6 +756,36 @@ const App: React.FC = () => {
             </div>
           </div>
         </header>
+
+        {(syncStatus === 'error' || !isOnline) && !isDemoMode && (
+          <div
+            role="alert"
+            className={`px-8 py-3 text-sm flex items-center justify-between gap-4 border-b ${
+              syncStatus === 'error'
+                ? 'bg-rose-500/10 text-rose-100 border-rose-500/30'
+                : 'bg-brass/10 text-brassbright border-brass/25'
+            }`}
+          >
+            <span>
+              <strong className="font-bold">
+                {syncStatus === 'error' ? 'Your latest changes are not saved.' : 'You are offline.'}
+              </strong>{' '}
+              {syncStatus === 'error'
+                ? syncError ?? 'Could not reach the database.'
+                : 'You can keep working; changes are stored on this device and will sync automatically when you reconnect.'}
+              {hasUnsavedChanges && syncStatus === 'error' && ' Your edits are being held on screen so nothing is lost.'}
+            </span>
+            {syncStatus === 'error' && (
+              <button
+                onClick={retrySync}
+                className="shrink-0 px-3 py-1.5 rounded-lg border border-rose-400/40 text-xs font-bold hover:bg-rose-500/20 transition-colors"
+              >
+                Retry now
+              </button>
+            )}
+          </div>
+        )}
+
 
         {/* Dashboard Content */}
         <div className="p-8 max-w-7xl mx-auto space-y-8 pb-20">

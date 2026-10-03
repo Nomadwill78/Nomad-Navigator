@@ -27,6 +27,10 @@ interface UseOrgDataResult {
   deleteGrant: (grantId: string) => void;
   syncStatus: SyncStatus;
   syncError: string | null;
+  /** True while a failed edit is being held so it can be retried (not lost). */
+  hasUnsavedChanges: boolean;
+  /** Re-sends every edit that failed to save. */
+  retrySync: () => void;
 }
 
 /** How long to wait after the last keystroke before writing to Firestore. */
@@ -57,6 +61,13 @@ export function useOrgData(
   const [syncError, setSyncError] = useState<string | null>(null);
 
   const statsPending = useRef(false);
+  // Edits whose write was rejected. They are kept here (and re-applied over incoming
+  // snapshots) so a failed save never silently reverts what the user typed.
+  const failedStats = useRef<DashboardStats | null>(null);
+  const failedGrantChanges = useRef<Map<string, Partial<Grant>>>(new Map());
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const refreshUnsaved = () =>
+    setHasUnsavedChanges(failedStats.current !== null || failedGrantChanges.current.size > 0);
   const statsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Grant ids with an edit in flight (debounce pending or write in progress) —
@@ -87,7 +98,9 @@ export function useOrgData(
       orgId,
       (next) => {
         if (statsPending.current) return; // local edit is newer
-        setStatsState(next);
+        // A rejected edit is still the user's newest intent: keep showing it,
+        // flagged as unsaved, until it is retried or discarded.
+        setStatsState(failedStats.current ?? next);
         setSyncStatus('live');
         setSyncError(null);
       },
@@ -102,13 +115,17 @@ export function useOrgData(
       orgId,
       (next) => {
         setGrantsState((current) => {
-          if (pendingGrantIds.current.size === 0) return next;
+          if (pendingGrantIds.current.size === 0 && failedGrantChanges.current.size === 0) return next;
           // Keep the in-progress local version of any grant with an edit in
           // flight; take the server's version of everything else. This is what
           // lets another user's concurrent edit to a different grant come
           // straight through instead of being blocked by our own pending edit.
           const currentById = new Map(current.map((g) => [g.id, g]));
-          return next.map((g) => (pendingGrantIds.current.has(g.id) ? currentById.get(g.id) ?? g : g));
+          return next.map((g) => {
+            if (pendingGrantIds.current.has(g.id)) return currentById.get(g.id) ?? g;
+            const failed = failedGrantChanges.current.get(g.id);
+            return failed ? { ...g, ...failed } : g;
+          });
         });
         setSyncStatus('live');
         setSyncError(null);
@@ -154,10 +171,14 @@ export function useOrgData(
       statsTimer.current = setTimeout(async () => {
         try {
           await persistStats(orgId, next);
+          failedStats.current = null;
+          refreshUnsaved();
           setSyncError(null);
           setSyncStatus('live');
         } catch (error) {
           console.error('Failed to save metrics:', error);
+          failedStats.current = next;
+          refreshUnsaved();
           setSyncStatus('error');
           setSyncError(describeError(error));
         } finally {
@@ -211,10 +232,14 @@ export function useOrgData(
         if (!toWrite) return;
         try {
           await updateGrantRemote(orgId, grantId, toWrite);
+          failedGrantChanges.current.delete(grantId);
+          refreshUnsaved();
           setSyncError(null);
           setSyncStatus('live');
         } catch (error) {
           console.error('Failed to save grant:', error);
+          failedGrantChanges.current.set(grantId, { ...failedGrantChanges.current.get(grantId), ...toWrite });
+          refreshUnsaved();
           setSyncStatus('error');
           setSyncError(describeError(error));
         } finally {
@@ -246,6 +271,16 @@ export function useOrgData(
     [orgId, isDemoMode]
   );
 
+  const retrySync = useCallback(() => {
+    if (!orgId || isDemoMode) return;
+    setSyncError(null);
+    setSyncStatus('loading');
+    if (failedStats.current) setStats(failedStats.current);
+    failedGrantChanges.current.forEach((changes, grantId) => updateGrant(grantId, changes));
+    // Nothing failed but we are in the error state (e.g. a dropped listener):
+    // the listeners reattach on their own; just report we are trying again.
+  }, [orgId, isDemoMode, setStats, updateGrant]);
+
   // Clear timers on unmount so nothing fires against an org the component has left.
   useEffect(() => {
     return () => {
@@ -254,7 +289,7 @@ export function useOrgData(
     };
   }, []);
 
-  return { stats, grants, setStats, createGrant, updateGrant, deleteGrant, syncStatus, syncError };
+  return { stats, grants, setStats, createGrant, updateGrant, deleteGrant, syncStatus, syncError, hasUnsavedChanges, retrySync };
 }
 
 function describeError(error: unknown): string {

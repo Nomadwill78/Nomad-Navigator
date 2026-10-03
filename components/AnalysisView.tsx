@@ -24,14 +24,13 @@ import {
   Info
 } from 'lucide-react';
 import { DashboardStats, Grant } from '../types';
+import { buildAnalysisData, capPoints, sharePercent, MAX_CHART_POINTS, MetricType, DimensionType } from '../src/lib/analysis';
 
 interface AnalysisViewProps {
   stats: DashboardStats;
   grants: Grant[];
 }
 
-type MetricType = 'impact' | 'cost' | 'roi';
-type DimensionType = 'grant' | 'time' | 'funder';
 
 // Categorical series drawn from the documented brass (funding) and teal (impact) ramps
 const COLORS = ['#cba85c', '#4fc4d3', '#e7ce88', '#2f8b98', '#b8905a', '#93a6c2'];
@@ -41,43 +40,17 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ stats, grants }) => 
   const [dimension, setDimension] = useState<DimensionType>('grant');
   const [chartType, setChartType] = useState<'bar' | 'area'>('bar');
 
-  // Prepare data based on selection
-  const getAnalysisData = () => {
-    if (dimension === 'grant') {
-      return grants.map(g => ({
-        // Derived from the grant's own name — a chart label under a bar has
-        // limited width, so this takes the first word rather than truncating
-        // mid-word.
-        name: g.name?.split(' ')[0] || 'Untitled',
-        fullName: g.name,
-        value: metric === 'impact' 
-          ? g.kpis.reduce((acc, k) => acc + k.current, 0)
-          : metric === 'cost' ? g.amount : (g.amount / Math.max(1, g.kpis[0]?.current || 1)).toFixed(2)
-      }));
-    }
-
-    if (dimension === 'time') {
-      return stats.programs.map(p => ({
-        name: p.month,
-        value: metric === 'impact' ? p.peopleServed : metric === 'cost' ? p.totalCost : p.costPerPerson
-      }));
-    }
-
-    if (dimension === 'funder') {
-      const funderTotals: Record<string, number> = {};
-      grants.forEach(g => {
-        const val = metric === 'impact' 
-          ? g.kpis[0]?.current || 0 
-          : metric === 'cost' ? g.amount : g.amount / 1000;
-        funderTotals[g.funder] = (funderTotals[g.funder] || 0) + Number(val);
-      });
-      return Object.entries(funderTotals).map(([name, value]) => ({ name, value }));
-    }
-
-    return [];
-  };
-
-  const data = getAnalysisData();
+  // Memoised: the aggregation is O(grants) and must not rerun on unrelated renders.
+  const allData = React.useMemo(
+    () => buildAnalysisData(stats, grants, metric, dimension),
+    [stats.programs, grants, metric, dimension]
+  );
+  // Time series keep chronological order (show the most recent N); others keep the largest N.
+  const data = React.useMemo(
+    () => (dimension === 'time' ? allData.slice(-MAX_CHART_POINTS) : capPoints(allData)),
+    [allData, dimension]
+  );
+  const total = React.useMemo(() => data.reduce((a, b) => a + b.value, 0), [data]);
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
@@ -214,7 +187,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ stats, grants }) => 
               </div>
               <div className="mt-4 flex items-center gap-2">
                  <div className="w-1.5 h-1.5 rounded-full bg-teal"></div>
-                 <p className="text-[10px] text-inkmute font-medium">Contributes {((Number(item.value) / data.reduce((a,b) => a + Number(b.value), 0)) * 100).toFixed(0)}% to total {metric}</p>
+                 <p className="text-[10px] text-inkmute font-medium">Contributes {sharePercent(item.value, total)}% to total {metric}</p>
               </div>
            </div>
          ))}
