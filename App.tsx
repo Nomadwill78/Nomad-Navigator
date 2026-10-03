@@ -382,6 +382,19 @@ const App: React.FC = () => {
   const permissions = role ? ROLE_PERMISSIONS[role] : null;
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeView, setActiveView] = useState<'dashboard' | 'data' | 'grants' | 'analysis' | 'discovery' | 'team' | 'billing' | 'settings'>('dashboard');
+  // True while the user has a CSV loaded into the Manage Data importer but hasn't
+  // confirmed it yet. Used to warn before navigating away, so the mapped data isn't
+  // silently thrown away.
+  const [hasPendingImport, setHasPendingImport] = useState(false);
+  const navigateTo = (view: typeof activeView) => {
+    if (hasPendingImport && view !== 'data') {
+      const proceed = window.confirm(
+        "You have an unfinished CSV import on the Manage Data page. Leaving now will discard it. Continue?"
+      );
+      if (!proceed) return;
+    }
+    setActiveView(view);
+  };
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [trajectoryRange, setTrajectoryRange] = useState<'6M' | '1Y' | 'ALL'>('ALL');
@@ -541,7 +554,7 @@ const App: React.FC = () => {
                 label="Impact Overview" 
                 active={activeView === 'dashboard'} 
                 isOpen={isSidebarOpen} 
-                onClick={() => setActiveView('dashboard')}
+                onClick={() => navigateTo('dashboard')}
               />
             </DemoHint>
           ) : (
@@ -550,7 +563,7 @@ const App: React.FC = () => {
               label="Impact Overview" 
               active={activeView === 'dashboard'} 
               isOpen={isSidebarOpen} 
-              onClick={() => setActiveView('dashboard')}
+              onClick={() => navigateTo('dashboard')}
             />
           )}
 
@@ -561,7 +574,7 @@ const App: React.FC = () => {
                 label="Grant Tracking" 
                 active={activeView === 'grants'} 
                 isOpen={isSidebarOpen} 
-                onClick={() => setActiveView('grants')}
+                onClick={() => navigateTo('grants')}
               />
             </DemoHint>
           ) : (
@@ -570,7 +583,7 @@ const App: React.FC = () => {
               label="Grant Tracking" 
               active={activeView === 'grants'} 
               isOpen={isSidebarOpen} 
-              onClick={() => setActiveView('grants')}
+              onClick={() => navigateTo('grants')}
             />
           )}
 
@@ -579,7 +592,7 @@ const App: React.FC = () => {
             label="Grant Discovery" 
             active={activeView === 'discovery'} 
             isOpen={isSidebarOpen} 
-            onClick={() => setActiveView('discovery')}
+            onClick={() => navigateTo('discovery')}
           />
 
           {isDemoMode ? (
@@ -589,7 +602,7 @@ const App: React.FC = () => {
                 label="Manage Data" 
                 active={activeView === 'data'} 
                 isOpen={isSidebarOpen} 
-                onClick={() => setActiveView('data')}
+                onClick={() => navigateTo('data')}
                 alert={isQualityAlert}
               />
             </DemoHint>
@@ -599,7 +612,7 @@ const App: React.FC = () => {
               label="Manage Data" 
               active={activeView === 'data'} 
               isOpen={isSidebarOpen} 
-              onClick={() => setActiveView('data')}
+              onClick={() => navigateTo('data')}
               alert={isQualityAlert}
             />
           )}
@@ -613,7 +626,7 @@ const App: React.FC = () => {
                 label="Analysis Deep Dive" 
                 active={activeView === 'analysis'} 
                 isOpen={isSidebarOpen} 
-                onClick={() => setActiveView('analysis')}
+                onClick={() => navigateTo('analysis')}
               />
             </DemoHint>
           ) : (
@@ -622,7 +635,7 @@ const App: React.FC = () => {
               label="Analysis Deep Dive" 
               active={activeView === 'analysis'} 
               isOpen={isSidebarOpen} 
-              onClick={() => setActiveView('analysis')}
+              onClick={() => navigateTo('analysis')}
             />
           )}
           <button 
@@ -641,10 +654,10 @@ const App: React.FC = () => {
           </button>
           
           {role && ROLE_PERMISSIONS[role].canManageTeam && (
-            <NavItem icon={<Users size={20} />} label="Team Management" active={activeView === 'team'} isOpen={isSidebarOpen} onClick={() => setActiveView('team')} />
+            <NavItem icon={<Users size={20} />} label="Team Management" active={activeView === 'team'} isOpen={isSidebarOpen} onClick={() => navigateTo('team')} />
           )}
           {role && ROLE_PERMISSIONS[role].canManageTeam && (
-            <NavItem icon={<CreditCard size={20} />} label="Billing" active={activeView === 'billing'} isOpen={isSidebarOpen} onClick={() => setActiveView('billing')} />
+            <NavItem icon={<CreditCard size={20} />} label="Billing" active={activeView === 'billing'} isOpen={isSidebarOpen} onClick={() => navigateTo('billing')} />
           )}
           <NavItem icon={<MapPin size={20} />} label="Geographic Reach" isOpen={isSidebarOpen} comingSoon />
           <NavItem icon={<DollarSign size={20} />} label="Financials" isOpen={isSidebarOpen} comingSoon />
@@ -671,7 +684,7 @@ const App: React.FC = () => {
              label="Settings"
              active={activeView === 'settings'}
              isOpen={isSidebarOpen}
-             onClick={() => setActiveView('settings')}
+             onClick={() => navigateTo('settings')}
            />
         </div>
       </aside>
@@ -732,7 +745,7 @@ const App: React.FC = () => {
             <div className="flex items-center gap-3 pl-4 border-l border-hairline/50">
                <div className="text-right hidden sm:block">
                   <button
-                    onClick={() => setActiveView('settings')}
+                    onClick={() => navigateTo('settings')}
                     className="text-xs font-bold text-parchment hover:text-teal transition-colors"
                     title="Account settings"
                   >
@@ -747,7 +760,7 @@ const App: React.FC = () => {
                   </button>
                </div>
                <button
-                 onClick={() => setActiveView('settings')}
+                 onClick={() => navigateTo('settings')}
                  title="Account settings"
                  className="w-10 h-10 bg-gradient-to-br from-surface2 to-surface rounded-full flex items-center justify-center text-brass font-bold border border-brass/40 hover:border-brass/70 transition-colors shrink-0"
                >
@@ -791,7 +804,7 @@ const App: React.FC = () => {
         <div className="p-8 max-w-7xl mx-auto space-y-8 pb-20">
           
           {activeView === 'data' ? (
-            <DataManagementView stats={stats} onUpdate={setStats} />
+            <DataManagementView stats={stats} onUpdate={setStats} onPendingImportChange={setHasPendingImport} />
           ) : activeView === 'grants' ? (
             <GrantTrackingView grants={grants} onCreateGrant={createGrant} onUpdateGrant={updateGrant} onDeleteGrant={deleteGrant} />
           ) : activeView === 'analysis' ? (
@@ -879,13 +892,13 @@ const App: React.FC = () => {
                       done={!hasNoData}
                       label="Add your data"
                       actionLabel="Add data"
-                      onAction={() => setActiveView('data')}
+                      onAction={() => navigateTo('data')}
                     />
                     <ChecklistStep
                       done={grants.length > 0}
                       label="Track a grant"
                       actionLabel="Add grant"
-                      onAction={() => setActiveView('grants')}
+                      onAction={() => navigateTo('grants')}
                     />
                     <ChecklistStep
                       done={false}

@@ -141,9 +141,12 @@ const InputField: React.FC<{
 interface DataManagementViewProps {
   stats: DashboardStats;
   onUpdate: (newStats: DashboardStats) => void;
+  // Lets the parent know a CSV import is mid-flight (file loaded, not yet confirmed)
+  // so it can warn the user before navigating away and silently discarding it.
+  onPendingImportChange?: (pending: boolean) => void;
 }
 
-export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, onUpdate }) => {
+export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, onUpdate, onPendingImportChange }) => {
   const { role } = useAuth();
   const permissions = role ? ROLE_PERMISSIONS[role] : null;
 
@@ -166,6 +169,24 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Warn before the tab closes/refreshes while a mapped CSV hasn't been confirmed yet.
+  React.useEffect(() => {
+    if (!showMappingUI) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [showMappingUI]);
+
+  // Tell the parent app whether an import is in progress, so it can confirm before
+  // switching views (otherwise the mapped data is silently lost on navigation).
+  React.useEffect(() => {
+    onPendingImportChange?.(showMappingUI);
+    return () => onPendingImportChange?.(false);
+  }, [showMappingUI, onPendingImportChange]);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
