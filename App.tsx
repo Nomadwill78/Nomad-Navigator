@@ -180,6 +180,15 @@ const DEMO_GRANTS: Grant[] = [
   }
 ];
 
+// Sample deadlines are computed relative to today rather than hardcoded, so the
+// "AI found these opportunities" preview never shows a deadline that has already
+// passed, no matter when someone views the demo.
+function daysFromNow(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 const SAMPLE_OPPORTUNITIES: Opportunity[] = [
   {
     id: 'o1',
@@ -187,7 +196,7 @@ const SAMPLE_OPPORTUNITIES: Opportunity[] = [
     name: 'Global Water Security Grant',
     amount: 750000,
     matchScore: 94,
-    deadline: '2025-09-15',
+    deadline: daysFromNow(45),
     description: 'Funding for innovative infrastructure projects in developing urban centers focused on sustainable water management.',
     whyMatch: 'Matches your current 92% performance in Urban WASH projects and your high SROI in East Africa.'
   },
@@ -197,7 +206,7 @@ const SAMPLE_OPPORTUNITIES: Opportunity[] = [
     name: 'Community Hygiene Accelerator',
     amount: 200000,
     matchScore: 88,
-    deadline: '2025-10-01',
+    deadline: daysFromNow(61),
     description: 'Scaling hygiene education and facility installations in high-density informal settlements.',
     whyMatch: 'Strong alignment with your "Rural Sanitation Program" outcomes and your verified data methodology.'
   }
@@ -381,6 +390,13 @@ const App: React.FC = () => {
   } = useAuth();
   const permissions = role ? ROLE_PERMISSIONS[role] : null;
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  // On phones/small tablets the sidebar is an off-canvas drawer rather than a
+  // permanent column, so it should start closed there instead of covering the page.
+  useEffect(() => {
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      setIsSidebarOpen(false);
+    }
+  }, []);
   const [activeView, setActiveView] = useState<'dashboard' | 'data' | 'grants' | 'analysis' | 'discovery' | 'team' | 'billing' | 'settings'>('dashboard');
   // True while the user has a CSV loaded into the Manage Data importer but hasn't
   // confirmed it yet. Used to warn before navigating away, so the mapped data isn't
@@ -394,6 +410,11 @@ const App: React.FC = () => {
       if (!proceed) return;
     }
     setActiveView(view);
+    // On mobile the sidebar is an overlay drawer, so close it once the user has
+    // picked a destination instead of leaving it covering the page they asked for.
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      setIsSidebarOpen(false);
+    }
   };
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -536,11 +557,23 @@ const App: React.FC = () => {
   return (
     <div className="compass-canvas min-h-screen bg-ink flex font-sans text-parchment">
 
-      {/* Sidebar */}
+      {/* Mobile backdrop: tapping outside the open drawer closes it */}
+      {isSidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/60 z-30"
+          onClick={() => setIsSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Sidebar: a permanent column on desktop (collapses to icons-only),
+          an off-canvas drawer on mobile (slides in over the content). */}
       <aside
         className={`${
           isSidebarOpen ? 'w-64' : 'w-20'
-        } bg-abyss text-parchment transition-all duration-300 ease-in-out fixed h-full z-20 flex flex-col shadow-2xl border-r border-hairline/50`}
+        } max-md:w-64 bg-abyss text-parchment transition-all duration-300 ease-in-out fixed h-full z-20 max-md:z-40 flex flex-col shadow-2xl border-r border-hairline/50 ${
+          isSidebarOpen ? 'max-md:translate-x-0' : 'max-md:-translate-x-full'
+        }`}
       >
         <div className="h-20 flex items-center justify-start px-5 border-b border-hairline/40">
           <BrandLogo size={32} showText={isSidebarOpen} variant="light" />
@@ -690,7 +723,7 @@ const App: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <main className={`flex-1 transition-all duration-300 ${isSidebarOpen ? 'ml-64' : 'ml-20'}`}>
+      <main className={`flex-1 transition-all duration-300 max-md:ml-0 ${isSidebarOpen ? 'ml-64' : 'ml-20'}`}>
         
         {/* Header */}
         <header className="h-20 bg-abyss/85 backdrop-blur-md border-b border-hairline/50 sticky top-0 z-10 px-8 flex items-center justify-between">
