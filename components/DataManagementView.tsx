@@ -64,6 +64,80 @@ function parseCSV(text: string): string[][] {
   return lines;
 }
 
+/** Returns a copy of `obj` with `path` set to `value`, without mutating `obj`. */
+function setIn(obj: any, path: string[], value: any): any {
+  const [head, ...rest] = path;
+  if (rest.length === 0) return { ...obj, [head]: value };
+  return { ...obj, [head]: setIn(obj?.[head] ?? {}, rest, value) };
+}
+
+/**
+ * These two components MUST live at module scope. They used to be declared
+ * inside DataManagementView, so every keystroke created a brand-new component
+ * type, React unmounted and remounted every input, and the focused field lost
+ * focus after one character (typing "540" kept only "5").
+ */
+const FieldContext = React.createContext<{
+  stats: DashboardStats;
+  canEdit: boolean;
+  onChange: (path: string, value: any) => void;
+}>({ stats: undefined as unknown as DashboardStats, canEdit: false, onChange: () => {} });
+
+const FieldGroup: React.FC<{ icon: React.ReactNode; title: string; children: React.ReactNode }> = ({ icon, title, children }) => (
+  <div className="bg-surface rounded-2xl border border-hairline shadow-sm overflow-hidden mb-6">
+    <div className="p-4 border-b border-hairline/60 bg-ink/50 flex items-center gap-3">
+      <div className="p-2 bg-surface rounded-lg shadow-sm text-teal">
+        {icon}
+      </div>
+      <h4 className="font-bold text-parchment">{title}</h4>
+    </div>
+    <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {children}
+    </div>
+  </div>
+);
+
+const InputField: React.FC<{
+  label: string;
+  path: string;
+  type?: string;
+  tooltip: string;
+  placeholder?: string;
+}> = ({ label, path, type = 'text', tooltip, placeholder }) => {
+  const { stats, canEdit, onChange } = React.useContext(FieldContext);
+  const value = path.split('.').reduce((obj: any, key) => obj?.[key], stats as any);
+  // A cleared number field is 0, never NaN (parseFloat('') is NaN, which would be
+  // saved to the database and shown as "NaN" on the dashboard).
+  const display = typeof value === 'number' && Number.isNaN(value) ? '' : value ?? '';
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1.5">
+        <label className="text-xs font-bold text-inkmute uppercase tracking-wider">{label}</label>
+        <div className="group relative">
+          <Info size={14} className="text-inkfaint cursor-help hover:text-teal transition-colors" />
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-abyss text-ivory text-[10px] rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl z-50">
+            {tooltip}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-abyss"></div>
+          </div>
+        </div>
+      </div>
+      <input
+        type={type}
+        disabled={!canEdit}
+        value={display}
+        onChange={(e) => {
+          if (type !== 'number') return onChange(path, e.target.value);
+          const parsed = parseFloat(e.target.value);
+          onChange(path, Number.isFinite(parsed) ? parsed : 0);
+        }}
+        placeholder={placeholder}
+        className={`w-full px-4 py-2.5 bg-ink/50 border border-hairline rounded-xl text-sm focus:ring-2 focus:ring-teal/40 focus:bg-surface outline-none transition-all ${!canEdit && 'opacity-60 cursor-not-allowed'}`}
+      />
+    </div>
+  );
+};
+
 interface DataManagementViewProps {
   stats: DashboardStats;
   onUpdate: (newStats: DashboardStats) => void;
@@ -292,67 +366,13 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
 
   const handleChange = (path: string, value: any) => {
     if (!permissions?.canEditMetrics) return;
-    const newStats = { ...stats };
-    const keys = path.split('.');
-    let current: any = newStats;
-    
-    for (let i = 0; i < keys.length - 1; i++) {
-      current = current[keys[i]];
-    }
-    
-    current[keys[keys.length - 1]] = value;
-    onUpdate(newStats);
+    onUpdate(setIn(stats, path.split('.'), value));
   };
 
-  const FieldGroup: React.FC<{ icon: React.ReactNode; title: string; children: React.ReactNode }> = ({ icon, title, children }) => (
-    <div className="bg-surface rounded-2xl border border-hairline shadow-sm overflow-hidden mb-6">
-      <div className="p-4 border-b border-hairline/60 bg-ink/50 flex items-center gap-3">
-        <div className="p-2 bg-surface rounded-lg shadow-sm text-teal">
-          {icon}
-        </div>
-        <h4 className="font-bold text-parchment">{title}</h4>
-      </div>
-      <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {children}
-      </div>
-    </div>
-  );
-
-  const InputField: React.FC<{ 
-    label: string; 
-    path: string; 
-    type?: string; 
-    tooltip: string;
-    placeholder?: string;
-  }> = ({ label, path, type = "text", tooltip, placeholder }) => {
-    // Get value from path
-    const value = path.split('.').reduce((obj, key) => obj?.[key], stats as any);
-
-    return (
-      <div className="space-y-1.5">
-        <div className="flex items-center gap-1.5">
-          <label className="text-xs font-bold text-inkmute uppercase tracking-wider">{label}</label>
-          <div className="group relative">
-            <Info size={14} className="text-inkfaint cursor-help hover:text-teal transition-colors" />
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-abyss text-ivory text-[10px] rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl z-50">
-              {tooltip}
-              <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-abyss"></div>
-            </div>
-          </div>
-        </div>
-        <input 
-          type={type}
-          disabled={!permissions?.canEditMetrics}
-          value={value ?? ""}
-          onChange={(e) => handleChange(path, type === 'number' ? parseFloat(e.target.value) : e.target.value)}
-          placeholder={placeholder}
-          className={`w-full px-4 py-2.5 bg-ink/50 border border-hairline rounded-xl text-sm focus:ring-2 focus:ring-teal/40 focus:bg-surface outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
-        />
-      </div>
-    );
-  };
+  const fieldContext = { stats, canEdit: !!permissions?.canEditMetrics, onChange: handleChange };
 
   return (
+    <FieldContext.Provider value={fieldContext}>
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -809,5 +829,6 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
         </div>
       </div>
     </div>
+    </FieldContext.Provider>
   );
 };
