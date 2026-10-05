@@ -1,134 +1,53 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /{document=**} { allow read, write: if false; }
 
-    // =========================================================================
-    // Nomad Compass — Firestore security rules
-    //
-    // AUTHORITATIVE ROLE MODEL (six roles). This list must stay identical to
-    // `UserRole` in types.ts and to the table in security_spec.md:
-    //
-    //   admin               manage team, grants, metrics, delete, export
-    //   grant_coordinator   grants + export
-    //   impact_analyst      metrics + export
-    //   compliance_officer  export only (read/audit)
-    //   data_entry          metrics only
-    //   viewer              read only
-    //
-    // The older four-role model (admin/editor/viewer/uploader) is RETIRED.
-    //
-    // ISOLATION MODEL: all organization data is nested under
-    // /organizations/{orgId}/…, and every read and write below is gated on
-    // membership of that org. There is no collection-group access, and
-    // /organizations is not listable, so an org can only be reached by a member
-    // who already knows its id.
-    // =========================================================================
-
-    // Default Deny
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // --- Helpers ---
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    // Email-based trust (invitation matching) requires a PROVEN address —
-    // otherwise anyone could sign up as someone else and claim their invitation.
-    function hasVerifiedEmail() {
-      return isSignedIn() && request.auth.token.email_verified == true;
-    }
-
-    function authEmail() {
-      return request.auth.token.email.lower();
-    }
-
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
+    function isSignedIn() { return request.auth != null; }
+    function hasVerifiedEmail() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function authEmail() { return request.auth.token.email.lower(); }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
-
-    function getMember(orgId) {
-      return get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data;
-    }
-
-    function isOrgMember(orgId) {
-      return isSignedIn() && exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
-    }
-
-    function hasRole(orgId, roles) {
-      return isOrgMember(orgId) && getMember(orgId).role in roles;
-    }
-
-    // The invitation that would let this user join `orgId`, if any.
-    function inviteRef() {
-      return /databases/$(database)/documents/invitations/$(authEmail());
-    }
-
+    function getMember(orgId) { return get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data; }
+    function isOrgMember(orgId) { return isSignedIn() && exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)); }
+    function hasRole(orgId, roles) { return isOrgMember(orgId) && getMember(orgId).role in roles; }
+    function inviteRef() { return /databases/$(database)/documents/invitations/$(authEmail()); }
     function hasPendingInvite(orgId) {
-      return hasVerifiedEmail() &&
-             exists(inviteRef()) &&
-             get(inviteRef()).data.orgId == orgId &&
-             get(inviteRef()).data.status == 'pending';
+      return hasVerifiedEmail() && exists(inviteRef()) && get(inviteRef()).data.orgId == orgId && get(inviteRef()).data.status == 'pending';
     }
 
-    // The org's real seat limit, driven by its plan. Orgs created before
-    // this billing model shipped have no billing doc yet — grandfathered in
-    // at 8 (the old flat default) rather than failing closed, until they're
-    // upgraded (which seeds the doc) or manually backfilled.
+    // null is the explicit unlimited-seat entitlement used by Compass Growth.
     function orgSeatLimit(orgId) {
       return exists(/databases/$(database)/documents/organizations/$(orgId)/billing/subscription)
         ? get(/databases/$(database)/documents/organizations/$(orgId)/billing/subscription).data.seatLimit
         : 8;
     }
 
-    // --- Entity Validators ---
+    function hasAvailableSeat(orgId, memberCount) {
+      let limit = orgSeatLimit(orgId);
+      return limit == null || memberCount < limit;
+    }
+
     function isValidOrganization(data) {
       return data.keys().hasAll(['name', 'creatorId', 'createdAt', 'memberCount']) &&
-             data.keys().size() == 4 &&
-             data.name is string && data.name.size() > 0 && data.name.size() < 256 &&
-             (data.memberCount is int || data.memberCount is number) &&
-             // Defensive outer bound only — the largest any plan offers (Pro).
-             // The real per-plan limit is enforced by orgSeatLimit() below.
-             data.memberCount >= 0 && data.memberCount <= 20;
+             data.keys().size() == 4 && data.name is string && data.name.size() > 0 && data.name.size() < 256 &&
+             (data.memberCount is int || data.memberCount is number) && data.memberCount >= 0;
     }
 
-    // The client-seeded trial doc has exactly these 4 keys; the Stripe
-    // fields only ever get added later by the trusted server (which
-    // bypasses these rules), so client-side create never includes them.
     function isValidBilling(data) {
       return data.keys().hasAll(['plan', 'status', 'seatLimit', 'updatedAt']) &&
-             data.keys().size() == 4 &&
-             data.plan is string && data.status is string &&
-             (data.seatLimit is int || data.seatLimit is number);
+             data.keys().size() == 4 && data.plan is string && data.status is string &&
+             ((data.seatLimit is int) || data.seatLimit == null);
     }
 
-    function isValidRole(role) {
-      return role in ['admin', 'grant_coordinator', 'impact_analyst', 'compliance_officer', 'data_entry', 'viewer'];
-    }
+    function isValidRole(role) { return role in ['admin', 'grant_coordinator', 'impact_analyst', 'compliance_officer', 'data_entry', 'viewer']; }
 
     function isValidOrgMember(data) {
-      return data.keys().hasAll(['userId', 'email', 'role', 'joinedAt']) &&
-             data.keys().size() == 4 &&
-             data.userId is string &&
-             data.email is string && data.email.size() > 0 &&
-             isValidRole(data.role);
+      return data.keys().hasAll(['userId', 'email', 'role', 'joinedAt']) && data.keys().size() == 4 &&
+             data.userId is string && data.email is string && data.email.size() > 0 && isValidRole(data.role);
     }
 
-    // Validates the whole resulting grant document (Firestore rules evaluate
-    // `request.resource.data` as the full post-write document, so this runs the
-    // same checks whether the write is a `create` or a partial `update`).
-    //
-    // KNOWN GAP: rules has no `list.every(predicate)` — there's no way to walk
-    // `kpis`/`subgrantees` here and validate each entry's own shape (name,
-    // numeric target/current, etc.) without hardcoding a fixed max index or
-    // adding a Cloud Function. That per-element validation is enforced by the
-    // TypeScript types and by validateGrant() in src/lib/grantValidation.ts —
-    // this layer is a backstop against a malformed document shape reaching the
-    // database at all, not a guarantee about every nested value.
     function isValidGrant(data, grantId) {
       return data.name is string && data.name.size() > 0 && data.name.size() < 300 &&
              data.funder is string && data.funder.size() > 0 && data.funder.size() < 300 &&
@@ -136,162 +55,81 @@ service cloud.firestore {
              (!('spentAmount' in data) || (data.spentAmount is number && data.spentAmount >= 0)) &&
              data.startDate is string && data.startDate.matches('^\\d{4}-\\d{2}-\\d{2}$') &&
              data.endDate is string && data.endDate.matches('^\\d{4}-\\d{2}-\\d{2}$') &&
-             data.status in ['active', 'pending', 'completed'] &&
-             data.kpis is list && data.kpis.size() <= 200 &&
-             (!('subgrantees' in data) || (data.subgrantees is list && data.subgrantees.size() <= 200)) &&
-             data.id == grantId;
+             data.status in ['active', 'pending', 'completed'] && data.kpis is list && data.kpis.size() <= 200 &&
+             (!('subgrantees' in data) || (data.subgrantees is list && data.subgrantees.size() <= 200)) && data.id == grantId;
     }
 
     function isValidInvitation(data) {
       return data.keys().hasAll(['email', 'orgId', 'orgName', 'role', 'invitedBy', 'invitedByEmail', 'status', 'createdAt']) &&
-             data.keys().size() == 8 &&
-             data.email is string && data.email.size() > 3 && data.email.size() < 200 &&
-             data.orgId is string && data.orgId.size() > 0 &&
-             data.orgName is string && data.orgName.size() < 256 &&
-             isValidRole(data.role) &&
-             data.invitedBy == request.auth.uid &&
-             data.status == 'pending';
+             data.keys().size() == 8 && data.email is string && data.email.size() > 3 && data.email.size() < 200 &&
+             data.orgId is string && data.orgId.size() > 0 && data.orgName is string && data.orgName.size() < 256 &&
+             isValidRole(data.role) && data.invitedBy == request.auth.uid && data.status == 'pending';
     }
 
-    // --- Matches ---
-
     match /organizations/{orgId} {
-      // `get` only — never `list`. Orgs are not enumerable.
-      // An invitee must be able to read the org they were invited to: the join
-      // transaction reads memberCount before claiming a seat, and the name is
-      // shown on the join screen. Scoped to the single org named in their invitation.
       allow get: if isOrgMember(orgId) || hasPendingInvite(orgId);
-
-      allow create: if isSignedIn() &&
-                       isValidOrganization(incoming()) &&
-                       incoming().creatorId == request.auth.uid &&
-                       isValidId(orgId);
-
+      allow create: if isSignedIn() && isValidOrganization(incoming()) && incoming().creatorId == request.auth.uid && isValidId(orgId);
       allow update: if
-        // Admins may edit the org, but never reassign its creator.
-        (hasRole(orgId, ['admin']) &&
-         isValidOrganization(incoming()) &&
-         incoming().creatorId == existing().creatorId)
+        (hasRole(orgId, ['admin']) && isValidOrganization(incoming()) && incoming().creatorId == existing().creatorId)
         ||
-        // An invited user claiming their seat may increment memberCount by
-        // exactly one, and touch nothing else. This is what lets a join
-        // complete atomically without granting the invitee org-edit rights.
-        (hasPendingInvite(orgId) &&
-         incoming().diff(existing()).affectedKeys().hasOnly(['memberCount']) &&
-         incoming().memberCount == existing().memberCount + 1 &&
-         incoming().memberCount <= orgSeatLimit(orgId));
+        (hasPendingInvite(orgId) && incoming().diff(existing()).affectedKeys().hasOnly(['memberCount']) &&
+         incoming().memberCount == existing().memberCount + 1 && hasAvailableSeat(orgId, incoming().memberCount));
 
-      // Members are keyed by auth uid — the same key the app reads to resolve a
-      // role. Nothing else may create a membership document.
       match /members/{userId} {
         allow read: if isOrgMember(orgId);
-
-        allow create: if isValidOrgMember(incoming()) &&
-          incoming().userId == userId &&
-          getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.memberCount <= orgSeatLimit(orgId) &&
+        allow create: if isValidOrgMember(incoming()) && incoming().userId == userId &&
+          hasAvailableSeat(orgId, getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.memberCount) &&
           (
-            // 1. The org creator seeding themselves as the first admin.
-            (isSignedIn() && userId == request.auth.uid &&
-             getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.creatorId == request.auth.uid)
+            (isSignedIn() && userId == request.auth.uid && getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.creatorId == request.auth.uid)
             ||
-            // 2. An invitee claiming their own seat, at exactly the role they
-            //    were invited to. They cannot invent a role for themselves.
-            (userId == request.auth.uid &&
-             hasPendingInvite(orgId) &&
-             incoming().role == get(inviteRef()).data.role &&
-             incoming().email.lower() == authEmail())
+            (userId == request.auth.uid && hasPendingInvite(orgId) && incoming().role == get(inviteRef()).data.role && incoming().email.lower() == authEmail())
             ||
-            // 3. An existing admin adding someone directly.
             (hasRole(orgId, ['admin']))
           );
-
-        // Role changes are admin-only, and an admin cannot change their own role
-        // (which is what stops the last admin from demoting the org into a
-        // state with no administrator).
-        allow update: if hasRole(orgId, ['admin']) &&
-                         isValidOrgMember(incoming()) &&
-                         incoming().userId == existing().userId &&
-                         userId != request.auth.uid;
-
-        allow delete: if hasRole(orgId, ['admin']) &&
-                         userId != request.auth.uid &&
-                         userId != get(/databases/$(database)/documents/organizations/$(orgId)).data.creatorId;
+        allow update: if hasRole(orgId, ['admin']) && isValidOrgMember(incoming()) && incoming().userId == existing().userId && userId != request.auth.uid;
+        allow delete: if hasRole(orgId, ['admin']) && userId != request.auth.uid && userId != get(/databases/$(database)/documents/organizations/$(orgId)).data.creatorId;
       }
 
-      // Subscription plan and seat limit. Any member can read their org's
-      // plan; only the org creator may seed the initial trial doc (in the
-      // same transaction that creates the org — see AuthContext.createOrg).
-      // Every change after that comes from the trusted server (Stripe
-      // webhook via firebase-admin, which bypasses these rules entirely) —
-      // there is no client path to grant yourself a bigger plan.
       match /billing/{docId} {
         allow get: if isOrgMember(orgId);
         allow list: if false;
-        allow create: if docId == 'subscription' &&
-                         isSignedIn() &&
+        allow create: if docId == 'subscription' && isSignedIn() &&
                          getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.creatorId == request.auth.uid &&
-                         isValidBilling(incoming()) &&
-                         incoming().plan == 'trial' &&
-                         incoming().seatLimit == 8;
+                         isValidBilling(incoming()) && incoming().plan == 'trial' && incoming().seatLimit == 8;
         allow update, delete: if false;
       }
 
-      // Grants: read by any member, written by admin + grant_coordinator.
       match /grants/{grantId} {
         allow get, list: if isOrgMember(orgId);
         allow create, update: if hasRole(orgId, ['admin', 'grant_coordinator']) && isValidGrant(incoming(), grantId);
-        // Matches ROLE_PERMISSIONS.canDeleteGrants — admin only.
         allow delete: if hasRole(orgId, ['admin']);
       }
 
-      // Metrics: the dashboard document lives at metrics/dashboard.
-      // Written by the roles whose UI permission is canEditMetrics.
       match /metrics/{metricId} {
         allow get, list: if isOrgMember(orgId);
         allow write: if hasRole(orgId, ['admin', 'impact_analyst', 'data_entry']);
       }
     }
 
-    // A user profile is private to that user. (Previously any signed-in user
-    // could read every profile, which exposed emails and org membership.)
     match /users/{userId} {
       allow read, write: if isSignedIn() && userId == request.auth.uid;
     }
 
-    // Invitations. Document id is the invitee's lowercased email, which is what
-    // makes "is this invitation mine?" a cheap, spoof-proof id comparison.
     match /invitations/{inviteEmail} {
-      // The invitee reads their own; org admins read/list their org's.
-      allow get: if isSignedIn() &&
-                    (inviteEmail == authEmail() || hasRole(resource.data.orgId, ['admin']));
+      allow get: if isSignedIn() && (inviteEmail == authEmail() || hasRole(resource.data.orgId, ['admin']));
       allow list: if isSignedIn() && hasRole(resource.data.orgId, ['admin']);
-
-      // Only an admin of the target org may invite, the id must match the
-      // email in the payload, and the org must have a seat free.
-      allow create: if isValidInvitation(incoming()) &&
-                       inviteEmail == incoming().email &&
-                       hasRole(incoming().orgId, ['admin']) &&
-                       get(/databases/$(database)/documents/organizations/$(incoming().orgId)).data.memberCount < orgSeatLimit(incoming().orgId);
-
-      // Invitations are immutable: revoke and re-issue rather than edit.
+      allow create: if isValidInvitation(incoming()) && inviteEmail == incoming().email && hasRole(incoming().orgId, ['admin']) &&
+                       hasAvailableSeat(incoming().orgId, get(/databases/$(database)/documents/organizations/$(incoming().orgId)).data.memberCount);
       allow update: if false;
-
-      // Deleted when revoked by an admin, or consumed by the invitee on accept.
-      allow delete: if isSignedIn() &&
-                       (inviteEmail == authEmail() || hasRole(resource.data.orgId, ['admin']));
+      allow delete: if isSignedIn() && (inviteEmail == authEmail() || hasRole(resource.data.orgId, ['admin']));
     }
 
-    // Public free-trial signups. Anyone may submit a request (create only);
-    // no one can read/edit/delete them via the app — the owner reads them in
-    // the Firebase console. Fields are size-bounded to limit abuse.
     match /trial_signups/{signupId} {
-      allow create: if
-        incoming().keys().hasOnly(['name', 'email', 'org', 'useCase', 'status', 'createdAt']) &&
+      allow create: if incoming().keys().hasOnly(['name', 'email', 'org', 'useCase', 'status', 'createdAt']) &&
         incoming().name is string && incoming().name.size() > 0 && incoming().name.size() < 120 &&
         incoming().email is string && incoming().email.size() > 3 && incoming().email.size() < 200 &&
         incoming().org is string && incoming().org.size() > 0 && incoming().org.size() < 200 &&
-        incoming().useCase is string && incoming().useCase.size() < 2000 &&
-        incoming().status == 'pending' &&
+        incoming().useCase is string && incoming().useCase.size() < 2000 && incoming().status == 'pending' &&
         incoming().createdAt == request.time;
       allow read, update, delete: if false;
     }
