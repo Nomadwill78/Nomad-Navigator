@@ -10,6 +10,7 @@ import {
 import { resolveKpiStatus, summarizeKpis } from 'src/lib/kpi';
 import { summarizeVolunteerHours } from 'src/lib/volunteer';
 import { weightedAskAmount } from 'src/lib/cultivation';
+import { roundTo } from 'src/lib/money';
 
 import {
   DONATION_SELECTION,
@@ -372,3 +373,25 @@ export const recomputePlanRollup = async (deps: RollupDeps, planId: string): Pro
 
 export const daysSince = (date: string | null, asOf: string): number | null =>
   date ? daysBetween(date, asOf) : null;
+
+// Cost per person is total cost divided by people served. When nobody was served
+// it stays empty rather than showing an infinite or meaningless number.
+export const recomputeProgramMetric = async (deps: RollupDeps, metricId: string): Promise<boolean> => {
+  const metric = await fetchOne(deps.client, COLLECTION.programMetric, metricId, {
+    peopleServed: true,
+    totalCost: MONEY,
+    costPerPerson: MONEY,
+  });
+  if (!metric) return false;
+
+  const served = numberOf(metric.peopleServed);
+  const cost = unitsOf(metric.totalCost);
+  const perPerson = served !== null && served > 0 && cost !== null ? roundTo(cost / served, 2) : null;
+
+  return updateIfChanged(
+    deps.client,
+    COLLECTION.programMetric,
+    { id: metric.id, costPerPerson: money(unitsOf(metric.costPerPerson), deps.currency) },
+    { costPerPerson: money(perPerson, deps.currency) },
+  );
+};

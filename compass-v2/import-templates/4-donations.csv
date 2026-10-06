@@ -1,0 +1,2 @@
+Donation,Donor,Organization donor,Amount,Gift date,Status,Gift type,Payment method,Designation,Anonymous gift,Reference number
+,example.donor@example.invalid,,250,2025-11-15,Received,One-time gift,Check,,false,CHK-1001

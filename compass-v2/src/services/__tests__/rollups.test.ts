@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  recomputeProgramMetric,
   recomputeCampaignRollup,
   recomputeCompanyRollup,
   recomputeDonorRollup,
@@ -306,5 +307,39 @@ describe('recomputePlanRollup', () => {
 
     expect(fake.row('cultivationPlans', 'a')!.weightedAmount).toEqual({ amountMicros: 5_000_000_000, currencyCode: 'USD' });
     expect(fake.row('cultivationPlans', 'b')!.weightedAmount).toBeNull();
+  });
+});
+
+describe('recomputeProgramMetric', () => {
+  const metric = (overrides: Record<string, unknown>) =>
+    createFakeClient({ programMetrics: [{ id: 'm1', name: 'Tutoring', ...overrides }] });
+
+  it('divides cost by people served', async () => {
+    const fake = metric({ peopleServed: 120, totalCost: eur(14000) });
+
+    await recomputeProgramMetric(deps(fake.client), 'm1');
+
+    expect(fake.row('programMetrics', 'm1')!.costPerPerson).toEqual({ amountMicros: 116_670_000, currencyCode: 'USD' });
+  });
+
+  it('leaves it empty when nobody was served, instead of dividing by zero', async () => {
+    for (const peopleServed of [0, null]) {
+      const fake = metric({ peopleServed, totalCost: eur(500), costPerPerson: eur(9) });
+
+      await recomputeProgramMetric(deps(fake.client), 'm1');
+
+      expect(fake.row('programMetrics', 'm1')!.costPerPerson).toBeNull();
+    }
+  });
+
+  it('leaves it empty when the cost is unknown, and is quiet when nothing changed', async () => {
+    const unknown = metric({ peopleServed: 10, totalCost: null });
+
+    await recomputeProgramMetric(deps(unknown.client), 'm1');
+    expect(unknown.row('programMetrics', 'm1')!.costPerPerson ?? null).toBeNull();
+
+    const settled = metric({ peopleServed: 10, totalCost: eur(100), costPerPerson: eur(10) });
+    await recomputeProgramMetric(deps(settled.client), 'm1');
+    expect(settled.writes).toEqual([]);
   });
 });

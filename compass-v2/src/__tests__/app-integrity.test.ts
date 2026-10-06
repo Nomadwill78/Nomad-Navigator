@@ -71,7 +71,7 @@ describe('every definition', () => {
       agents: agents.length, skills: skills.length, roles: roles.length,
     }).toEqual({
       objects: 8, views: 14, navigation: 26, pageLayouts: 1,
-      commands: 4, frontComponents: 4, logicFunctions: 13,
+      commands: 4, frontComponents: 4, logicFunctions: 15,
       agents: 2, skills: 5, roles: 6,
     });
   });

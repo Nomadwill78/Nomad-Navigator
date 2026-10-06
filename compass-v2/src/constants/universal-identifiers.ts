@@ -123,6 +123,7 @@ export const LOGIC_FUNCTION_ID = {
   onKpiChanged: stableUuid('logic-function:on-kpi-changed'),
   onGrantChanged: stableUuid('logic-function:on-grant-changed'),
   onPlanChanged: stableUuid('logic-function:on-plan-changed'),
+  onProgramMetricChanged: stableUuid('logic-function:on-program-metric-changed'),
   nightlySweep: stableUuid('logic-function:nightly-sweep'),
   weeklyAiInsights: stableUuid('logic-function:weekly-ai-insights'),
   generateDonorInsight: stableUuid('logic-function:generate-donor-insight'),
@@ -130,6 +131,7 @@ export const LOGIC_FUNCTION_ID = {
   recordDonation: stableUuid('logic-function:record-donation'),
   addSampleData: stableUuid('logic-function:add-sample-data'),
   removeSampleData: stableUuid('logic-function:remove-sample-data'),
+  importFromV1: stableUuid('logic-function:import-from-v1'),
   healthCheck: stableUuid('logic-function:health-check'),
 } as const;
 

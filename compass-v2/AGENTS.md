@@ -1,3 +1,5 @@
+> **This project's conventions override the generic notes below.** IDs are made with `stableUuid` (see `CLAUDE.md`), not random UUIDs from `yarn twenty dev:add`. Read `CLAUDE.md` first.
+
 ## Base documentation
 
 - Getting started:
