@@ -5,7 +5,16 @@ import {
   type TaskPlan,
 } from 'src/lib/stewardship';
 import { dateOnly, DONATION_SELECTION, fullName } from 'src/services/mappers';
-import { recomputeDonorRollup, recomputeGrant, type RollupDeps } from 'src/services/rollups';
+import {
+  recomputeCampaignRollup,
+  recomputeCompanyRollup,
+  recomputeDonorRollup,
+  recomputeGrant,
+  recomputePlanRollup,
+  recomputeProgramMetric,
+  recomputeVolunteerRollup,
+  type RollupDeps,
+} from 'src/services/rollups';
 import { chunk, COLLECTION, fetchAll, type RecordNode } from 'src/services/repo';
 import { createTaskFromPlan, type KeyValueStore } from 'src/services/tasks';
 
@@ -27,6 +36,13 @@ export type SweepSummary = {
   donorsUpdated: number;
   renewalTasksCreated: number;
   grantsChecked: number;
+  // Totals re-derived from scratch, so a change that Twenty never delivered to
+  // an automation (a timeout during a big import, for example) heals itself.
+  campaignsReconciled: number;
+  organizationsReconciled: number;
+  volunteersReconciled: number;
+  plansReconciled: number;
+  programResultsReconciled: number;
   reportTasksCreated: number;
   backgroundCheckTasksCreated: number;
   // True when a table was larger than a single run reads. The next run
@@ -56,6 +72,11 @@ export const runNightlySweep = async (deps: SweepDeps): Promise<SweepSummary> =>
     donorsUpdated: 0,
     renewalTasksCreated: 0,
     grantsChecked: 0,
+    campaignsReconciled: 0,
+    organizationsReconciled: 0,
+    volunteersReconciled: 0,
+    plansReconciled: 0,
+    programResultsReconciled: 0,
     reportTasksCreated: 0,
     backgroundCheckTasksCreated: 0,
     truncated: false,
@@ -161,6 +182,43 @@ export const runNightlySweep = async (deps: SweepDeps): Promise<SweepSummary> =>
   }
 
   summary.reportTasksCreated = await createdCount(deps, reportPlans, MAX_REPORT_TASKS_PER_RUN);
+
+  // ---- reconcile everything else that is calculated
+  const campaigns = await fetchAll(deps.client, COLLECTION.fundraisingCampaign, {});
+  summary.truncated ||= campaigns.truncated;
+  for (const campaign of campaigns.records) {
+    if (await recomputeCampaignRollup(deps, campaign.id)) summary.campaignsReconciled += 1;
+  }
+
+  // Every organization that has given, or has a grant, whatever the grant's status.
+  const allGrants = await fetchAll(deps.client, COLLECTION.grant, { funderId: true });
+  summary.truncated ||= allGrants.truncated;
+  const organizationIds = new Set<string>([
+    ...received.records.map((donation) => donation.organizationDonorId).filter((id): id is string => Boolean(id)),
+    ...allGrants.records.map((grant) => grant.funderId).filter((id): id is string => Boolean(id)),
+  ]);
+  for (const companyId of organizationIds) {
+    if (await recomputeCompanyRollup(deps, companyId)) summary.organizationsReconciled += 1;
+  }
+
+  const hours = await fetchAll(deps.client, COLLECTION.volunteerLog, { volunteerId: true });
+  summary.truncated ||= hours.truncated;
+  const volunteerIds = new Set(hours.records.map((log) => log.volunteerId).filter((id): id is string => Boolean(id)));
+  for (const personId of volunteerIds) {
+    if (await recomputeVolunteerRollup(deps, personId)) summary.volunteersReconciled += 1;
+  }
+
+  const openPlans = await fetchAll(deps.client, COLLECTION.cultivationPlan, {});
+  summary.truncated ||= openPlans.truncated;
+  for (const plan of openPlans.records) {
+    if (await recomputePlanRollup(deps, plan.id)) summary.plansReconciled += 1;
+  }
+
+  const metrics = await fetchAll(deps.client, COLLECTION.programMetric, {});
+  summary.truncated ||= metrics.truncated;
+  for (const metric of metrics.records) {
+    if (await recomputeProgramMetric(deps, metric.id)) summary.programResultsReconciled += 1;
+  }
 
   // ---- volunteers: background checks that are expiring or have expired
   const checks = await fetchAll(

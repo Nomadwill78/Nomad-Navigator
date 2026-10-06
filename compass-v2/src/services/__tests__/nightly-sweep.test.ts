@@ -216,3 +216,50 @@ describe('nightly sweep: volunteers', () => {
     );
   });
 });
+
+describe('nightly sweep: self-healing', () => {
+  const asOf = '2026-10-06';
+
+  it('repairs totals that were never updated because a change event was lost', async () => {
+    const fake = createFakeClient({
+      people: [
+        { id: 'vol', name: { firstName: 'Sam', lastName: 'Rivera' }, contactTypes: [], volunteerHours: null },
+      ],
+      companies: [{ id: 'org', name: 'Acme Co', totalGiven: null }],
+      fundraisingCampaigns: [{ id: 'camp', goalAmount: eur(1000), raisedAmount: null }],
+      donations: [
+        { id: 'd1', name: 'x', status: 'RECEIVED', giftType: 'ONE_TIME', amount: eur(400), giftDate: '2026-08-01', donorId: null, organizationDonorId: 'org', campaignId: 'camp', grantId: null },
+      ],
+      volunteerLogs: [{ id: 'v1', volunteerId: 'vol', hours: 6, activityDate: '2026-09-01', status: 'APPROVED' }],
+      cultivationPlans: [{ id: 'plan', stage: 'CULTIVATION', askAmount: eur(8000), weightedAmount: null }],
+      programMetrics: [{ id: 'pm', name: 'Tutoring', peopleServed: 50, totalCost: eur(1000), costPerPerson: null }],
+      grants: [],
+    });
+
+    const summary = await runNightlySweep(sweepDeps(fake.client, asOf));
+
+    expect(fake.row('fundraisingCampaigns', 'camp')).toMatchObject({ raisedAmount: { amountMicros: 400_000_000 }, percentOfGoal: 40 });
+    expect(fake.row('companies', 'org')!.totalGiven).toMatchObject({ amountMicros: 400_000_000 });
+    expect(fake.row('people', 'vol')).toMatchObject({ volunteerHours: 6, volunteerStatus: 'ACTIVE' });
+    expect(fake.row('cultivationPlans', 'plan')!.weightedAmount).toMatchObject({ amountMicros: 2_000_000_000 });
+    expect(fake.row('programMetrics', 'pm')!.costPerPerson).toMatchObject({ amountMicros: 20_000_000 });
+    expect(summary).toMatchObject({
+      campaignsReconciled: 1, organizationsReconciled: 1, volunteersReconciled: 1, plansReconciled: 1, programResultsReconciled: 1,
+    });
+  });
+
+  it('is quiet once everything is already correct', async () => {
+    const fake = createFakeClient({
+      people: [], companies: [], grants: [],
+      fundraisingCampaigns: [{ id: 'camp', goalAmount: eur(1000) }],
+      donations: [{ id: 'd1', name: 'x', status: 'RECEIVED', giftType: 'ONE_TIME', amount: eur(400), giftDate: '2026-08-01', donorId: null, organizationDonorId: null, campaignId: 'camp', grantId: null }],
+    });
+
+    await runNightlySweep(sweepDeps(fake.client, asOf));
+    fake.clearWrites();
+    const second = await runNightlySweep(sweepDeps(fake.client, asOf));
+
+    expect(fake.writes).toEqual([]);
+    expect(second.campaignsReconciled).toBe(0);
+  });
+});

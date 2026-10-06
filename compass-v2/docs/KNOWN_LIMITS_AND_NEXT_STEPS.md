@@ -5,7 +5,7 @@ Honest accounting of what is proven, what is not, and what comes next.
 ## What is proven
 
 - **The app builds and validates.** `yarn twenty dev:build` produces a complete Twenty app: 8 new record types and 132 fields in all (including the links between records and the fields added to People and Companies), 15 background automations and tools, 14 saved views, a home dashboard, 4 team roles plus 2 system roles, 2 AI agents and 5 assistant skills.
-- **The rules are tested.** 359 automated tests check the calculations (KPI status, giving status, pace, reminders, rounding, dates), the automations running against a stand-in for Twenty, the AI guardrails, the importer, and the whole app's internal consistency: every view points at fields that exist on its object, every filter is one Twenty allows for that field type, every relation has two matching sides, every sidebar link leads somewhere, and the AI roles can read nothing.
+- **The rules are tested.** 361 automated tests check the calculations (KPI status, giving status, pace, reminders, rounding, dates), the automations running against a stand-in for Twenty, the AI guardrails, the importer, and the whole app's internal consistency: every view points at fields that exist on its object, every filter is one Twenty allows for that field type, every relation has two matching sides, every sidebar link leads somewhere, and the AI roles can read nothing.
 - **The import tool runs.** It was executed for real under Node 24 against a local server.
 - **Mistakes are caught.** Several tests were checked by deliberately breaking something and confirming the test failed.
 
@@ -24,7 +24,7 @@ The live tests in `src/__tests__/compass.integration-test.ts` were written to ch
 
 ## Limits to know about
 
-- **Calculated fields are locked on screen, not in the database.** Someone with API access could change one. Nightly recalculation repairs donor giving figures and active-grant figures; other totals correct themselves the next time a related record changes.
+- **Calculated fields are locked on screen, not in the database.** Someone with API access could change one. Every night Compass re-derives all of them (donor totals and status, campaign and funder totals, volunteer hours, grant figures, forecasts, cost per person) from the underlying records, so a wrong or stale total repairs itself within a day. The same pass repairs any change Twenty failed to deliver to an automation, for example during a very large import.
 - **Totals are in one currency.** Gifts in another currency are recorded but not added in. Each donor's count of skipped gifts is not yet shown on screen.
 - **One person, one email.** There is no household or family grouping yet.
 - **Large databases.** A single nightly run reads up to 20,000 donations. Beyond that it still works on what it read but a larger batch size is needed.

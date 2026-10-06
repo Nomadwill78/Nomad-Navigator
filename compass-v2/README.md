@@ -4,7 +4,7 @@ Grants, impact, donors, volunteers and donor cultivation in one place, with AI i
 
 Version 1 tracked grants and their results. Version 2 keeps all of that and adds the people side of a nonprofit: donors, gifts, volunteers, and the relationships that lead to gifts.
 
-> **Status: early preview (alpha).** Everything here is built and has passed 359 automated checks, but it has **not yet been installed on a live Twenty server**, because the environment it was built in could not run one. The first real install is the real test. See [Known limits and next steps](docs/KNOWN_LIMITS_AND_NEXT_STEPS.md) for exactly what is and is not proven.
+> **Status: early preview (alpha).** Everything here is built and has passed 361 automated checks, but it has **not yet been installed on a live Twenty server**, because the environment it was built in could not run one. The first real install is the real test. See [Known limits and next steps](docs/KNOWN_LIMITS_AND_NEXT_STEPS.md) for exactly what is and is not proven.
 
 ## What it is
 
@@ -85,7 +85,7 @@ Nonprofits sell trust. These are rules the code enforces, not just wishes in a p
 yarn install
 yarn typecheck      # type check
 yarn lint
-yarn test:unit      # 359 tests, no server needed
+yarn test:unit      # 361 tests, no server needed
 yarn twenty dev:build   # builds and validates the whole app offline
 ```
 

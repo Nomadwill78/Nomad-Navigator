@@ -167,7 +167,7 @@ When you later change the app, raise the `version` number in `package.json` and 
 
 ## Running the live tests (for the person who maintains this)
 
-The 359 automated tests that run without a server (`yarn test:unit`) check the rules. The live tests check that a *real* Twenty accepts what Compass sends it. Run them against a throwaway local Twenty:
+The 361 automated tests that run without a server (`yarn test:unit`) check the rules. The live tests check that a *real* Twenty accepts what Compass sends it. Run them against a throwaway local Twenty:
 
 ```bash
 yarn twenty docker:start
@@ -184,5 +184,5 @@ They install Compass, add a person and a gift, add a grant and a KPI, and check 
 - **`corepack` is not found:** reinstall Node.js 24.5 or newer from nodejs.org.
 - **Docker errors:** open Docker Desktop and wait until it says it is running.
 - **A button says the AI could not be reached:** the AI is not connected or has no credits. See *Turn on the AI* above.
-- **A total looks wrong:** do not edit it. Fix the gift, KPI or hours it comes from. It corrects itself within a minute. If it does not, you can run the nightly repair job by hand, which recalculates every donor's giving status and every active grant's figures: `yarn twenty dev:function:exec -n nightly-sweep --remote production`.
+- **A total looks wrong:** do not edit it. Fix the gift, KPI or hours it comes from. It corrects itself within a minute. If it does not, you can run the nightly repair job by hand, which re-derives every total from your records: `yarn twenty dev:function:exec -n nightly-sweep --remote production`.
 - **Anything else:** Twenty's troubleshooting page is <https://docs.twenty.com/developers/extend/apps/getting-started/troubleshooting>. Or ask for help with the exact message you saw.
