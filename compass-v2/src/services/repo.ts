@@ -114,6 +114,16 @@ export const updateRecord = async (
   });
 };
 
+// Moves a record to Twenty's trash, where it can still be restored. Nothing in
+// Compass permanently destroys data.
+export const softDeleteRecord = async (
+  client: GraphqlClient,
+  collection: Collection,
+  id: string,
+): Promise<void> => {
+  await client.mutation({ [`delete${collection.mutationName}`]: { __args: { id }, id: true } });
+};
+
 // Records are only written when something actually changed. Every write wakes
 // Twenty's event system and other automations, so skipping no-ops keeps nightly
 // recalculation quiet.

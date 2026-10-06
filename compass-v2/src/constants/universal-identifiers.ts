@@ -116,3 +116,89 @@ export const WORKSPACE_MEMBER_FIELD = fieldIds('workspaceMember', [
 ] as const);
 
 export const id = (seed: string): string => stableUuid(seed);
+
+export const LOGIC_FUNCTION_ID = {
+  onDonationChanged: stableUuid('logic-function:on-donation-changed'),
+  onVolunteerLogChanged: stableUuid('logic-function:on-volunteer-log-changed'),
+  onKpiChanged: stableUuid('logic-function:on-kpi-changed'),
+  onGrantChanged: stableUuid('logic-function:on-grant-changed'),
+  onPlanChanged: stableUuid('logic-function:on-plan-changed'),
+  nightlySweep: stableUuid('logic-function:nightly-sweep'),
+  weeklyAiInsights: stableUuid('logic-function:weekly-ai-insights'),
+  generateDonorInsight: stableUuid('logic-function:generate-donor-insight'),
+  generateGrantReport: stableUuid('logic-function:generate-grant-report'),
+  recordDonation: stableUuid('logic-function:record-donation'),
+  addSampleData: stableUuid('logic-function:add-sample-data'),
+  removeSampleData: stableUuid('logic-function:remove-sample-data'),
+  healthCheck: stableUuid('logic-function:health-check'),
+} as const;
+
+export const AGENT_ID = {
+  donorInsights: stableUuid('agent:donor-insights-analyst'),
+  grantReportWriter: stableUuid('agent:grant-report-writer'),
+} as const;
+
+export const ROLE_ID = {
+  aiNoData: stableUuid('role:ai-no-data'),
+  fundraiser: stableUuid('role:fundraiser'),
+  grantsManager: stableUuid('role:grants-manager'),
+  volunteerCoordinator: stableUuid('role:volunteer-coordinator'),
+  boardViewer: stableUuid('role:board-viewer'),
+} as const;
+
+export const SETTING_ID = {
+  majorGiftThreshold: stableUuid('setting:major-gift-threshold'),
+  reportingCurrency: stableUuid('setting:reporting-currency'),
+  aiIncludeFreeText: stableUuid('setting:ai-include-free-text'),
+  aiWeeklyInsightsEnabled: stableUuid('setting:ai-weekly-insights-enabled'),
+  aiWeeklyInsightLimit: stableUuid('setting:ai-weekly-insight-limit'),
+} as const;
+
+export const SKILL_ID = {
+  howCompassWorks: stableUuid('skill:how-compass-works'),
+  donorCultivation: stableUuid('skill:donor-cultivation'),
+  donorStewardship: stableUuid('skill:donor-stewardship'),
+  grantReporting: stableUuid('skill:grant-reporting'),
+  aiGuardrails: stableUuid('skill:ai-guardrails'),
+} as const;
+
+export const VIEW_ID = {
+  donors: stableUuid('view:donors'),
+  donorsToReach: stableUuid('view:donors-to-reach'),
+  prospects: stableUuid('view:prospects'),
+  aiInsights: stableUuid('view:ai-donor-insights'),
+  giftsToThank: stableUuid('view:gifts-to-thank'),
+  cultivationPipeline: stableUuid('view:cultivation-pipeline'),
+  overdueSteps: stableUuid('view:overdue-next-steps'),
+  activeCampaigns: stableUuid('view:active-campaigns'),
+  grantPipeline: stableUuid('view:grant-pipeline'),
+  activeGrants: stableUuid('view:active-grants'),
+  grantsNeedingAttention: stableUuid('view:grants-needing-attention'),
+  kpisBehind: stableUuid('view:kpis-behind'),
+  volunteers: stableUuid('view:volunteers'),
+  hoursAwaitingApproval: stableUuid('view:hours-awaiting-approval'),
+} as const;
+
+export const FOLDER_ID = {
+  fundraising: stableUuid('folder:fundraising'),
+  grants: stableUuid('folder:grants'),
+  volunteers: stableUuid('folder:volunteers'),
+} as const;
+
+export const PAGE_LAYOUT_ID = {
+  home: stableUuid('page-layout:home'),
+} as const;
+
+export const FRONT_COMPONENT_ID = {
+  donorInsight: stableUuid('front-component:donor-insight'),
+  grantReport: stableUuid('front-component:grant-report'),
+  addSampleData: stableUuid('front-component:add-sample-data'),
+  removeSampleData: stableUuid('front-component:remove-sample-data'),
+} as const;
+
+export const COMMAND_ID = {
+  donorInsight: stableUuid('command:donor-insight'),
+  grantReport: stableUuid('command:grant-report'),
+  addSampleData: stableUuid('command:add-sample-data'),
+  removeSampleData: stableUuid('command:remove-sample-data'),
+} as const;

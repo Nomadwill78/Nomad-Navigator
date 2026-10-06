@@ -9,11 +9,13 @@ import { COLLECTION, type Collection, type GraphqlClient } from 'src/services/re
 // integration test (run against a real server) is for.
 
 type Row = Record<string, any>;
-export type WriteLogEntry = { operation: 'create' | 'update'; collection: string; id: string; data: Row };
+export type WriteLogEntry = { operation: 'create' | 'update' | 'delete'; collection: string; id: string; data: Row };
 
 const collections: Collection[] = Object.values(COLLECTION);
 const byPlural = new Map<string, Collection>(collections.map((collection) => [collection.plural, collection]));
 const byMutation = new Map<string, Collection>(collections.map((collection) => [collection.mutationName, collection]));
+
+const OPERATORS = new Set(['eq', 'neq', 'in', 'gt', 'gte', 'lt', 'lte', 'is']);
 
 const matches = (row: Row, filter: Row | undefined): boolean => {
   if (!filter) return true;
@@ -24,6 +26,12 @@ const matches = (row: Row, filter: Row | undefined): boolean => {
 
     const value = row[key];
     const rules = condition as Row;
+
+    // A filter on part of a composite field, such as emails.primaryEmail, is a
+    // nested filter on the value rather than a list of operators.
+    if (Object.keys(rules).some((name) => !OPERATORS.has(name))) {
+      return matches((value ?? {}) as Row, rules);
+    }
 
     return Object.entries(rules).every(([operator, expected]) => {
       switch (operator) {
@@ -82,7 +90,13 @@ export const createFakeClient = (initial: Record<string, Row[]> = {}) => {
       const response: Record<string, unknown> = {};
 
       for (const [name, selection] of Object.entries<any>(request)) {
-        const operation = name.startsWith('create') ? 'create' : name.startsWith('update') ? 'update' : null;
+        const operation = name.startsWith('create')
+          ? 'create'
+          : name.startsWith('update')
+            ? 'update'
+            : name.startsWith('delete')
+              ? 'delete'
+              : null;
         const collection = operation ? byMutation.get(name.slice(operation.length)) : undefined;
 
         if (!operation || !collection) throw new Error(`Fake client does not support the mutation "${name}".`);
@@ -96,6 +110,14 @@ export const createFakeClient = (initial: Record<string, Row[]> = {}) => {
           rows.push(row);
           writes.push({ operation, collection: collection.plural, id: row.id, data });
           response[name] = { id: row.id };
+        } else if (operation === 'delete') {
+          // Soft delete: the row leaves every query, as in Twenty.
+          const index = rows.findIndex((candidate) => candidate.id === id);
+          if (index === -1) throw new Error(`Cannot delete ${collection.plural} ${id}: not found.`);
+
+          rows.splice(index, 1);
+          writes.push({ operation, collection: collection.plural, id: id!, data: {} });
+          response[name] = { id };
         } else {
           const row = rows.find((candidate) => candidate.id === id);
           if (!row) throw new Error(`Cannot update ${collection.plural} ${id}: not found.`);
