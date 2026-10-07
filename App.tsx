@@ -880,7 +880,11 @@ const App: React.FC = () => {
               canDelete={!!permissions?.canDeleteGrants}
               onCreate={createProgram}
               onUpdate={updateProgram}
-              onDelete={deleteProgram}
+              onDelete={(programId) => {
+                // Grants must not keep pointing at a program that no longer exists.
+                grants.filter((g) => g.programId === programId).forEach((g) => updateGrant(g.id, { programId: undefined }));
+                deleteProgram(programId);
+              }}
               onOpenGrants={() => navigateTo('grants')}
             />
           ) : activeView === 'analysis' ? (

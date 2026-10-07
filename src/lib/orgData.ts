@@ -1,6 +1,7 @@
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   onSnapshot,
   setDoc,
@@ -128,6 +129,20 @@ export function deepStripUndefined<T>(value: T): T {
   return value;
 }
 
+/**
+ * Turns a partial grant edit into a Firestore update. A top-level field set to `undefined`
+ * means "clear this" (for example, unassigning a program), which Firestore only understands
+ * as an explicit deleteField(). Without this the clear would be silently dropped and the old
+ * value would come back on the next sync.
+ */
+export function buildGrantUpdate(changes: Partial<Grant>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(changes)) {
+    out[key] = value === undefined ? deleteField() : deepStripUndefined(value);
+  }
+  return out;
+}
+
 function stripUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
   const result: Partial<T> = {};
   for (const key of Object.keys(obj) as (keyof T)[]) {
@@ -233,7 +248,7 @@ export async function updateGrant(orgId: string, grantId: string, changes: Parti
   const invalid = validateGrant(changes);
   if (invalid) throw new Error(invalid);
 
-  await updateDoc(grantDoc(orgId, grantId), deepStripUndefined(stripUndefined(changes as Record<string, unknown>)));
+  await updateDoc(grantDoc(orgId, grantId), buildGrantUpdate(changes));
 }
 
 /** Deletes exactly one grant document. Never touches any other grant. */

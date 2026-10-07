@@ -82,3 +82,16 @@ describe('programs writes match canEditGrants; every member can read', () => {
       })
     ));
 });
+
+describe('clearing an optional grant field', () => {
+  it('a grant coordinator can unassign a program with deleteField', async () => {
+    const { updateDoc, deleteField } = await import('firebase/firestore');
+    const ref = doc(dbAs('grant_coordinator'), `organizations/${ORG}/grants/g3`);
+    await assertSucceeds(
+      setDoc(ref, { id: 'g3', name: 'G', funder: 'F', amount: 1000, startDate: '2026-01-01', endDate: '2026-12-31', status: 'active', kpis: [], programId: 'p1', restriction: 'restricted' })
+    );
+    await assertSucceeds(updateDoc(ref, { programId: deleteField(), restriction: deleteField() }));
+    const after = (await getDoc(ref)).data()!;
+    if ('programId' in after || 'restriction' in after) throw new Error('field was not cleared');
+  });
+});
