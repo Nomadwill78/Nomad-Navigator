@@ -23,6 +23,7 @@ import { GrantTermsPanel } from './GrantTermsPanel';
 import { SharedKpiControl } from './SharedKpiControl';
 import { ReportingCalendarPanel } from './ReportingCalendarPanel';
 import { KpiDetailsPanel } from './KpiDetailsPanel';
+import { FunderReportModal } from './FunderReportModal';
 import { linkSharedKpi, unlinkSharedKpi, syncSharedFields, pickSharedFields } from '../src/lib/programs';
 import { useAuth } from '../src/contexts/AuthContext';
 import { exportGrantPortfolioPDF, exportToCSV, exportToJSON } from '../src/lib/exportUtils';
@@ -54,7 +55,8 @@ type HeaderDraft = {
 };
 
 export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, programs = [], onCreateGrant, onUpdateGrant, onDeleteGrant }) => {
-  const { role } = useAuth();
+  const { role, organization } = useAuth();
+  const [reportGrantId, setReportGrantId] = useState<string | null>(null);
   const permissions = role ? ROLE_PERMISSIONS[role] : null;
 
   const [selectedGrantId, setSelectedGrantId] = useState<string | null>(null);
@@ -457,6 +459,13 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, pr
                     </div>
                   </div>
                   <div className="flex gap-2">
+                    <button
+                      onClick={() => setReportGrantId(selectedGrant.id)}
+                      title="Build a funder report PDF for this grant"
+                      className="px-3 py-1.5 text-xs font-bold text-brassbright border border-brass/30 bg-brass/10 rounded-lg hover:bg-brass/15 transition-colors"
+                    >
+                      Funder report
+                    </button>
                     {permissions?.canEditGrants && (
                       <button
                         onClick={() => openHeaderEditor(selectedGrant)}
@@ -951,6 +960,14 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, pr
           )}
         </div>
       </div>
+      {reportGrantId && grants.find((g) => g.id === reportGrantId) && (
+        <FunderReportModal
+          grant={grants.find((g) => g.id === reportGrantId)!}
+          orgName={organization?.name ?? 'Your organization'}
+          programName={programs.find((p) => p.id === grants.find((g) => g.id === reportGrantId)?.programId)?.name}
+          onClose={() => setReportGrantId(null)}
+        />
+      )}
     </div>
   );
 };

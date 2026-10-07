@@ -888,6 +888,7 @@ const App: React.FC = () => {
               grants={grants}
               canEdit={!!permissions?.canEditGrants}
               canDelete={!!permissions?.canDeleteGrants}
+              orgName={organization?.name ?? 'Your organization'}
               onCreate={createProgram}
               onUpdate={updateProgram}
               onDelete={(programId) => {

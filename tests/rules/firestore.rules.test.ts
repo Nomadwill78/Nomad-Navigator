@@ -95,3 +95,18 @@ describe('clearing an optional grant field', () => {
     if ('programId' in after || 'restriction' in after) throw new Error('field was not cleared');
   });
 });
+
+describe('Phase 3 data', () => {
+  it('a grant with reports, KPI details and breakdowns still saves', () =>
+    assertSucceeds(
+      setDoc(doc(dbAs('admin'), `organizations/${ORG}/grants/g4`), {
+        id: 'g4', name: 'G', funder: 'F', amount: 1000, startDate: '2026-01-01', endDate: '2026-12-31', status: 'active',
+        reports: [{ id: 'r', title: 'Q3', dueDate: '2026-10-20', owner: 'Dana' }],
+        kpis: [{ id: 'k', name: 'K', target: 5, current: 2, unit: 'x', baseline: 1, history: [{ id: 'h', date: '2026-03-31', value: 2 }], ageBreakdown: [{ id: 'a', label: '16-24', count: 2 }] }],
+      })
+    ));
+  it('no client can write the reminder log, not even an admin (only the server job can)', () =>
+    assertFails(setDoc(doc(dbAs('admin'), `organizations/${ORG}/reminderLog/x`), { sentAt: 'now' })));
+  it('no client can read the reminder log either', () =>
+    assertFails(getDoc(doc(dbAs('admin'), `organizations/${ORG}/reminderLog/x`))));
+});
