@@ -21,7 +21,9 @@ import {
 import { Grant, GrantKPI, Program, Subgrantee, SubgranteeKPI, ROLE_PERMISSIONS } from '../types';
 import { GrantTermsPanel } from './GrantTermsPanel';
 import { SharedKpiControl } from './SharedKpiControl';
-import { linkSharedKpi, unlinkSharedKpi, syncSharedCurrent } from '../src/lib/programs';
+import { ReportingCalendarPanel } from './ReportingCalendarPanel';
+import { KpiDetailsPanel } from './KpiDetailsPanel';
+import { linkSharedKpi, unlinkSharedKpi, syncSharedFields, pickSharedFields } from '../src/lib/programs';
 import { useAuth } from '../src/contexts/AuthContext';
 import { exportGrantPortfolioPDF, exportToCSV, exportToJSON } from '../src/lib/exportUtils';
 import { resolveKpiStatus, KpiStatus } from '../src/lib/kpiStatus';
@@ -243,8 +245,9 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, pr
     if (!grant) return;
     onUpdateGrant(grantId, { kpis: grant.kpis.map(k => k.id === kpiId ? { ...k, ...updates } : k) });
     // A KPI shared with other funders is one outcome: keep every copy at the same value.
-    if (updates.current !== undefined) {
-      const others = syncSharedCurrent(grants, { grantId, kpiId }, updates.current);
+    const sharedPatch = pickSharedFields(updates as GrantKPI);
+    if (Object.keys(sharedPatch).length > 0) {
+      const others = syncSharedFields(grants, { grantId, kpiId }, sharedPatch);
       Object.entries(others).forEach(([id, changes]) => onUpdateGrant(id, changes));
     }
   };
@@ -613,6 +616,12 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, pr
                   onChange={(changes) => onUpdateGrant(selectedGrant.id, changes)}
                 />
 
+                <ReportingCalendarPanel
+                  grant={selectedGrant}
+                  canEdit={!!permissions?.canEditGrants}
+                  onChange={(changes) => onUpdateGrant(selectedGrant.id, changes)}
+                />
+
                 <div className="flex gap-2 p-1 bg-abyss border border-hairline rounded-xl w-fit">
                    <button
                      onClick={() => setActiveTab('kpis')}
@@ -716,6 +725,11 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, pr
                                  style={{ width: `${progress}%` }}
                                ></div>
                             </div>
+                            <KpiDetailsPanel
+                              kpi={kpi}
+                              canEdit={!!permissions?.canEditGrants}
+                              onChange={(updates) => handleUpdateKPI(selectedGrant.id, kpi.id, updates)}
+                            />
                             <SharedKpiControl
                               grant={selectedGrant}
                               kpi={kpi}

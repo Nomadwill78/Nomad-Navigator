@@ -61,6 +61,8 @@ import { useOrgData } from './src/hooks/useOrgData';
 import { computeGrantTotals, computeFundingDiversity, rollUpKpis } from './src/lib/overview';
 import { filterGrants, availableYears, isFilterActive, NO_FILTER, GrantFilter } from './src/lib/programs';
 import { ProgramsView } from './components/ProgramsView';
+import { DueSoonCard } from './components/DueSoonCard';
+import { aggregateBreakdown } from './src/lib/kpiHistory';
 import { generateImpactReport } from './services/geminiService';
 import { DashboardStats, ProgramMetric, Grant, Opportunity, Program, ROLE_PERMISSIONS } from './types';
 import { Analytics } from '@vercel/analytics/react';
@@ -454,6 +456,14 @@ const App: React.FC = () => {
   // People served is entered for the whole organization, so a per-program or per-year
   // spend divided by it would be a made-up ratio. It is only shown when nothing is filtered.
   const costPerPerson = !filterOn && stats.totalPeopleServed > 0 && totals.totalSpent > 0 ? totals.totalSpent / stats.totalPeopleServed : null;
+  // Who was served: counts entered on KPIs win. Manage Data's whole-organization percents
+  // are only a fallback, and are not shown while a filter is on because they cannot be filtered.
+  const kpiAge = useMemo(() => aggregateBreakdown(filtered, 'age'), [filtered]);
+  const kpiRace = useMemo(() => aggregateBreakdown(filtered, 'ethnicity'), [filtered]);
+  const demoFromKpis = kpiAge.length > 0 || kpiRace.length > 0;
+  const ageSlices = kpiAge.length > 0 ? kpiAge : demoFromKpis || filterOn ? [] : stats.demographics.age;
+  const raceSlices = kpiRace.length > 0 ? kpiRace : demoFromKpis || filterOn ? [] : stats.demographics.race;
+  const ageTotal = kpiAge.reduce((a, r) => a + r.count, 0);
   const urbanShare = stats.geographic.urbanRural.find(u => /urban/i.test(u.name))?.value;
   const hasNoData = !isDemoMode && stats.totalPeopleServed === 0 && (stats.programs || []).length === 0;
 
@@ -1121,8 +1131,17 @@ const App: React.FC = () => {
                       <div>
                         <h3 className="font-display font-semibold text-ivory text-lg flex items-center gap-2">Demographic Reach</h3>
                         <p className="text-sm text-inkmute">Beneficiaries by Age and Ethnicity</p>
+                        <p className="text-[11px] text-inkfaint mt-1">
+                          {demoFromKpis
+                            ? 'Counted from the age and ethnicity entered on your KPIs. Shared KPIs count once.'
+                            : filterOn && ageSlices.length === 0 && raceSlices.length === 0
+                              ? 'No age or ethnicity counts entered on the KPIs of these grants.'
+                              : ageSlices.length === 0 && raceSlices.length === 0
+                                ? 'Enter who was served under a KPI on a grant, or use Manage Data.'
+                                : 'From Manage Data (organization-wide). Enter counts on a KPI to replace this.'}
+                        </p>
                       </div>
-                      <button className="text-inkfaint hover:text-parchment"><Settings size={16} /></button>
+                      
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -1133,7 +1152,7 @@ const App: React.FC = () => {
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Pie 
-                                data={stats.demographics.age} 
+                                data={ageSlices} 
                                 dataKey="value" 
                                 nameKey="name" 
                                 cx="50%" 
@@ -1143,7 +1162,7 @@ const App: React.FC = () => {
                                 paddingAngle={5}
                                 label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                               >
-                                {stats.demographics.age.map((entry, index) => (
+                                {ageSlices.map((entry, index) => (
                                   <Cell key={`cell-${index}`} fill={COLORS.impact[index % COLORS.impact.length]} stroke="none" />
                                 ))}
                               </Pie>
@@ -1156,16 +1175,16 @@ const App: React.FC = () => {
                           
                           {/* Center Text */}
                           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-                              <span className="font-display text-3xl font-semibold text-ivory">{stats.totalPeopleServed.toLocaleString()}</span>
+                              <span className="font-display text-3xl font-semibold text-ivory">{(demoFromKpis ? ageTotal : stats.totalPeopleServed).toLocaleString()}</span>
                               <p className="text-[0.6rem] text-inkfaint font-mono2 uppercase tracking-tighter">Served</p>
                           </div>
                       </div>
 
                       {/* Legend */}
                       <div className="flex justify-center gap-4 flex-wrap">
-                          {stats.demographics.age.map((item, i) => (
+                          {ageSlices.map((item, i) => (
                               <div key={i} className="flex items-center gap-1.5">
-                                  <div className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS.impact[i]}}></div>
+                                  <div className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS.impact[i % COLORS.impact.length]}}></div>
                                   <span className="text-[10px] text-inkmute font-mono2 uppercase tracking-wide">{item.name}</span>
                               </div>
                           ))}
@@ -1179,7 +1198,7 @@ const App: React.FC = () => {
                           <ResponsiveContainer width="100%" height="100%">
                               <BarChart 
                                 layout="vertical" 
-                                data={stats.demographics.race} 
+                                data={raceSlices} 
                                 margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
                               >
                                   <XAxis type="number" hide />
@@ -1196,7 +1215,7 @@ const App: React.FC = () => {
                                     contentStyle={{ background: '#0b1c33', borderRadius: '10px', border: '1px solid #24405f', boxShadow: '0 18px 40px -18px rgba(0, 0, 0, 0.7)' }}
                                   />
                                   <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24}>
-                                      {stats.demographics.race.map((entry, index) => (
+                                      {raceSlices.map((entry, index) => (
                                           <Cell key={`cell-${index}`} fill={COLORS.neutral[index % COLORS.neutral.length]} />
                                       ))}
                                       <LabelList dataKey="value" position="right" style={{ fontSize: 10, fill: '#93a6c2', fontWeight: 700 }} />
@@ -1406,7 +1425,10 @@ const App: React.FC = () => {
 
                 {/* KPI Sidebar Column (Spans 1 column on desktop) */}
                 <div className="lg:col-span-1 lg:sticky lg:top-24">
-                  <KpiSidebar rollup={kpiRollup} />
+                  <div className="space-y-8">
+                    <KpiSidebar rollup={kpiRollup} />
+                    <DueSoonCard grants={filtered} onOpenGrants={() => navigateTo('grants')} />
+                  </div>
                 </div>
 
               </div> {/* Closes outer dashboard grid */}
