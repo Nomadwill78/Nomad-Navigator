@@ -111,3 +111,34 @@ describe('Resend mailer', () => {
     await expect(bad.send({ to: ['a@b.org'], subject: 's', text: 't' })).rejects.toThrow(/403.*domain not verified/);
   });
 });
+
+import { createGmailMailer, createMailer } from '../src/server/reminders';
+describe('Gmail mailer', () => {
+  const fakeTransport = (impl: (msg: any) => Promise<void>) => {
+    const made: any[] = [];
+    const factory = ((opts: any) => { made.push(opts); return { sendMail: impl }; }) as any;
+    return { factory, made };
+  };
+  it('needs the address and an app password', () => {
+    expect(() => createGmailMailer({})).toThrow(/GMAIL_USER/);
+    expect(() => createGmailMailer({ GMAIL_USER: 'me@gmail.com' })).toThrow(/GMAIL_APP_PASSWORD/);
+  });
+  it('connects to Gmail securely, strips spaces from the app password and sends from the Gmail address', async () => {
+    const sent: any[] = [];
+    const { factory, made } = fakeTransport(async (m) => { sent.push(m); });
+    const mailer = createGmailMailer({ GMAIL_USER: 'me@gmail.com', GMAIL_APP_PASSWORD: 'abcd efgh ijkl mnop', REMINDER_FROM_NAME: 'Nomad Compass' }, factory);
+    await mailer.send({ to: ['a@b.org'], subject: 'S', text: 'T' });
+    expect(made[0]).toMatchObject({ host: 'smtp.gmail.com', port: 465, secure: true, auth: { user: 'me@gmail.com', pass: 'abcdefghijklmnop' } });
+    expect(sent[0]).toMatchObject({ from: 'Nomad Compass <me@gmail.com>', to: ['a@b.org'], subject: 'S', text: 'T' });
+  });
+  it('explains a rejected login in plain words', async () => {
+    const { factory } = fakeTransport(async () => { throw new Error('Invalid login: 535-5.7.8 Username and Password not accepted'); });
+    const mailer = createGmailMailer({ GMAIL_USER: 'me@gmail.com', GMAIL_APP_PASSWORD: 'x' }, factory);
+    await expect(mailer.send({ to: ['a@b.org'], subject: 'S', text: 'T' })).rejects.toThrow(/app password, not your normal password/);
+  });
+  it('picks Gmail when set, Resend otherwise, and refuses when neither is set up', () => {
+    expect(() => createMailer({})).toThrow(/No email sender/);
+    expect(() => createMailer({ RESEND_API_KEY: 'k' })).toThrow(/REMINDER_FROM_EMAIL/); // went down the Resend path
+    expect(() => createMailer({ GMAIL_USER: 'me@gmail.com' })).toThrow(/GMAIL_APP_PASSWORD/); // went down the Gmail path
+  });
+});

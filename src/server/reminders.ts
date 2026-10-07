@@ -1,3 +1,4 @@
+import nodemailer from 'nodemailer';
 import { Grant } from '../../types';
 import { buildReminderEmail, planReminders, PlannedReminder } from '../lib/reporting';
 
@@ -107,6 +108,47 @@ export function createResendMailer(env: { RESEND_API_KEY?: string; REMINDER_FROM
       if (!res.ok) throw new Error(`Email provider returned ${res.status}: ${(await res.text()).slice(0, 200)}`);
     },
   };
+}
+
+/**
+ * Sends through a Gmail account using an "app password" (no domain or paid service needed).
+ * Needs GMAIL_USER (the Gmail address) and GMAIL_APP_PASSWORD (16 characters from Google Account > Security > App passwords).
+ * Gmail allows roughly 500 recipients a day, far more than reminders need.
+ */
+export function createGmailMailer(
+  env: { GMAIL_USER?: string; GMAIL_APP_PASSWORD?: string; REMINDER_FROM_NAME?: string },
+  createTransport: typeof nodemailer.createTransport = nodemailer.createTransport.bind(nodemailer)
+): Mailer {
+  const user = env.GMAIL_USER;
+  const pass = env.GMAIL_APP_PASSWORD?.replace(/\s+/g, ''); // Google shows it in groups of four; spaces are not part of it
+  if (!user) throw new Error('GMAIL_USER is required to send reminders with Gmail');
+  if (!pass) throw new Error('GMAIL_APP_PASSWORD is required to send reminders with Gmail');
+  const transport = createTransport({ host: 'smtp.gmail.com', port: 465, secure: true, auth: { user, pass } });
+  const from = env.REMINDER_FROM_NAME ? `${env.REMINDER_FROM_NAME} <${user}>` : user;
+  return {
+    async send({ to, subject, text }) {
+      try {
+        await transport.sendMail({ from, to, subject, text });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new Error(/Invalid login|535|Username and Password not accepted/i.test(msg)
+          ? 'Gmail rejected the login. Check GMAIL_USER and that GMAIL_APP_PASSWORD is an app password, not your normal password.'
+          : `Gmail send failed: ${msg}`);
+      }
+    },
+  };
+}
+
+export type MailerEnv = {
+  GMAIL_USER?: string; GMAIL_APP_PASSWORD?: string; REMINDER_FROM_NAME?: string;
+  RESEND_API_KEY?: string; REMINDER_FROM_EMAIL?: string;
+};
+
+/** Picks Gmail when its settings exist, otherwise Resend. Throws a plain message when neither is set up. */
+export function createMailer(env: MailerEnv): Mailer {
+  if (env.GMAIL_USER || env.GMAIL_APP_PASSWORD) return createGmailMailer(env);
+  if (env.RESEND_API_KEY || env.REMINDER_FROM_EMAIL) return createResendMailer(env);
+  throw new Error('No email sender is set up. Set GMAIL_USER and GMAIL_APP_PASSWORD (see docs/REMINDERS.md).');
 }
 
 /** Firestore (Admin SDK) implementation of the store. */

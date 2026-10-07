@@ -1,7 +1,7 @@
 import express from "express";
 import { timingSafeEqual } from "node:crypto";
 import { getStripe, priceIdForPlan, requireOrgAdmin, isAuthError, getAdmin } from "./stripeAdmin";
-import { runReminders, createResendMailer, createFirestoreReminderStore } from "./reminders";
+import { runReminders, createMailer, createFirestoreReminderStore } from "./reminders";
 
 const respondToAuthError = (error: any, res: express.Response): boolean => {
   if (isAuthError(error)) {
@@ -146,7 +146,7 @@ export function createApiApp(): express.Express {
       const { db } = getAdmin();
       const summary = await runReminders({
         store: createFirestoreReminderStore(db),
-        mailer: dryRun ? { send: async () => {} } : createResendMailer(process.env),
+        mailer: dryRun ? { send: async () => {} } : createMailer(process.env),
         today: new Date().toISOString().slice(0, 10),
         dryRun,
         appUrl: process.env.APP_URL,
