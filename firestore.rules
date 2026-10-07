@@ -59,6 +59,16 @@ service cloud.firestore {
              (!('subgrantees' in data) || (data.subgrantees is list && data.subgrantees.size() <= 200)) && data.id == grantId;
     }
 
+    function isValidProgram(data, programId) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 300 &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 4000)) &&
+             (!('populationServed' in data) || (data.populationServed is string && data.populationServed.size() <= 1000)) &&
+             (!('startDate' in data) || (data.startDate is string && (data.startDate == '' || data.startDate.matches('^\\d{4}-\\d{2}-\\d{2}$')))) &&
+             (!('endDate' in data) || (data.endDate is string && (data.endDate == '' || data.endDate.matches('^\\d{4}-\\d{2}-\\d{2}$')))) &&
+             (!('budgetNeed' in data) || (data.budgetNeed is number && data.budgetNeed >= 0)) &&
+             data.id == programId;
+    }
+
     function isValidInvitation(data) {
       return data.keys().hasAll(['email', 'orgId', 'orgName', 'role', 'invitedBy', 'invitedByEmail', 'status', 'createdAt']) &&
              data.keys().size() == 8 && data.email is string && data.email.size() > 3 && data.email.size() < 200 &&
@@ -102,6 +112,12 @@ service cloud.firestore {
       match /grants/{grantId} {
         allow get, list: if isOrgMember(orgId);
         allow create, update: if hasRole(orgId, ['admin', 'grant_coordinator']) && isValidGrant(incoming(), grantId);
+        allow delete: if hasRole(orgId, ['admin']);
+      }
+
+      match /programs/{programId} {
+        allow get, list: if isOrgMember(orgId);
+        allow create, update: if hasRole(orgId, ['admin', 'grant_coordinator']) && isValidProgram(incoming(), programId);
         allow delete: if hasRole(orgId, ['admin']);
       }
 

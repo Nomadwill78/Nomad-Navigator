@@ -8,8 +8,8 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { DashboardStats, Grant } from '../../types';
-import { validateGrant } from './grantValidation';
+import { DashboardStats, Grant, Program } from '../../types';
+import { validateGrant, validateProgram } from './grantValidation';
 
 /**
  * Organization-scoped data access.
@@ -51,12 +51,15 @@ export const EMPTY_STATS: DashboardStats = {
 
 const grantsCollection = (orgId: string) => collection(db, `organizations/${orgId}/grants`);
 const grantDoc = (orgId: string, grantId: string) => doc(db, `organizations/${orgId}/grants`, grantId);
+const programsCollection = (orgId: string) => collection(db, `organizations/${orgId}/programs`);
+const programDoc = (orgId: string, programId: string) => doc(db, `organizations/${orgId}/programs`, programId);
 const statsDoc = (orgId: string) => doc(db, `organizations/${orgId}/metrics`, 'dashboard');
 
 // --- Offline mirror -------------------------------------------------------
 
 const statsCacheKey = (orgId: string) => `nomad_compass_stats_${orgId}`;
 const grantsCacheKey = (orgId: string) => `nomad_compass_grants_${orgId}`;
+const programsCacheKey = (orgId: string) => `nomad_compass_programs_${orgId}`;
 
 function readCache<T>(key: string, fallback: T): T {
   try {
@@ -76,6 +79,7 @@ function writeCache(key: string, value: unknown) {
 }
 
 export const readCachedStats = (orgId: string) => readCache<DashboardStats>(statsCacheKey(orgId), EMPTY_STATS);
+export const readCachedPrograms = (orgId: string) => readCache<Program[]>(programsCacheKey(orgId), []);
 export const readCachedGrants = (orgId: string) => readCache<Grant[]>(grantsCacheKey(orgId), []);
 
 /**
@@ -100,11 +104,9 @@ function sanitizeGrant(grant: Grant): Grant {
   return {
     ...grant,
     spentAmount: grant.spentAmount ?? 0,
-    subgrantees: (grant.subgrantees ?? []).map((sub) => ({
-      ...sub,
-      kpis: sub.kpis ?? [],
-    })),
-    kpis: grant.kpis ?? [],
+    subgrantees: (grant.subgrantees ?? []).map((sub) => stripUndefined({ ...sub, kpis: sub.kpis ?? [] }) as typeof sub),
+    kpis: (grant.kpis ?? []).map((k) => stripUndefined(k as unknown as Record<string, unknown>) as unknown as typeof k),
+    budgetLines: grant.budgetLines ?? [],
   };
 }
 
@@ -113,6 +115,19 @@ function sanitizeGrant(grant: Grant): Grant {
  * update legitimately has no reason to touch every key — so unlike
  * `sanitizeGrant`, this drops absent keys instead of defaulting them.
  */
+/** Removes `undefined` at every depth, including inside lists, which Firestore also rejects. */
+export function deepStripUndefined<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((v) => deepStripUndefined(v)) as unknown as T;
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (v !== undefined) out[k] = deepStripUndefined(v);
+    }
+    return out as T;
+  }
+  return value;
+}
+
 function stripUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
   const result: Partial<T> = {};
   for (const key of Object.keys(obj) as (keyof T)[]) {
@@ -156,6 +171,22 @@ export function subscribeToGrants(
   );
 }
 
+export function subscribeToPrograms(
+  orgId: string,
+  onData: (programs: Program[]) => void,
+  onError: (error: Error) => void
+): Unsubscribe {
+  return onSnapshot(
+    programsCollection(orgId),
+    (snap) => {
+      const programs = snap.docs.map((d) => ({ ...(d.data() as Program), id: d.id }));
+      writeCache(programsCacheKey(orgId), programs);
+      onData(programs);
+    },
+    (error) => onError(error)
+  );
+}
+
 export function subscribeToStats(
   orgId: string,
   onData: (stats: DashboardStats) => void,
@@ -188,7 +219,7 @@ export async function createGrant(orgId: string, grant: Omit<Grant, 'id'>): Prom
   if (invalid) throw new Error(invalid);
 
   const ref = doc(grantsCollection(orgId));
-  await setDoc(ref, sanitizeGrant({ ...grant, id: ref.id }) as unknown as Record<string, unknown>);
+  await setDoc(ref, deepStripUndefined(sanitizeGrant({ ...grant, id: ref.id })) as unknown as Record<string, unknown>);
   return ref.id;
 }
 
@@ -202,10 +233,30 @@ export async function updateGrant(orgId: string, grantId: string, changes: Parti
   const invalid = validateGrant(changes);
   if (invalid) throw new Error(invalid);
 
-  await updateDoc(grantDoc(orgId, grantId), stripUndefined(changes as Record<string, unknown>));
+  await updateDoc(grantDoc(orgId, grantId), deepStripUndefined(stripUndefined(changes as Record<string, unknown>)));
 }
 
 /** Deletes exactly one grant document. Never touches any other grant. */
 export async function deleteGrant(orgId: string, grantId: string): Promise<void> {
   await deleteDoc(grantDoc(orgId, grantId));
+}
+
+// --- Programs -------------------------------------------------------------
+
+export async function createProgram(orgId: string, program: Omit<Program, 'id'>): Promise<string> {
+  const invalid = validateProgram(program) ?? (program.name?.trim() ? null : 'Program name is required.');
+  if (invalid) throw new Error(invalid);
+  const ref = doc(programsCollection(orgId));
+  await setDoc(ref, stripUndefined({ ...program, id: ref.id }) as Record<string, unknown>);
+  return ref.id;
+}
+
+export async function updateProgram(orgId: string, programId: string, changes: Partial<Omit<Program, 'id'>>): Promise<void> {
+  const invalid = validateProgram(changes);
+  if (invalid) throw new Error(invalid);
+  await updateDoc(programDoc(orgId, programId), stripUndefined(changes as Record<string, unknown>));
+}
+
+export async function deleteProgram(orgId: string, programId: string): Promise<void> {
+  await deleteDoc(programDoc(orgId, programId));
 }

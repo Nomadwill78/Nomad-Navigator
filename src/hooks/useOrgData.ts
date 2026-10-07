@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DashboardStats, Grant } from '../../types';
+import { DashboardStats, Grant, Program } from '../../types';
 import {
   EMPTY_STATS,
   createGrant as createGrantRemote,
   deleteGrant as deleteGrantRemote,
   persistStats,
+  createProgram as createProgramRemote,
+  updateProgram as updateProgramRemote,
+  deleteProgram as deleteProgramRemote,
+  readCachedPrograms,
+  subscribeToPrograms,
   readCachedGrants,
   readCachedStats,
   subscribeToGrants,
@@ -18,6 +23,10 @@ export type SyncStatus = 'loading' | 'live' | 'cached' | 'error' | 'demo';
 interface UseOrgDataResult {
   stats: DashboardStats;
   grants: Grant[];
+  programs: Program[];
+  createProgram: (program: Omit<Program, 'id'>) => Promise<string>;
+  updateProgram: (programId: string, changes: Partial<Omit<Program, 'id'>>) => Promise<void>;
+  deleteProgram: (programId: string) => void;
   setStats: (stats: DashboardStats) => void;
   /** Writes a brand-new grant immediately (not debounced) and returns its id. */
   createGrant: (grant: Omit<Grant, 'id'>) => Promise<string>;
@@ -53,10 +62,12 @@ export function useOrgData(
   orgId: string | null,
   isDemoMode: boolean,
   demoStats: DashboardStats,
-  demoGrants: Grant[]
+  demoGrants: Grant[],
+  demoPrograms: Program[] = []
 ): UseOrgDataResult {
   const [stats, setStatsState] = useState<DashboardStats>(EMPTY_STATS);
   const [grants, setGrantsState] = useState<Grant[]>([]);
+  const [programs, setProgramsState] = useState<Program[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('loading');
   const [syncError, setSyncError] = useState<string | null>(null);
 
@@ -92,6 +103,7 @@ export function useOrgData(
     // Paint the cached copy immediately so an offline reload isn't a blank screen.
     setStatsState(readCachedStats(orgId));
     setGrantsState(readCachedGrants(orgId));
+    setProgramsState(readCachedPrograms(orgId));
     setSyncStatus(navigator.onLine ? 'loading' : 'cached');
 
     const unsubStats = subscribeToStats(
@@ -137,9 +149,20 @@ export function useOrgData(
       }
     );
 
+    const unsubPrograms = subscribeToPrograms(
+      orgId,
+      (next) => setProgramsState(next),
+      (error) => {
+        console.error('Program sync failed:', error);
+        setSyncStatus('error');
+        setSyncError(describeError(error));
+      }
+    );
+
     return () => {
       unsubStats();
       unsubGrants();
+      unsubPrograms();
     };
   }, [orgId, isDemoMode]);
 
@@ -148,12 +171,14 @@ export function useOrgData(
     if (isDemoMode) {
       setStatsState(demoStats);
       setGrantsState(demoGrants);
+      setProgramsState(demoPrograms);
       setSyncStatus('demo');
       return;
     }
     if (orgId) {
       setStatsState(readCachedStats(orgId));
       setGrantsState(readCachedGrants(orgId));
+      setProgramsState(readCachedPrograms(orgId));
       setSyncStatus(navigator.onLine ? 'loading' : 'cached');
     }
     // demoStats/demoGrants are module constants; re-running on identity is unnecessary
@@ -271,6 +296,57 @@ export function useOrgData(
     [orgId, isDemoMode]
   );
 
+  // --- Program writes (immediate, not debounced: programs are edited in a form, not by keystroke) ---
+  const createProgram = useCallback(
+    async (program: Omit<Program, 'id'>): Promise<string> => {
+      if (isDemoMode) {
+        const id = generateId();
+        setProgramsState((cur) => [...cur, { ...program, id }]);
+        return id;
+      }
+      if (!orgId) throw new Error('No active organization.');
+      try {
+        return await createProgramRemote(orgId, program);
+      } catch (error) {
+        setSyncStatus('error');
+        setSyncError(describeError(error));
+        throw error;
+      }
+    },
+    [orgId, isDemoMode]
+  );
+
+  const updateProgram = useCallback(
+    async (programId: string, changes: Partial<Omit<Program, 'id'>>): Promise<void> => {
+      if (isDemoMode) {
+        setProgramsState((cur) => cur.map((p) => (p.id === programId ? { ...p, ...changes } : p)));
+        return;
+      }
+      if (!orgId) throw new Error('No active organization.');
+      try {
+        await updateProgramRemote(orgId, programId, changes);
+      } catch (error) {
+        setSyncStatus('error');
+        setSyncError(describeError(error));
+        throw error;
+      }
+    },
+    [orgId, isDemoMode]
+  );
+
+  const deleteProgram = useCallback(
+    (programId: string) => {
+      setProgramsState((cur) => cur.filter((p) => p.id !== programId));
+      if (isDemoMode || !orgId) return;
+      deleteProgramRemote(orgId, programId).catch((error) => {
+        console.error('Failed to delete program:', error);
+        setSyncStatus('error');
+        setSyncError(describeError(error));
+      });
+    },
+    [orgId, isDemoMode]
+  );
+
   const retrySync = useCallback(() => {
     if (!orgId || isDemoMode) return;
     setSyncError(null);
@@ -289,7 +365,7 @@ export function useOrgData(
     };
   }, []);
 
-  return { stats, grants, setStats, createGrant, updateGrant, deleteGrant, syncStatus, syncError, hasUnsavedChanges, retrySync };
+  return { stats, grants, programs, createProgram, updateProgram, deleteProgram, setStats, createGrant, updateGrant, deleteGrant, syncStatus, syncError, hasUnsavedChanges, retrySync };
 }
 
 function describeError(error: unknown): string {
