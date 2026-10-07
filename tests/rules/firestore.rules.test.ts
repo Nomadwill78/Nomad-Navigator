@@ -46,3 +46,52 @@ describe('grants writes match canEditGrants', () => {
     it(`${r} ${allowed ? 'can' : 'cannot'} write a grant`, () => (allowed ? assertSucceeds(grant(dbAs(r))) : assertFails(grant(dbAs(r)))));
   }
 });
+
+const program = (db: any, over: Record<string, unknown> = {}) =>
+  setDoc(doc(db, `organizations/${ORG}/programs/p1`), {
+    id: 'p1', name: 'Youth Workforce and Family Stability', description: '', populationServed: 'Youth 16-24',
+    startDate: '2026-01-01', endDate: '2026-12-31', ...over,
+  });
+
+describe('programs writes match canEditGrants; every member can read', () => {
+  for (const r of roles) {
+    const allowed = ['admin', 'grant_coordinator'].includes(r);
+    it(`${r} ${allowed ? 'can' : 'cannot'} write a program`, () => (allowed ? assertSucceeds(program(dbAs(r))) : assertFails(program(dbAs(r)))));
+  }
+  it('a viewer can read programs', async () => {
+    await assertSucceeds(program(dbAs('admin')));
+    await assertSucceeds(getDoc(doc(dbAs('viewer'), `organizations/${ORG}/programs/p1`)));
+  });
+  it('a non-member cannot read programs', () => assertFails(getDoc(doc(dbAs('stranger'), `organizations/${ORG}/programs/p1`))));
+  it('rejects an empty name, a bad date and a negative cost', async () => {
+    await assertFails(program(dbAs('admin'), { name: '' }));
+    await assertFails(program(dbAs('admin'), { startDate: '01/01/2026' }));
+    await assertFails(program(dbAs('admin'), { budgetNeed: -5 }));
+  });
+  it('only an admin can delete a program', async () => {
+    const { deleteDoc } = await import('firebase/firestore');
+    await assertSucceeds(program(dbAs('admin')));
+    await assertFails(deleteDoc(doc(dbAs('grant_coordinator'), `organizations/${ORG}/programs/p1`)));
+    await assertSucceeds(deleteDoc(doc(dbAs('admin'), `organizations/${ORG}/programs/p1`)));
+  });
+  it('a grant with the new Phase 2 fields still saves', () =>
+    assertSucceeds(
+      setDoc(doc(dbAs('admin'), `organizations/${ORG}/grants/g2`), {
+        id: 'g2', name: 'G', funder: 'F', amount: 1000, startDate: '2026-01-01', endDate: '2026-12-31', status: 'active', kpis: [],
+        programId: 'p1', restriction: 'restricted', matchRequired: 500, matchSecured: 100, reportFrequency: 'quarterly', budgetLines: [],
+      })
+    ));
+});
+
+describe('clearing an optional grant field', () => {
+  it('a grant coordinator can unassign a program with deleteField', async () => {
+    const { updateDoc, deleteField } = await import('firebase/firestore');
+    const ref = doc(dbAs('grant_coordinator'), `organizations/${ORG}/grants/g3`);
+    await assertSucceeds(
+      setDoc(ref, { id: 'g3', name: 'G', funder: 'F', amount: 1000, startDate: '2026-01-01', endDate: '2026-12-31', status: 'active', kpis: [], programId: 'p1', restriction: 'restricted' })
+    );
+    await assertSucceeds(updateDoc(ref, { programId: deleteField(), restriction: deleteField() }));
+    const after = (await getDoc(ref)).data()!;
+    if ('programId' in after || 'restriction' in after) throw new Error('field was not cleared');
+  });
+});

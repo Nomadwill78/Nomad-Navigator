@@ -18,15 +18,20 @@ import {
   ArrowRight,
   Download
 } from 'lucide-react';
-import { Grant, GrantKPI, Subgrantee, SubgranteeKPI, ROLE_PERMISSIONS } from '../types';
+import { Grant, GrantKPI, Program, Subgrantee, SubgranteeKPI, ROLE_PERMISSIONS } from '../types';
+import { GrantTermsPanel } from './GrantTermsPanel';
+import { SharedKpiControl } from './SharedKpiControl';
+import { linkSharedKpi, unlinkSharedKpi, syncSharedCurrent } from '../src/lib/programs';
 import { useAuth } from '../src/contexts/AuthContext';
 import { exportGrantPortfolioPDF, exportToCSV, exportToJSON } from '../src/lib/exportUtils';
 import { resolveKpiStatus, KpiStatus } from '../src/lib/kpiStatus';
 import { generateId } from '../src/lib/id';
 import { draftIncompleteReason } from '../src/lib/grantValidation';
+import { computePace, checkOverspend, computePartnerCompliance, formatYmd, todayYmd, PACE_TOLERANCE_POINTS } from '../src/lib/overview';
 
 interface GrantTrackingViewProps {
   grants: Grant[];
+  programs?: Program[];
   onCreateGrant: (grant: Omit<Grant, 'id'>) => Promise<string>;
   onUpdateGrant: (grantId: string, changes: Partial<Grant>) => void;
   onDeleteGrant: (grantId: string) => void;
@@ -46,7 +51,7 @@ type HeaderDraft = {
   name: string; funder: string; amount: string; startDate: string; endDate: string; status: Grant['status'];
 };
 
-export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, onCreateGrant, onUpdateGrant, onDeleteGrant }) => {
+export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, programs = [], onCreateGrant, onUpdateGrant, onDeleteGrant }) => {
   const { role } = useAuth();
   const permissions = role ? ROLE_PERMISSIONS[role] : null;
 
@@ -63,7 +68,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
     // a new grant should look obviously unfinished, not like real data. It also
     // isn't written to Firestore yet: it's a local draft until required fields
     // are complete and the user saves it (see saveHeaderEditor).
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayYmd();
     setSelectedGrantId(null);
     setDraftError(null);
     setEditingHeaderId('new');
@@ -72,7 +77,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
       funder: '',
       amount: '',
       startDate: today,
-      endDate: new Date(Date.now() + 31536000000).toISOString().split('T')[0],
+      endDate: `${Number(today.slice(0, 4)) + 1}${today.slice(4)}`,
       status: 'pending',
     });
   };
@@ -237,6 +242,21 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
     const grant = grants.find(g => g.id === grantId);
     if (!grant) return;
     onUpdateGrant(grantId, { kpis: grant.kpis.map(k => k.id === kpiId ? { ...k, ...updates } : k) });
+    // A KPI shared with other funders is one outcome: keep every copy at the same value.
+    if (updates.current !== undefined) {
+      const others = syncSharedCurrent(grants, { grantId, kpiId }, updates.current);
+      Object.entries(others).forEach(([id, changes]) => onUpdateGrant(id, changes));
+    }
+  };
+
+  const handleLinkKpi = (grantId: string, kpiId: string, sourceGrantId: string, sourceKpiId: string) => {
+    const changes = linkSharedKpi(grants, { grantId: sourceGrantId, kpiId: sourceKpiId }, { grantId, kpiId });
+    Object.entries(changes).forEach(([id, c]) => onUpdateGrant(id, c));
+  };
+
+  const handleUnlinkKpi = (grantId: string, kpiId: string) => {
+    const changes = unlinkSharedKpi(grants, { grantId, kpiId });
+    Object.entries(changes).forEach(([id, c]) => onUpdateGrant(id, c));
   };
 
   const handleAddKPI = (grantId: string) => {
@@ -383,11 +403,20 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                 </div>
                 <h4 className="font-bold text-parchment line-clamp-1">{grant.name}</h4>
                 <p className="text-xs text-inkmute mb-3">{grant.funder}</p>
+                {(grant.programId || grant.restriction || grant.matchRequired) && (
+                  <p className="text-[10px] text-inkfaint mb-2 line-clamp-1">
+                    {[
+                      programs.find((p) => p.id === grant.programId)?.name,
+                      grant.restriction === 'restricted' ? 'Restricted' : grant.restriction === 'unrestricted' ? 'Unrestricted' : null,
+                      grant.matchRequired ? `Match $${grant.matchRequired.toLocaleString()}` : null,
+                    ].filter(Boolean).join(' · ')}
+                  </p>
+                )}
 
                 <div className="flex items-center gap-4 text-[10px] text-inkfaint font-medium">
                   <div className="flex items-center gap-1">
                     <Calendar size={12} />
-                    {new Date(grant.endDate).toLocaleDateString()}
+                    {formatYmd(grant.endDate)}
                   </div>
                   <div className="flex items-center gap-1">
                      <Users size={12} />
@@ -421,7 +450,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                     <div className="flex items-center gap-4 text-sm text-inkmute">
                         <span className="flex items-center gap-1.5"><DollarSign size={14} className="text-inkfaint" /> {selectedGrant.funder || 'No funder set'}</span>
                         <span className="w-1.5 h-1.5 rounded-full bg-inkfaint"></span>
-                        <span className="flex items-center gap-1.5"><Calendar size={14} className="text-inkfaint" /> {selectedGrant.startDate} - {selectedGrant.endDate}</span>
+                        <span className="flex items-center gap-1.5"><Calendar size={14} className="text-inkfaint" /> {formatYmd(selectedGrant.startDate)} - {formatYmd(selectedGrant.endDate)}</span>
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -451,43 +480,41 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                 {(() => {
                   const totalAmount = selectedGrant.amount;
                   const spentAmount = selectedGrant.spentAmount ?? 0;
-                  const fundsSpentPercent = totalAmount > 0 ? (spentAmount / totalAmount) * 100 : 0;
+                  const pace = computePace(selectedGrant);
+                  const timeElapsedPercent = pace.elapsedPercent;
+                  const overspend = checkOverspend(selectedGrant);
 
-                  const startDate = new Date(selectedGrant.startDate).getTime();
-                  const endDate = new Date(selectedGrant.endDate).getTime();
-                  const today = Date.now();
-
-                  let timeElapsedPercent = 0;
-                  if (endDate > startDate) {
-                    const totalDuration = endDate - startDate;
-                    const elapsedDuration = today - startDate;
-                    timeElapsedPercent = Math.min(Math.max((elapsedDuration / totalDuration) * 100, 0), 100);
-                  }
-
-                  // Burn rate calculation and indicator
-                  const diff = fundsSpentPercent - timeElapsedPercent;
+                  // Burn rate: flagged whenever spending and elapsed time differ by more than
+                  // PACE_TOLERANCE_POINTS, in either direction.
                   let burnStatus = {
                     label: "On Track",
                     color: "text-teal bg-teal/10 border-teal/25",
                     desc: "Your budget burn rate matches the timeline progress well."
                   };
 
-                  if (diff > 12) {
+                  if (pace.status === 'no_dates') {
                     burnStatus = {
-                      label: "High Burn Rate",
-                      // Overspend is money awaiting a decision, not an error, so it stays
-                      // brass rather than taking the Alert red. It carries a heavier wash
-                      // and border than the underspend case to rank the two.
-                      color: "text-brassbright bg-brass/15 border-brass/40",
-                      desc: "Warning: Funds are being spent significantly faster than time elapsed."
+                      label: "No Dates",
+                      color: "text-inkmute bg-abyss border-hairline",
+                      desc: "Set valid start and end dates to compare spending against the timeline."
                     };
-                  } else if (diff < -15) {
+                  } else if (pace.status === 'at_risk' && pace.gap > 0) {
                     burnStatus = {
-                      label: "Underutilization Alert",
+                      label: "At Risk: Spending Ahead",
+                      // Overspend is money awaiting a decision, not an error, so it stays
+                      // brass rather than taking the Alert red.
+                      color: "text-brassbright bg-brass/15 border-brass/40",
+                      desc: `Funds are ${pace.gap.toFixed(0)} points ahead of the timeline (more than ${PACE_TOLERANCE_POINTS} points apart).`
+                    };
+                  } else if (pace.status === 'at_risk') {
+                    burnStatus = {
+                      label: "At Risk: Spending Behind",
                       color: "text-brassbright bg-brass/10 border-brass/25",
-                      desc: "Alert: Funds are being spent slower than the elapsed timeline. Risk of under-spending."
+                      desc: `Funds are ${Math.abs(pace.gap).toFixed(0)} points behind the timeline (more than ${PACE_TOLERANCE_POINTS} points apart). Risk of under-spending.`
                     };
                   }
+
+                  const fundsSpentPercent = pace.spentPercent;
 
                   return (
                     <div className="mb-6 p-5 bg-surface rounded-2xl border border-hairline/80 shadow-sm space-y-4">
@@ -531,7 +558,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                   type="number"
                                   value={spentAmount}
                                   onChange={(e) => {
-                                    const val = Math.min(Math.max(0, parseInt(e.target.value) || 0), totalAmount);
+                                    const val = Math.max(0, parseInt(e.target.value) || 0);
                                     onUpdateGrant(selectedGrant.id, { spentAmount: val });
                                   }}
                                   className="bg-transparent font-semibold text-parchment text-xs outline-none w-full"
@@ -558,11 +585,18 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                             />
                           </div>
                           <div className="flex justify-between text-[10px] text-inkfaint font-medium pt-1">
-                            <span>Start: {new Date(selectedGrant.startDate).toLocaleDateString()}</span>
-                            <span>End: {new Date(selectedGrant.endDate).toLocaleDateString()}</span>
+                            <span>Start: {formatYmd(selectedGrant.startDate)}</span>
+                            <span>End: {formatYmd(selectedGrant.endDate)}</span>
                           </div>
                         </div>
                       </div>
+
+                      {overspend.over && (
+                        <div role="alert" className="text-xs text-parchment bg-brass/15 border border-brass/40 px-3 py-2 rounded-xl">
+                          <span className="font-bold text-brassbright">Over budget: </span>
+                          ${spentAmount.toLocaleString()} spent is ${overspend.amount.toLocaleString()} more than the ${totalAmount.toLocaleString()} award. Your entry is kept as typed. Check it, or confirm the award amount.
+                        </div>
+                      )}
 
                       <div className="text-xs text-inkmute bg-ink/50 border border-hairline/60 px-3 py-2 rounded-xl">
                         <span className="font-semibold text-parchment">Analysis: </span>
@@ -571,6 +605,13 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                     </div>
                   );
                 })()}
+
+                <GrantTermsPanel
+                  grant={selectedGrant}
+                  programs={programs}
+                  canEdit={!!permissions?.canEditGrants}
+                  onChange={(changes) => onUpdateGrant(selectedGrant.id, changes)}
+                />
 
                 <div className="flex gap-2 p-1 bg-abyss border border-hairline rounded-xl w-fit">
                    <button
@@ -675,6 +716,14 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                  style={{ width: `${progress}%` }}
                                ></div>
                             </div>
+                            <SharedKpiControl
+                              grant={selectedGrant}
+                              kpi={kpi}
+                              allGrants={grants}
+                              canEdit={!!permissions?.canEditGrants}
+                              onLink={(sg, sk) => handleLinkKpi(selectedGrant.id, kpi.id, sg, sk)}
+                              onUnlink={() => handleUnlinkKpi(selectedGrant.id, kpi.id)}
+                            />
                           </div>
                         );
                       })}
@@ -723,6 +772,36 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                         className="bg-transparent font-semibold text-parchment text-xs outline-none w-24"
                                       />
                                    </div>
+                                 </div>
+                                 <div className="flex flex-wrap items-center gap-2">
+                                   <label className="text-[10px] font-bold text-inkfaint uppercase tracking-widest">Drawn so far</label>
+                                   <div className="flex items-center gap-1 bg-ink/50 border border-hairline/60 rounded px-2 py-0.5">
+                                      <DollarSign size={10} className="text-inkfaint" />
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={sub.drawnAmount ?? 0}
+                                        onChange={(e) => handleUpdateSubgrantee(selectedGrant.id, sub.id, { drawnAmount: Math.max(0, parseFloat(e.target.value) || 0) })}
+                                        className="bg-transparent font-semibold text-parchment text-xs outline-none w-24"
+                                        aria-label="Amount drawn so far"
+                                      />
+                                   </div>
+                                   <span className="text-[11px] text-inkmute">
+                                     {sub.allocatedAmount > 0
+                                       ? `$${(sub.drawnAmount ?? 0).toLocaleString()} drawn of $${sub.allocatedAmount.toLocaleString()}`
+                                       : 'No allocation set'}
+                                   </span>
+                                   <select
+                                     value={sub.reportingStatus ?? ''}
+                                     onChange={(e) => handleUpdateSubgrantee(selectedGrant.id, sub.id, { reportingStatus: (e.target.value || undefined) as Subgrantee['reportingStatus'] })}
+                                     className="bg-ink/70 border border-hairline rounded-md px-2 py-0.5 text-[11px] text-parchment outline-none"
+                                     aria-label="Partner reporting status"
+                                   >
+                                     <option value="">Reporting: not set</option>
+                                     <option value="current">Reports up to date</option>
+                                     <option value="late">Reports late</option>
+                                     <option value="not_started">Has not started reporting</option>
+                                   </select>
                                  </div>
                                </div>
                                <span className="px-2 py-0.5 bg-brass/10 text-brassbright rounded-full text-[10px] font-bold uppercase tracking-wider h-fit">
@@ -818,17 +897,29 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                       )}
                     </div>
 
-                    <div className="mt-8 p-6 bg-brass/10 rounded-2xl border border-brass/25 flex items-start gap-4">
-                      <div className="p-3 bg-surface rounded-xl shadow-sm text-brassbright">
-                        <ShieldCheck size={24} />
-                      </div>
-                      <div>
-                        <h5 className="font-bold text-ivory mb-1">Subgrantee Compliance</h5>
-                        <p className="text-sm text-parchment/80 leading-relaxed font-medium">
-                          Partner organizations are averaging <strong className="font-bold text-parchment">84% compliance</strong>. Nomad Compass recommends requesting additional validation data from {selectedGrant.subgrantees?.[0]?.name || 'partners'} before the quarterly disbursement.
-                        </p>
-                      </div>
-                    </div>
+                    {(() => {
+                      const compliance = computePartnerCompliance([selectedGrant]);
+                      if (!compliance) return null;
+                      const lowest = [...(selectedGrant.subgrantees ?? [])]
+                        .map((sub) => ({ sub, c: computePartnerCompliance([{ ...selectedGrant, subgrantees: [sub] }]) }))
+                        .filter((x) => x.c)
+                        .sort((a, b) => a.c!.percent - b.c!.percent)[0];
+                      return (
+                        <div className="mt-8 p-6 bg-brass/10 rounded-2xl border border-brass/25 flex items-start gap-4">
+                          <div className="p-3 bg-surface rounded-xl shadow-sm text-brassbright">
+                            <ShieldCheck size={24} />
+                          </div>
+                          <div>
+                            <h5 className="font-bold text-ivory mb-1">Partner Progress</h5>
+                            <p className="text-sm text-parchment/80 leading-relaxed font-medium">
+                              Partners are averaging <strong className="font-bold text-parchment">{compliance.percent}%</strong> of
+                              their KPI targets across {compliance.kpiCount} {compliance.kpiCount === 1 ? 'KPI' : 'KPIs'}.
+                              {lowest && compliance.partnerCount > 1 ? ` Furthest behind: ${lowest.sub.name} at ${lowest.c!.percent}%.` : ''}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>

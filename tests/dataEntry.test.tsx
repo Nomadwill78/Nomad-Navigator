@@ -28,12 +28,12 @@ describe('Manage Metrics data entry', () => {
   it('keeps focus and every character while typing a multi-digit number', async () => {
     const user = userEvent.setup();
     render(<Harness />);
-    const input = field(/^Water Access Count$/i);
+    const input = field(/^Primary Outcome Count$/i);
     await user.click(input);
     await user.clear(input);
     await user.type(input, '540');
-    expect(field(/^Water Access Count$/i).value).toBe('540');
-    expect(document.activeElement).toBe(field(/^Water Access Count$/i));
+    expect(field(/^Primary Outcome Count$/i).value).toBe('540');
+    expect(document.activeElement).toBe(field(/^Primary Outcome Count$/i));
   });
 
   it('types a full sentence into a text field without losing characters', async () => {
@@ -61,8 +61,8 @@ describe('Manage Metrics data entry', () => {
     const user = userEvent.setup();
     const seen: DashboardStats[] = [];
     render(<Harness onStats={(s) => seen.push(s)} />);
-    await user.type(field(/^Water Access Count$/i), '7');
-    await user.type(field(/^Water Access Count$/i), '8');
+    await user.type(field(/^Primary Outcome Count$/i), '7');
+    await user.type(field(/^Primary Outcome Count$/i), '8');
     expect(seen.length).toBeGreaterThan(1);
     expect(seen[0].outcomesDetails.householdsWaterAccess).toBe(7);
     expect(seen[0].outcomesDetails).not.toBe(seen[1].outcomesDetails);

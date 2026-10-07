@@ -188,9 +188,47 @@ export interface UserProfile {
   hasSeenWelcome?: boolean;
 }
 
-export interface GrantKPI { id: string; name: string; target: number; current: number; unit: string; }
+export interface GrantKPI {
+  id: string; name: string; target: number; current: number; unit: string;
+  /** KPIs sharing this id are the same outcome reported to different funders (counted once, each with its own target). */
+  sharedKpiId?: string;
+}
 export interface SubgranteeKPI { id: string; name: string; target: number; current: number; unit: string; }
-export interface Subgrantee { id: string; name: string; allocatedAmount: number; status: 'active' | 'pending' | 'completed'; kpis: SubgranteeKPI[]; }
+export type PartnerReportingStatus = 'current' | 'late' | 'not_started';
+export interface Subgrantee {
+  id: string; name: string; allocatedAmount: number; status: 'active' | 'pending' | 'completed'; kpis: SubgranteeKPI[];
+  /** Money the partner has drawn down so far against allocatedAmount. */
+  drawnAmount?: number;
+  reportingStatus?: PartnerReportingStatus;
+}
 export interface Opportunity { id: string; funder: string; name: string; amount: number; matchScore: number; deadline: string; description: string; whyMatch: string; }
-export interface Grant { id: string; name: string; funder: string; amount: number; startDate: string; endDate: string; status: 'active' | 'pending' | 'completed'; kpis: GrantKPI[]; subgrantees?: Subgrantee[]; spentAmount?: number; }
+
+export type BudgetCategory = 'personnel' | 'supplies' | 'partner_pass_through' | 'other';
+export interface BudgetLine { id: string; category: BudgetCategory; budgeted: number; spent: number; }
+export type GrantReportFrequency = 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'none';
+
+export interface Grant {
+  id: string; name: string; funder: string; amount: number; startDate: string; endDate: string;
+  status: 'active' | 'pending' | 'completed'; kpis: GrantKPI[]; subgrantees?: Subgrantee[]; spentAmount?: number;
+  /** The program this grant funds. Unset means the grant is not assigned to a program yet. */
+  programId?: string;
+  restriction?: 'restricted' | 'unrestricted';
+  allowedUses?: string;
+  matchRequired?: number;
+  matchSecured?: number;
+  reportFrequency?: GrantReportFrequency;
+  budgetLines?: BudgetLine[];
+}
+
+/** A program is what the organization runs; several grants from different funders can pay for it. */
+export interface Program {
+  id: string;
+  name: string;
+  description: string;
+  populationServed: string;
+  startDate: string;
+  endDate: string;
+  /** What it costs to run the program. Used only to work out the funding gap; left unset if unknown. */
+  budgetNeed?: number;
+}
 export interface AIAnalysisData { keyFindings: string[]; recommendations: string[]; risks: string[]; trendAnalysis: string; readinessScore: number; }
