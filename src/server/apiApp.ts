@@ -1,5 +1,7 @@
 import express from "express";
+import { timingSafeEqual } from "node:crypto";
 import { getStripe, priceIdForPlan, requireOrgAdmin, isAuthError, getAdmin } from "./stripeAdmin";
+import { runReminders, createResendMailer, createFirestoreReminderStore } from "./reminders";
 
 const respondToAuthError = (error: any, res: express.Response): boolean => {
   if (isAuthError(error)) {
@@ -119,6 +121,39 @@ export function createApiApp(): express.Express {
     } catch (error: any) {
       if (respondToAuthError(error, res)) return;
       console.error("Create portal session error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Daily reminder job (Vercel Cron calls this; see vercel.json). Vercel sends
+  // "Authorization: Bearer <CRON_SECRET>" automatically when CRON_SECRET is set.
+  // Without that secret the route refuses to run at all, so it can never be triggered by a stranger.
+  // Add ?dryRun=1 to see who WOULD be emailed without sending or recording anything.
+  app.get("/api/send-reminders", async (req, res) => {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) {
+      res.status(503).json({ error: "CRON_SECRET is not set, so reminders are switched off." });
+      return;
+    }
+    const given = Buffer.from(String(req.headers.authorization ?? ""));
+    const want = Buffer.from(`Bearer ${secret}`);
+    if (given.length !== want.length || !timingSafeEqual(given, want)) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    try {
+      const dryRun = req.query.dryRun === "1" || req.query.dryRun === "true";
+      const { db } = getAdmin();
+      const summary = await runReminders({
+        store: createFirestoreReminderStore(db),
+        mailer: dryRun ? { send: async () => {} } : createResendMailer(process.env),
+        today: new Date().toISOString().slice(0, 10),
+        dryRun,
+        appUrl: process.env.APP_URL,
+      });
+      res.status(summary.failed > 0 ? 207 : 200).json(summary);
+    } catch (error: any) {
+      console.error("Reminder run failed:", error);
       res.status(500).json({ error: error.message });
     }
   });

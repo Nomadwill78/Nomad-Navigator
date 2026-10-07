@@ -1,14 +1,16 @@
 import React, { useMemo, useState } from 'react';
-import { Layers, Plus, Trash2, Edit2, AlertTriangle, Users, Link2 } from 'lucide-react';
+import { Layers, Plus, Trash2, Edit2, AlertTriangle, Users, Link2, FileDown } from 'lucide-react';
 import { Grant, Program } from '../types';
 import { rollUpProgram, Outcome } from '../src/lib/programs';
 import { formatYmd, todayYmd } from '../src/lib/overview';
+import { exportBoardSummaryPDF } from '../src/lib/reportPdf';
 
 interface Props {
   programs: Program[];
   grants: Grant[];
   canEdit: boolean;
   canDelete: boolean;
+  orgName: string;
   onCreate: (program: Omit<Program, 'id'>) => Promise<string>;
   onUpdate: (programId: string, changes: Partial<Omit<Program, 'id'>>) => Promise<void>;
   onDelete: (programId: string) => void;
@@ -63,7 +65,7 @@ const OutcomeRow: React.FC<{ outcome: Outcome }> = ({ outcome }) => (
   </div>
 );
 
-export const ProgramsView: React.FC<Props> = ({ programs, grants, canEdit, canDelete, onCreate, onUpdate, onDelete, onOpenGrants }) => {
+export const ProgramsView: React.FC<Props> = ({ programs, grants, canEdit, canDelete, orgName, onCreate, onUpdate, onDelete, onOpenGrants }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<'new' | string | null>(null);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
@@ -221,6 +223,13 @@ export const ProgramsView: React.FC<Props> = ({ programs, grants, canEdit, canDe
                     </p>
                   </div>
                   <div className="flex gap-1">
+                    <button
+                      onClick={() => exportBoardSummaryPDF({ title: selected.name, orgName, grants: grants.filter((g) => g.programId === selected.id), program: selected })}
+                      title="One-page PDF with program totals and the top 3 risks"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-brassbright border border-brass/30 bg-brass/10 rounded-lg hover:bg-brass/15"
+                    >
+                      <FileDown size={14} /> Board summary
+                    </button>
                     {canEdit && <button onClick={() => startEdit(selected)} title="Edit program" className="p-2 text-inkfaint hover:text-inkmute hover:bg-white/5 rounded-lg"><Edit2 size={18} /></button>}
                     {canDelete && <button onClick={() => remove(selected)} title="Delete program" className="p-2 text-inkfaint hover:text-alert hover:bg-alert/15 rounded-lg"><Trash2 size={18} /></button>}
                   </div>

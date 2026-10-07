@@ -1,4 +1,4 @@
-import { BudgetCategory, BudgetLine, Grant, Program } from '../../types';
+import { BudgetCategory, BudgetLine, Grant, GrantKPI, Program } from '../../types';
 import { resolveKpiStatus } from './kpiStatus';
 import { computeGrantTotals, dayNumber, computePace, kpiHealth, KpiHealth } from './overview';
 
@@ -138,8 +138,9 @@ export function linkSharedKpi(grants: Grant[], source: KpiRef, target: KpiRef): 
   const sharedId = sk.sharedKpiId ?? `shared-${sk.id}`;
   const out: Record<string, Partial<Grant>> = {};
   out[sg.id] = { kpis: sg.kpis.map((k) => (k.id === sk.id ? { ...k, sharedKpiId: sharedId } : k)) };
+  const shared = pickSharedFields(sk);
   out[tg.id] = {
-    kpis: tg.kpis.map((k) => (k.id === tk.id ? { ...k, sharedKpiId: sharedId, current: num(sk.current) } : k)),
+    kpis: tg.kpis.map((k) => (k.id === tk.id ? { ...k, ...shared, sharedKpiId: sharedId } : k)),
   };
   return out;
 }
@@ -151,6 +152,34 @@ export function unlinkSharedKpi(grants: Grant[], ref: KpiRef): Record<string, Pa
   return { [g.id]: { kpis: g.kpis.map((k) => (k.id === ref.kpiId ? { ...k, sharedKpiId: undefined } : k)) } };
 }
 
+/** The parts of a KPI that describe the real-world outcome itself, so they are the same for every funder. */
+export const SHARED_KPI_FIELDS = ['current', 'history', 'ageBreakdown', 'ethnicityBreakdown'] as const;
+export type SharedKpiPatch = Partial<Pick<GrantKPI, (typeof SHARED_KPI_FIELDS)[number]>>;
+
+export function pickSharedFields(kpi: GrantKPI): SharedKpiPatch {
+  const out: SharedKpiPatch = {};
+  for (const f of SHARED_KPI_FIELDS) if (kpi[f] !== undefined) (out as Record<string, unknown>)[f] = kpi[f];
+  return out;
+}
+
+/**
+ * When a shared KPI's value, history or breakdowns change, every KPI sharing its outcome
+ * must change with it. Funder-specific fields (target, definition, required by) are untouched.
+ * Returns changes for the OTHER grants only (the caller saves the edited grant itself).
+ */
+export function syncSharedFields(grants: Grant[], edited: KpiRef, patch: SharedKpiPatch): Record<string, Partial<Grant>> {
+  const eg = grants.find((g) => g.id === edited.grantId);
+  const ek = eg?.kpis.find((k) => k.id === edited.kpiId);
+  if (!eg || !ek?.sharedKpiId) return {};
+  const out: Record<string, Partial<Grant>> = {};
+  for (const g of grants) {
+    if (g.id === eg.id) continue;
+    if (!g.kpis.some((k) => k.sharedKpiId === ek.sharedKpiId)) continue;
+    out[g.id] = { kpis: g.kpis.map((k) => (k.sharedKpiId === ek.sharedKpiId ? { ...k, ...patch } : k)) };
+  }
+  return out;
+}
+
 /**
  * When a KPI's current value changes, every KPI sharing its outcome must change with it.
  * Returns changes for the OTHER grants only (the caller saves the edited grant itself).
@@ -160,16 +189,7 @@ export function syncSharedCurrent(
   edited: KpiRef,
   newCurrent: number
 ): Record<string, Partial<Grant>> {
-  const eg = grants.find((g) => g.id === edited.grantId);
-  const ek = eg?.kpis.find((k) => k.id === edited.kpiId);
-  if (!eg || !ek?.sharedKpiId) return {};
-  const out: Record<string, Partial<Grant>> = {};
-  for (const g of grants) {
-    if (g.id === eg.id) continue;
-    if (!g.kpis.some((k) => k.sharedKpiId === ek.sharedKpiId)) continue;
-    out[g.id] = { kpis: g.kpis.map((k) => (k.sharedKpiId === ek.sharedKpiId ? { ...k, current: newCurrent } : k)) };
-  }
-  return out;
+  return syncSharedFields(grants, edited, { current: newCurrent });
 }
 
 export interface OutcomeTarget {

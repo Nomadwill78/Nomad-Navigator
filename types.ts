@@ -188,10 +188,27 @@ export interface UserProfile {
   hasSeenWelcome?: boolean;
 }
 
+/** One measurement of a KPI for a reporting period. `date` is the last day of the period (YYYY-MM-DD). */
+export interface KpiEntry { id: string; date: string; value: number; }
+/** A count of people in one group, such as "Ages 16-24". */
+export interface BreakdownRow { id: string; label: string; count: number; }
+export type KpiReportingPeriod = 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'cumulative';
 export interface GrantKPI {
   id: string; name: string; target: number; current: number; unit: string;
   /** KPIs sharing this id are the same outcome reported to different funders (counted once, each with its own target). */
   sharedKpiId?: string;
+  /** Where the number started, so progress can be shown as change from baseline. */
+  baseline?: number;
+  reportingPeriod?: KpiReportingPeriod;
+  dataSource?: string;
+  definition?: string;
+  /** Which funder requires this KPI. */
+  requiredBy?: string;
+  /** A value per period. The latest entry is also saved as `current`. */
+  history?: KpiEntry[];
+  /** Who was served, counted by age and by ethnicity. */
+  ageBreakdown?: BreakdownRow[];
+  ethnicityBreakdown?: BreakdownRow[];
 }
 export interface SubgranteeKPI { id: string; name: string; target: number; current: number; unit: string; }
 export type PartnerReportingStatus = 'current' | 'late' | 'not_started';
@@ -205,6 +222,20 @@ export interface Opportunity { id: string; funder: string; name: string; amount:
 
 export type BudgetCategory = 'personnel' | 'supplies' | 'partner_pass_through' | 'other';
 export interface BudgetLine { id: string; category: BudgetCategory; budgeted: number; spent: number; }
+export type ReportStatus = 'upcoming' | 'submitted' | 'late';
+/** A report a funder expects. Status is worked out from the dates, never stored. */
+export interface ReportDue {
+  id: string;
+  title: string;
+  /** YYYY-MM-DD */
+  dueDate: string;
+  /** Who is responsible. */
+  owner: string;
+  /** Where reminders go. When empty, reminders go to the organization's admins. */
+  ownerEmail?: string;
+  /** YYYY-MM-DD once the report has been sent to the funder. */
+  submittedDate?: string;
+}
 export type GrantReportFrequency = 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'none';
 
 export interface Grant {
@@ -218,6 +249,7 @@ export interface Grant {
   matchSecured?: number;
   reportFrequency?: GrantReportFrequency;
   budgetLines?: BudgetLine[];
+  reports?: ReportDue[];
 }
 
 /** A program is what the organization runs; several grants from different funders can pay for it. */

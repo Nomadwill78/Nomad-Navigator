@@ -21,7 +21,10 @@ import {
 import { Grant, GrantKPI, Program, Subgrantee, SubgranteeKPI, ROLE_PERMISSIONS } from '../types';
 import { GrantTermsPanel } from './GrantTermsPanel';
 import { SharedKpiControl } from './SharedKpiControl';
-import { linkSharedKpi, unlinkSharedKpi, syncSharedCurrent } from '../src/lib/programs';
+import { ReportingCalendarPanel } from './ReportingCalendarPanel';
+import { KpiDetailsPanel } from './KpiDetailsPanel';
+import { FunderReportModal } from './FunderReportModal';
+import { linkSharedKpi, unlinkSharedKpi, syncSharedFields, pickSharedFields } from '../src/lib/programs';
 import { useAuth } from '../src/contexts/AuthContext';
 import { exportGrantPortfolioPDF, exportToCSV, exportToJSON } from '../src/lib/exportUtils';
 import { resolveKpiStatus, KpiStatus } from '../src/lib/kpiStatus';
@@ -52,7 +55,8 @@ type HeaderDraft = {
 };
 
 export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, programs = [], onCreateGrant, onUpdateGrant, onDeleteGrant }) => {
-  const { role } = useAuth();
+  const { role, organization } = useAuth();
+  const [reportGrantId, setReportGrantId] = useState<string | null>(null);
   const permissions = role ? ROLE_PERMISSIONS[role] : null;
 
   const [selectedGrantId, setSelectedGrantId] = useState<string | null>(null);
@@ -243,8 +247,9 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, pr
     if (!grant) return;
     onUpdateGrant(grantId, { kpis: grant.kpis.map(k => k.id === kpiId ? { ...k, ...updates } : k) });
     // A KPI shared with other funders is one outcome: keep every copy at the same value.
-    if (updates.current !== undefined) {
-      const others = syncSharedCurrent(grants, { grantId, kpiId }, updates.current);
+    const sharedPatch = pickSharedFields(updates as GrantKPI);
+    if (Object.keys(sharedPatch).length > 0) {
+      const others = syncSharedFields(grants, { grantId, kpiId }, sharedPatch);
       Object.entries(others).forEach(([id, changes]) => onUpdateGrant(id, changes));
     }
   };
@@ -454,6 +459,13 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, pr
                     </div>
                   </div>
                   <div className="flex gap-2">
+                    <button
+                      onClick={() => setReportGrantId(selectedGrant.id)}
+                      title="Build a funder report PDF for this grant"
+                      className="px-3 py-1.5 text-xs font-bold text-brassbright border border-brass/30 bg-brass/10 rounded-lg hover:bg-brass/15 transition-colors"
+                    >
+                      Funder report
+                    </button>
                     {permissions?.canEditGrants && (
                       <button
                         onClick={() => openHeaderEditor(selectedGrant)}
@@ -613,6 +625,12 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, pr
                   onChange={(changes) => onUpdateGrant(selectedGrant.id, changes)}
                 />
 
+                <ReportingCalendarPanel
+                  grant={selectedGrant}
+                  canEdit={!!permissions?.canEditGrants}
+                  onChange={(changes) => onUpdateGrant(selectedGrant.id, changes)}
+                />
+
                 <div className="flex gap-2 p-1 bg-abyss border border-hairline rounded-xl w-fit">
                    <button
                      onClick={() => setActiveTab('kpis')}
@@ -716,6 +734,11 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, pr
                                  style={{ width: `${progress}%` }}
                                ></div>
                             </div>
+                            <KpiDetailsPanel
+                              kpi={kpi}
+                              canEdit={!!permissions?.canEditGrants}
+                              onChange={(updates) => handleUpdateKPI(selectedGrant.id, kpi.id, updates)}
+                            />
                             <SharedKpiControl
                               grant={selectedGrant}
                               kpi={kpi}
@@ -937,6 +960,14 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, pr
           )}
         </div>
       </div>
+      {reportGrantId && grants.find((g) => g.id === reportGrantId) && (
+        <FunderReportModal
+          grant={grants.find((g) => g.id === reportGrantId)!}
+          orgName={organization?.name ?? 'Your organization'}
+          programName={programs.find((p) => p.id === grants.find((g) => g.id === reportGrantId)?.programId)?.name}
+          onClose={() => setReportGrantId(null)}
+        />
+      )}
     </div>
   );
 };
