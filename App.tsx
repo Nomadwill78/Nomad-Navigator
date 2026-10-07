@@ -19,7 +19,8 @@ import {
   Download,
   CheckCircle2,
   Circle,
-  CreditCard
+  CreditCard,
+  Layers
 } from 'lucide-react';
 import { exportDashboardPDF } from './src/lib/exportUtils';
 import { 
@@ -58,8 +59,10 @@ import { KpiSidebar } from './components/KpiSidebar';
 import { useAuth } from './src/contexts/AuthContext';
 import { useOrgData } from './src/hooks/useOrgData';
 import { computeGrantTotals, computeFundingDiversity, rollUpKpis } from './src/lib/overview';
+import { filterGrants, availableYears, isFilterActive, NO_FILTER, GrantFilter } from './src/lib/programs';
+import { ProgramsView } from './components/ProgramsView';
 import { generateImpactReport } from './services/geminiService';
-import { DashboardStats, ProgramMetric, Grant, Opportunity, ROLE_PERMISSIONS } from './types';
+import { DashboardStats, ProgramMetric, Grant, Opportunity, Program, ROLE_PERMISSIONS } from './types';
 import { Analytics } from '@vercel/analytics/react';
 
 // --- Chart ramps ---
@@ -141,6 +144,7 @@ const SAMPLE_PROGRAMS: ProgramMetric[] = [
 const DEMO_GRANTS: Grant[] = [
   {
     id: 'dg1',
+    programId: 'dp1',
     name: 'National Solar Expansion',
     funder: 'UNDP',
     amount: 1500000,
@@ -167,6 +171,7 @@ const DEMO_GRANTS: Grant[] = [
   },
   {
     id: 'dg2',
+    programId: 'dp1',
     name: 'West African Water Initiative',
     funder: 'USAID',
     amount: 500000,
@@ -179,6 +184,17 @@ const DEMO_GRANTS: Grant[] = [
     ],
     subgrantees: []
   }
+];
+
+const DEMO_PROGRAMS: Program[] = [
+  {
+    id: 'dp1',
+    name: 'Sample: Energy and Water Access',
+    description: 'Sample program for demo mode only.',
+    populationServed: 'Sample communities',
+    startDate: '2025-01-01',
+    endDate: '2026-12-31',
+  },
 ];
 
 // Sample deadlines are computed relative to today rather than hardcoded, so the
@@ -390,7 +406,7 @@ const App: React.FC = () => {
       setIsSidebarOpen(false);
     }
   }, []);
-  const [activeView, setActiveView] = useState<'dashboard' | 'data' | 'grants' | 'analysis' | 'discovery' | 'team' | 'billing' | 'settings'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'data' | 'grants' | 'programs' | 'analysis' | 'discovery' | 'team' | 'billing' | 'settings'>('dashboard');
   // True while the user has a CSV loaded into the Manage Data importer but hasn't
   // confirmed it yet. Used to warn before navigating away, so the mapped data isn't
   // silently thrown away.
@@ -415,11 +431,12 @@ const App: React.FC = () => {
 
   // Grants and metrics live in Firestore under this organization, so every member
   // of the org sees the same numbers. Demo mode is served from memory and never written.
-  const { stats, grants, setStats, createGrant, updateGrant, deleteGrant, syncStatus, syncError, hasUnsavedChanges, retrySync } = useOrgData(
+  const { stats, grants, programs, createProgram, updateProgram, deleteProgram, setStats, createGrant, updateGrant, deleteGrant, syncStatus, syncError, hasUnsavedChanges, retrySync } = useOrgData(
     organization?.id ?? null,
     isDemoMode,
     DEMO_STATS,
-    DEMO_GRANTS
+    DEMO_GRANTS,
+    DEMO_PROGRAMS
   );
 
   const sparkImpact = (stats.programs || []).map(p => ({ value: p.peopleServed }));
@@ -427,10 +444,16 @@ const App: React.FC = () => {
 
   // Every Overview figure below is computed from the grants the user entered.
   // Nothing here is a default, an estimate, or a placeholder number.
-  const totals = useMemo(() => computeGrantTotals(grants), [grants]);
-  const diversity = useMemo(() => computeFundingDiversity(grants), [grants]);
-  const kpiRollup = useMemo(() => rollUpKpis(grants), [grants]);
-  const costPerPerson = stats.totalPeopleServed > 0 && totals.totalSpent > 0 ? totals.totalSpent / stats.totalPeopleServed : null;
+  const [filter, setFilter] = useState<GrantFilter>(NO_FILTER);
+  const filtered = useMemo(() => filterGrants(grants, filter), [grants, filter]);
+  const filterOn = isFilterActive(filter);
+  const years = useMemo(() => availableYears(grants), [grants]);
+  const totals = useMemo(() => computeGrantTotals(filtered), [filtered]);
+  const diversity = useMemo(() => computeFundingDiversity(filtered), [filtered]);
+  const kpiRollup = useMemo(() => rollUpKpis(filtered), [filtered]);
+  // People served is entered for the whole organization, so a per-program or per-year
+  // spend divided by it would be a made-up ratio. It is only shown when nothing is filtered.
+  const costPerPerson = !filterOn && stats.totalPeopleServed > 0 && totals.totalSpent > 0 ? totals.totalSpent / stats.totalPeopleServed : null;
   const urbanShare = stats.geographic.urbanRural.find(u => /urban/i.test(u.name))?.value;
   const hasNoData = !isDemoMode && stats.totalPeopleServed === 0 && (stats.programs || []).length === 0;
 
@@ -620,6 +643,14 @@ const App: React.FC = () => {
               onClick={() => navigateTo('grants')}
             />
           )}
+
+          <NavItem
+            icon={<Layers size={20} />}
+            label="Programs"
+            active={activeView === 'programs'}
+            isOpen={isSidebarOpen}
+            onClick={() => navigateTo('programs')}
+          />
 
           <NavItem 
             icon={<Sparkles size={20} />} 
@@ -840,7 +871,18 @@ const App: React.FC = () => {
           {activeView === 'data' ? (
             <DataManagementView stats={stats} onUpdate={setStats} onPendingImportChange={setHasPendingImport} />
           ) : activeView === 'grants' ? (
-            <GrantTrackingView grants={grants} onCreateGrant={createGrant} onUpdateGrant={updateGrant} onDeleteGrant={deleteGrant} />
+            <GrantTrackingView grants={grants} programs={programs} onCreateGrant={createGrant} onUpdateGrant={updateGrant} onDeleteGrant={deleteGrant} />
+          ) : activeView === 'programs' ? (
+            <ProgramsView
+              programs={programs}
+              grants={grants}
+              canEdit={!!permissions?.canEditGrants}
+              canDelete={!!permissions?.canDeleteGrants}
+              onCreate={createProgram}
+              onUpdate={updateProgram}
+              onDelete={deleteProgram}
+              onOpenGrants={() => navigateTo('grants')}
+            />
           ) : activeView === 'analysis' ? (
             <AnalysisView stats={stats} grants={grants} />
           ) : activeView === 'discovery' ? (
@@ -900,6 +942,48 @@ const App: React.FC = () => {
                   )}
                 </div>
               </div>
+
+              {/* Filters: every grant-based figure below follows these two choices. */}
+              {grants.length > 0 && (
+                <div className="flex flex-wrap items-center gap-3 bg-surface border border-hairline rounded-xl px-4 py-3">
+                  <label className="flex items-center gap-2 text-xs text-inkfaint">
+                    Program
+                    <select
+                      value={filter.programId}
+                      onChange={(e) => setFilter({ ...filter, programId: e.target.value })}
+                      className="bg-ink/70 border border-hairline rounded-lg px-2 py-1.5 text-sm text-parchment outline-none max-w-[16rem]"
+                    >
+                      <option value="all">All programs</option>
+                      {programs.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                      <option value="none">Not assigned to a program</option>
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-inkfaint">
+                    Year
+                    <select
+                      value={String(filter.year)}
+                      onChange={(e) => setFilter({ ...filter, year: e.target.value === 'all' ? 'all' : Number(e.target.value) })}
+                      className="bg-ink/70 border border-hairline rounded-lg px-2 py-1.5 text-sm text-parchment outline-none"
+                    >
+                      <option value="all">All years</option>
+                      {years.map((y) => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {filterOn && (
+                    <>
+                      <button onClick={() => setFilter(NO_FILTER)} className="text-xs text-brassbright font-semibold underline">Clear filters</button>
+                      <p className="text-xs text-inkmute basis-full">
+                        Showing {filtered.length} of {grants.length} {grants.length === 1 ? 'grant' : 'grants'}. Funding, funders and key indicators follow the filter.
+                        People served, demographics and service areas are entered for the whole organization, so they are not filtered.
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* First-run guided path: a new organization starts empty, so tell it
                   what to do first rather than presenting a full dashboard with nothing
@@ -992,7 +1076,7 @@ const App: React.FC = () => {
                   description={
                     totals.grantCount > 0
                       ? `$${totals.totalSpent.toLocaleString()} spent from ${totals.activeFunders} active ${totals.activeFunders === 1 ? 'funder' : 'funders'}`
-                      : 'Add a grant to see funding totals'
+                      : filterOn ? 'No grants match these filters' : 'Add a grant to see funding totals'
                   }
                   icon={<Target />}
                   accent="impact"

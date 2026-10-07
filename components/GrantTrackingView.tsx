@@ -18,7 +18,10 @@ import {
   ArrowRight,
   Download
 } from 'lucide-react';
-import { Grant, GrantKPI, Subgrantee, SubgranteeKPI, ROLE_PERMISSIONS } from '../types';
+import { Grant, GrantKPI, Program, Subgrantee, SubgranteeKPI, ROLE_PERMISSIONS } from '../types';
+import { GrantTermsPanel } from './GrantTermsPanel';
+import { SharedKpiControl } from './SharedKpiControl';
+import { linkSharedKpi, unlinkSharedKpi, syncSharedCurrent } from '../src/lib/programs';
 import { useAuth } from '../src/contexts/AuthContext';
 import { exportGrantPortfolioPDF, exportToCSV, exportToJSON } from '../src/lib/exportUtils';
 import { resolveKpiStatus, KpiStatus } from '../src/lib/kpiStatus';
@@ -28,6 +31,7 @@ import { computePace, checkOverspend, computePartnerCompliance, formatYmd, today
 
 interface GrantTrackingViewProps {
   grants: Grant[];
+  programs?: Program[];
   onCreateGrant: (grant: Omit<Grant, 'id'>) => Promise<string>;
   onUpdateGrant: (grantId: string, changes: Partial<Grant>) => void;
   onDeleteGrant: (grantId: string) => void;
@@ -47,7 +51,7 @@ type HeaderDraft = {
   name: string; funder: string; amount: string; startDate: string; endDate: string; status: Grant['status'];
 };
 
-export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, onCreateGrant, onUpdateGrant, onDeleteGrant }) => {
+export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, programs = [], onCreateGrant, onUpdateGrant, onDeleteGrant }) => {
   const { role } = useAuth();
   const permissions = role ? ROLE_PERMISSIONS[role] : null;
 
@@ -238,6 +242,21 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
     const grant = grants.find(g => g.id === grantId);
     if (!grant) return;
     onUpdateGrant(grantId, { kpis: grant.kpis.map(k => k.id === kpiId ? { ...k, ...updates } : k) });
+    // A KPI shared with other funders is one outcome: keep every copy at the same value.
+    if (updates.current !== undefined) {
+      const others = syncSharedCurrent(grants, { grantId, kpiId }, updates.current);
+      Object.entries(others).forEach(([id, changes]) => onUpdateGrant(id, changes));
+    }
+  };
+
+  const handleLinkKpi = (grantId: string, kpiId: string, sourceGrantId: string, sourceKpiId: string) => {
+    const changes = linkSharedKpi(grants, { grantId: sourceGrantId, kpiId: sourceKpiId }, { grantId, kpiId });
+    Object.entries(changes).forEach(([id, c]) => onUpdateGrant(id, c));
+  };
+
+  const handleUnlinkKpi = (grantId: string, kpiId: string) => {
+    const changes = unlinkSharedKpi(grants, { grantId, kpiId });
+    Object.entries(changes).forEach(([id, c]) => onUpdateGrant(id, c));
   };
 
   const handleAddKPI = (grantId: string) => {
@@ -384,6 +403,15 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                 </div>
                 <h4 className="font-bold text-parchment line-clamp-1">{grant.name}</h4>
                 <p className="text-xs text-inkmute mb-3">{grant.funder}</p>
+                {(grant.programId || grant.restriction || grant.matchRequired) && (
+                  <p className="text-[10px] text-inkfaint mb-2 line-clamp-1">
+                    {[
+                      programs.find((p) => p.id === grant.programId)?.name,
+                      grant.restriction === 'restricted' ? 'Restricted' : grant.restriction === 'unrestricted' ? 'Unrestricted' : null,
+                      grant.matchRequired ? `Match $${grant.matchRequired.toLocaleString()}` : null,
+                    ].filter(Boolean).join(' · ')}
+                  </p>
+                )}
 
                 <div className="flex items-center gap-4 text-[10px] text-inkfaint font-medium">
                   <div className="flex items-center gap-1">
@@ -578,6 +606,13 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                   );
                 })()}
 
+                <GrantTermsPanel
+                  grant={selectedGrant}
+                  programs={programs}
+                  canEdit={!!permissions?.canEditGrants}
+                  onChange={(changes) => onUpdateGrant(selectedGrant.id, changes)}
+                />
+
                 <div className="flex gap-2 p-1 bg-abyss border border-hairline rounded-xl w-fit">
                    <button
                      onClick={() => setActiveTab('kpis')}
@@ -681,6 +716,14 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                  style={{ width: `${progress}%` }}
                                ></div>
                             </div>
+                            <SharedKpiControl
+                              grant={selectedGrant}
+                              kpi={kpi}
+                              allGrants={grants}
+                              canEdit={!!permissions?.canEditGrants}
+                              onLink={(sg, sk) => handleLinkKpi(selectedGrant.id, kpi.id, sg, sk)}
+                              onUnlink={() => handleUnlinkKpi(selectedGrant.id, kpi.id)}
+                            />
                           </div>
                         );
                       })}
@@ -729,6 +772,36 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, on
                                         className="bg-transparent font-semibold text-parchment text-xs outline-none w-24"
                                       />
                                    </div>
+                                 </div>
+                                 <div className="flex flex-wrap items-center gap-2">
+                                   <label className="text-[10px] font-bold text-inkfaint uppercase tracking-widest">Drawn so far</label>
+                                   <div className="flex items-center gap-1 bg-ink/50 border border-hairline/60 rounded px-2 py-0.5">
+                                      <DollarSign size={10} className="text-inkfaint" />
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={sub.drawnAmount ?? 0}
+                                        onChange={(e) => handleUpdateSubgrantee(selectedGrant.id, sub.id, { drawnAmount: Math.max(0, parseFloat(e.target.value) || 0) })}
+                                        className="bg-transparent font-semibold text-parchment text-xs outline-none w-24"
+                                        aria-label="Amount drawn so far"
+                                      />
+                                   </div>
+                                   <span className="text-[11px] text-inkmute">
+                                     {sub.allocatedAmount > 0
+                                       ? `$${(sub.drawnAmount ?? 0).toLocaleString()} drawn of $${sub.allocatedAmount.toLocaleString()}`
+                                       : 'No allocation set'}
+                                   </span>
+                                   <select
+                                     value={sub.reportingStatus ?? ''}
+                                     onChange={(e) => handleUpdateSubgrantee(selectedGrant.id, sub.id, { reportingStatus: (e.target.value || undefined) as Subgrantee['reportingStatus'] })}
+                                     className="bg-ink/70 border border-hairline rounded-md px-2 py-0.5 text-[11px] text-parchment outline-none"
+                                     aria-label="Partner reporting status"
+                                   >
+                                     <option value="">Reporting: not set</option>
+                                     <option value="current">Reports up to date</option>
+                                     <option value="late">Reports late</option>
+                                     <option value="not_started">Has not started reporting</option>
+                                   </select>
                                  </div>
                                </div>
                                <span className="px-2 py-0.5 bg-brass/10 text-brassbright rounded-full text-[10px] font-bold uppercase tracking-wider h-fit">
