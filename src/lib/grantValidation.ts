@@ -22,6 +22,33 @@ function validateKpiShape(kpi: Partial<GrantKPI | SubgranteeKPI>, label: string)
   if (typeof kpi.target !== 'number' || !Number.isFinite(kpi.target)) return `"${kpi.name}" has an invalid target.`;
   if (typeof kpi.current !== 'number' || !Number.isFinite(kpi.current)) return `"${kpi.name}" has an invalid current value.`;
   if (typeof kpi.unit !== 'string') return `"${kpi.name}" is missing a unit.`;
+  return validateKpiDetails(kpi as GrantKPI);
+}
+
+const VALID_PERIODS = ['monthly', 'quarterly', 'semiannual', 'annual', 'cumulative'];
+const text = (v: unknown, max: number) => v === undefined || (typeof v === 'string' && v.length <= max);
+
+/** The Phase 3 KPI fields: baseline, period, source, definition, history and who-was-served counts. */
+function validateKpiDetails(kpi: GrantKPI): string | null {
+  const n = kpi.name;
+  if (kpi.baseline !== undefined && !(typeof kpi.baseline === 'number' && Number.isFinite(kpi.baseline))) return `"${n}" has an invalid baseline.`;
+  if (kpi.reportingPeriod !== undefined && !VALID_PERIODS.includes(kpi.reportingPeriod)) return `"${n}" has an invalid reporting period.`;
+  if (!text(kpi.dataSource, 500) || !text(kpi.definition, 2000) || !text(kpi.requiredBy, 300)) return `"${n}" has a field that is too long.`;
+  if (kpi.history !== undefined) {
+    if (!Array.isArray(kpi.history) || kpi.history.length > 500) return `"${n}" has too many history entries.`;
+    for (const e of kpi.history) {
+      if (!isValidDate(e.date)) return `"${n}" has a history entry with an invalid date.`;
+      if (typeof e.value !== 'number' || !Number.isFinite(e.value)) return `"${n}" has a history entry with an invalid value.`;
+    }
+  }
+  for (const rows of [kpi.ageBreakdown, kpi.ethnicityBreakdown]) {
+    if (rows === undefined) continue;
+    if (!Array.isArray(rows) || rows.length > 50) return `"${n}" has too many breakdown rows.`;
+    for (const r of rows) {
+      if (typeof r.label !== 'string' || r.label.length > 100) return `"${n}" has a breakdown label that is invalid.`;
+      if (!isMoney(r.count)) return `"${n}" has a breakdown count that is not a non-negative number.`;
+    }
+  }
   return null;
 }
 
@@ -29,7 +56,7 @@ export type GrantValidationInput = Partial<
   Pick<
     Grant,
     | 'name' | 'funder' | 'amount' | 'spentAmount' | 'startDate' | 'endDate' | 'status' | 'kpis' | 'subgrantees'
-    | 'programId' | 'restriction' | 'allowedUses' | 'matchRequired' | 'matchSecured' | 'reportFrequency' | 'budgetLines'
+    | 'programId' | 'reports' | 'restriction' | 'allowedUses' | 'matchRequired' | 'matchSecured' | 'reportFrequency' | 'budgetLines'
   >
 >;
 
@@ -54,6 +81,19 @@ function validateTerms(input: GrantValidationInput): string | null {
   if (input.matchSecured !== undefined && !isMoney(input.matchSecured)) return 'Secured match must be a non-negative number.';
   if (input.reportFrequency !== undefined && !VALID_FREQUENCIES.includes(input.reportFrequency)) {
     return 'Report frequency is invalid.';
+  }
+  if (input.reports !== undefined) {
+    if (!Array.isArray(input.reports)) return 'Reports must be a list.';
+    if (input.reports.length > 200) return 'Too many reports on one grant.';
+    for (const r of input.reports) {
+      if (typeof r.title !== 'string' || r.title.trim().length === 0 || r.title.length > 300) return 'Every report needs a title.';
+      if (typeof r.dueDate !== 'string' || !isValidDate(r.dueDate)) return `"${r.title}" has an invalid due date.`;
+      if (!text(r.owner, 200)) return `"${r.title}" has an owner name that is too long.`;
+      if (r.ownerEmail !== undefined && r.ownerEmail !== '' && !(typeof r.ownerEmail === 'string' && r.ownerEmail.length <= 200 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.ownerEmail))) {
+        return `"${r.title}" has an invalid owner email.`;
+      }
+      if (r.submittedDate !== undefined && !isValidDate(r.submittedDate)) return `"${r.title}" has an invalid submitted date.`;
+    }
   }
   if (input.budgetLines !== undefined) {
     if (!Array.isArray(input.budgetLines)) return 'Budget lines must be a list.';
