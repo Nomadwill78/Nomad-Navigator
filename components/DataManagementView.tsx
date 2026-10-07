@@ -369,7 +369,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
   const downloadSampleCSV = () => {
     const sampleData = [
       ["Program Name", "Month", "Beneficiaries Served", "Total Budget Spent", "Cost Per Capita"],
-      ["Community Clean Water", "Jan", "1500", "18000", "12.0"],
+      ["Youth Workforce", "Jan", "1500", "18000", "12.0"],
       ["Sanitation Training", "Feb", "1200", "14000", "11.66"],
       ["Hygiene Education Outreach", "Mar", "2000", "19500", "9.75"],
       ["Village Well Refurbishment", "Apr", "800", "12000", "15.0"]
@@ -674,17 +674,17 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
         <InputField 
           label="Activities" 
           path="theoryOfChange.activities" 
-          tooltip="Summary of recurring high-level activities (e.g., '100 Wells Drilled')"
+          tooltip="Summary of recurring high-level activities (e.g., '12 workshops held')"
         />
         <InputField 
           label="Key Outputs" 
           path="theoryOfChange.outputs" 
-          tooltip="Measurable immediate results (e.g., '50,000 Gallons Clean Water')"
+          tooltip="Measurable immediate results (e.g., '300 youth trained')"
         />
         <InputField 
           label="Key Outcomes" 
           path="theoryOfChange.outcomes" 
-          tooltip="Intermediate effects on beneficiaries (e.g., '30% drop in illness')"
+          tooltip="Intermediate effects on beneficiaries (e.g., '70% of youth employed at 90 days')"
         />
         <InputField 
           label="Ultimate Impact" 
@@ -718,22 +718,22 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
           tooltip="Percentage of beneficiaries identifying with a disability"
         />
         <InputField 
-          label="Water Access Count" 
+          label="Primary Outcome Count" 
           path="outcomesDetails.householdsWaterAccess" 
           type="number"
-          tooltip="Total households with new or improved water access"
+          tooltip="Total people or households reached by your main outcome"
         />
         <InputField 
-          label="Health Improvements" 
+          label="Improvement Cases" 
           path="outcomesDetails.healthImprovements" 
           type="number"
-          tooltip="Documented cases of significant health improvement"
+          tooltip="Documented cases of significant improvement for participants"
         />
         <InputField 
           label="Behavioral Gains" 
           path="outcomesDetails.behaviorChanges" 
           type="number"
-          tooltip="Individuals showing positive sanitation behavior change"
+          tooltip="Individuals showing a positive behavior change"
         />
       </FieldGroup>
 
@@ -742,7 +742,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
           label="Total Budget Spent" 
           path="totalBudgetSpent" 
           type="number"
-          tooltip="Cumulative program spending for the period"
+          tooltip="Used in exports. The Overview totals spending from your grants instead."
         />
         <InputField 
           label="Operating Reserve" 
@@ -754,7 +754,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
           label="Avg Cost Per Person" 
           path="avgCostPerPerson" 
           type="number"
-          tooltip="Total Budget / Total People Served"
+          tooltip="Used in exports. The Overview divides grant spending by people served."
         />
       </FieldGroup>
 
@@ -774,68 +774,6 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({ stats, o
           path="dataQuality.lastUpdated" 
           tooltip="The date when this data was last verified"
         />
-      </FieldGroup>
-
-      <FieldGroup icon={<TrendingUp />} title="Key Performance Indicators (SaaS KPIs)">
-        {(stats.saasKpis || []).map((kpi, idx) => (
-          <div key={kpi.id} className="p-5 rounded-2xl border border-hairline/60 bg-ink/50 space-y-4 col-span-1 md:col-span-2 lg:col-span-3">
-            <h5 className="font-bold text-parchment text-sm border-b border-hairline/60 pb-2 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-teal"></span>
-              {kpi.name}
-            </h5>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-inkmute uppercase tracking-wider">Current Value</label>
-                <input
-                  type="text"
-                  disabled={!permissions?.canEditMetrics}
-                  value={kpi.value}
-                  onChange={(e) => {
-                    const newStats = { ...stats };
-                    const newKpis = [...(newStats.saasKpis || [])];
-                    newKpis[idx] = { ...newKpis[idx], value: e.target.value };
-                    newStats.saasKpis = newKpis;
-                    onUpdate(newStats);
-                  }}
-                  className={`w-full px-4 py-2.5 bg-surface border border-hairline rounded-xl text-sm focus:ring-2 focus:ring-teal/40 outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-inkmute uppercase tracking-wider">Percentage Change (%)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  disabled={!permissions?.canEditMetrics}
-                  value={kpi.changePercent}
-                  onChange={(e) => {
-                    const newStats = { ...stats };
-                    const newKpis = [...(newStats.saasKpis || [])];
-                    newKpis[idx] = { ...newKpis[idx], changePercent: parseFloat(e.target.value) || 0 };
-                    newStats.saasKpis = newKpis;
-                    onUpdate(newStats);
-                  }}
-                  className={`w-full px-4 py-2.5 bg-surface border border-hairline rounded-xl text-sm focus:ring-2 focus:ring-teal/40 outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-inkmute uppercase tracking-wider">Brief Explanation</label>
-                <input
-                  type="text"
-                  disabled={!permissions?.canEditMetrics}
-                  value={kpi.explanation}
-                  onChange={(e) => {
-                    const newStats = { ...stats };
-                    const newKpis = [...(newStats.saasKpis || [])];
-                    newKpis[idx] = { ...newKpis[idx], explanation: e.target.value };
-                    newStats.saasKpis = newKpis;
-                    onUpdate(newStats);
-                  }}
-                  className={`w-full px-4 py-2.5 bg-surface border border-hairline rounded-xl text-sm focus:ring-2 focus:ring-teal/40 outline-none transition-all ${!permissions?.canEditMetrics && 'opacity-60 cursor-not-allowed'}`}
-                />
-              </div>
-            </div>
-          </div>
-        ))}
       </FieldGroup>
 
       <div className="bg-teal/10 border border-teal/25 rounded-2xl p-6 flex gap-4">
