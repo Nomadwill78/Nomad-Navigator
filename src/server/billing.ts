@@ -141,6 +141,16 @@ export function mapSubscriptionStatus(stripeStatus: string): MappedStatus {
 
 export const isLiveSubscription = (sub: Pick<StripeSubscription, 'status'>): boolean => mapSubscriptionStatus(sub.status).live;
 
+/**
+ * Does this subscription stand in the way of starting a new one? Only a subscription that is really in force does.
+ * An "incomplete" one (a first payment that has not gone through) does not, so a person whose card failed at checkout
+ * can simply try again instead of being locked out until Stripe expires it.
+ */
+export const blocksNewCheckout = (sub: Pick<StripeSubscription, 'status'>): boolean => {
+  const m = mapSubscriptionStatus(sub.status);
+  return m.live && m.grantsPlan;
+};
+
 const customerIdOf = (sub: StripeSubscription): string => (typeof sub.customer === 'string' ? sub.customer : sub.customer.id);
 
 /** Works out what to store for a subscription. Returns an issue instead when the price is not one of ours. */
@@ -180,8 +190,12 @@ export async function applySubscription(
   deps: { stripe: StripeLike; store: BillingStore; env: Env },
   orgId: string,
   sub: StripeSubscription
-): Promise<'applied' | 'duplicate_cancelled' | 'stale_ignored' | 'issue'> {
+): Promise<'applied' | 'duplicate_cancelled' | 'stale_ignored' | 'pending_ignored' | 'issue'> {
   const { stripe, store, env } = deps;
+  // A subscription whose first payment has not gone through changes nothing yet. When it is paid, Stripe sends an
+  // update and it is adopted then. (If it expires instead, there was nothing to undo.)
+  const mapped = mapSubscriptionStatus(sub.status);
+  if (mapped.live && !mapped.grantsPlan) return 'pending_ignored';
   const current = await store.getBilling(orgId);
   const derived = deriveBillingPatch(sub, env, current?.plan);
   if ('issue' in derived) {
@@ -305,7 +319,7 @@ export async function createCheckout(
 
   // Stripe is the source of truth: if this customer already has a live subscription, do not start a second one.
   const existing = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 20 });
-  const live = existing.data.find(isLiveSubscription);
+  const live = existing.data.find(blocksNewCheckout);
   if (live) {
     throw new BillingError('ALREADY_SUBSCRIBED', 'This organization already has a subscription. Use "Change plan" instead of starting a new one.', 409);
   }

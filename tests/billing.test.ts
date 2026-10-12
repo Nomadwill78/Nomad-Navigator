@@ -60,11 +60,24 @@ describe('cancellation and failed-payment policy (status by status)', () => {
     expect(store.billing.get('org1')).toMatchObject({ plan: 'growth', status: 'active', stripeSubscriptionId: 'sub_new' });
   });
 
-  it('an unpaid first checkout never upgrades the plan', async () => {
+  it('an unpaid first checkout changes nothing: not the plan, not the status, not the recorded subscription', async () => {
     store.billing.set('org1', { plan: 'trial', status: 'trialing' });
     stripe.subs.set('sub_1', sub({ id: 'sub_1', status: 'incomplete' }));
     await processStripeEvent(deps(), evt('e1', 'checkout.session.completed', { mode: 'subscription', subscription: 'sub_1' }));
-    expect(store.billing.get('org1')!.plan).toBe('trial');
+    expect(store.billing.get('org1')).toEqual({ plan: 'trial', status: 'trialing' });
+  });
+  it('once that first payment succeeds, the same subscription is adopted', async () => {
+    store.billing.set('org1', { plan: 'trial', status: 'trialing' });
+    stripe.subs.set('sub_1', sub({ id: 'sub_1', status: 'incomplete' }));
+    await processStripeEvent(deps(), evt('e1', 'checkout.session.completed', { mode: 'subscription', subscription: 'sub_1' }));
+    stripe.subs.get('sub_1')!.status = 'active';
+    await processStripeEvent(deps(), evt('e2', 'customer.subscription.updated', { id: 'sub_1' }));
+    expect(store.billing.get('org1')).toMatchObject({ plan: 'starter', status: 'active', stripeSubscriptionId: 'sub_1' });
+  });
+  it('a person whose first payment failed at checkout can try again straight away', async () => {
+    store.billing.set('org1', { stripeCustomerId: 'cus_1' });
+    stripe.subs.set('sub_stuck', sub({ id: 'sub_stuck', status: 'incomplete' }));
+    await expect(createCheckout(deps(), { orgId: 'org1', plan: 'starter' })).resolves.toHaveProperty('url');
   });
 });
 

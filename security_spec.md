@@ -1,6 +1,6 @@
 # Security Specification for Nomad Compass
 
-**Status:** authoritative. `types.ts` (`UserRole`, `ROLE_PERMISSIONS`, `SEAT_LIMIT`) and
+**Status:** authoritative. `types.ts` (`UserRole`, `ROLE_PERMISSIONS`, `PLAN_SEAT_LIMITS`) and
 `firestore.rules` implement exactly what is written here. If you change one, change all three
 in the same commit.
 
@@ -33,11 +33,17 @@ only. Every other column is enforced in both the UI and `firestore.rules`.
 
 1. An organization always has at least one admin. Enforced by preventing an admin from changing
    their own role and by preventing deletion of the organization creator's membership.
-2. An organization cannot exceed **8 members** (`SEAT_LIMIT`). Rules cap `memberCount` at 8 on
-   organization writes, on member creation (`getAfter`), and on invitation creation. The UI counts
-   accepted members **plus pending invitations** against the same limit.
-   *Open product question: whether 8 is the intended V1 commercial limit or an artifact. Until that
-   is decided, it is enforced consistently but is not stated as a limit in marketing copy.*
+2. An organization cannot exceed its plan's seat limit: **Trial 8, Starter 3, Growth unlimited, Pro unlimited**
+   (`PLAN_SEAT_LIMITS` in `types.ts`, mirrored by `seatLimitOf()` in the rules and checked against it by a test).
+   The limit comes from the plan NAME, never from a stored number. The check is "members after joining <= limit",
+   so exactly `limit` members fit. It applies on member creation (`getAfter`), on the invitee's `memberCount`
+   update, and on invitation creation. The UI counts members **plus pending invitations** against the limit.
+   A subscription with a failed payment (`past_due`) or that has ended (`canceled`) adds no NEW members, but nobody
+   loses access or data. See `docs/BILLING.md`.
+2a. `memberCount` is a counter that only moves with a real membership change. An invitee may add exactly 1, and only
+   in the same commit that creates their own membership. Nobody (not even an admin) can set or lower it from a
+   browser, and browsers cannot delete members: removal goes through `POST /api/remove-member`, which deletes the
+   member and recounts in one transaction (so a wrong counter heals itself). A new organization must start at 1.
 3. Users can only access data belonging to organizations they are members of. This is structural:
    all org data is nested under `/organizations/{orgId}/`, `/organizations` is not listable, and
    every rule under it is gated on `isOrgMember(orgId)`.
@@ -76,21 +82,20 @@ document by email makes "is this invitation mine?" a document-id comparison agai
 | 6 | **Invitation Hijack** — signing up as `victim@org.org` to claim their invite | Acceptance requires `email_verified == true` |
 | 7 | **Self-Assigned Role** — accepting an invite at a higher role than offered | Member create requires `incoming().role == get(invite).data.role` |
 | 8 | **ID Poisoning** — oversized or hostile document ids | `isValidId()` on organization ids: ≤128 chars, `[A-Za-z0-9_-]` |
-| 9 | **De-Auth Attack** — removing the admin/owner | Member `delete` requires `admin`, and forbids deleting self or the org creator |
+| 9 | **De-Auth Attack** — removing the admin/owner | Browsers cannot delete members at all. The server removal route forbids removing yourself or the org creator, and an admin cannot change the owner's role |
 | 10 | **PII Leak** — reading other users' profiles | `/users/{uid}` is self-only read (previously any signed-in user) |
-| 11 | **Seat Inflation** — an invitee editing the org while joining | Invitee org `update` may touch `memberCount` only, `+1` only, capped at 8 |
+| 11 | **Seat Inflation** — an invitee editing the org while joining, or raising the counter without joining | Invitee org `update` may touch `memberCount` only, `+1` only, only together with their own membership in the same commit, within the plan limit |
 | 12 | **Creator Reassignment** — an admin making themselves the creator | Org `update` requires `incoming().creatorId == existing().creatorId` |
 | 13 | **Invitation Forgery** — a non-admin inviting themselves into an org | Invitation create requires `admin` of the target org and `invitedBy == request.auth.uid` |
 | 14 | **Trial Spam** — abusing the public signup form | `trial_signups` is create-only, never readable, with bounded field sizes |
 
 ## 5. Known gaps
 
-- **Rules are not yet covered by automated tests.** The intended runner is
-  `firestore.rules.test.ts` using `@firebase/rules-unit-testing`, asserting each row of §4. Until
-  that exists, rule changes must be exercised manually in the Firebase emulator.
+- **Rules tests** run against the Firestore emulator (`npm run test:rules`), covering seat limits per plan, status
+  policy, `memberCount` integrity, concurrency, and the server's Admin code. Run them before any rules change.
 - **Invitation email delivery is not implemented.** An invitation is a database record; the
   administrator has to tell their colleague to sign up. The UI says so plainly rather than implying
   a mail was sent.
-- **`memberCount` is maintained by clients** rather than a trigger, so it can drift if a write
-  fails midway. It is a cap input, not an authority — the true seat count is the number of
-  documents in the `members` subcollection.
+- **`memberCount` can still be wrong in data written before this version.** Run
+  `scripts/reconcile-member-counts.mjs` once (report first, then `--fix`). From now on it cannot drift: it only
+  moves with a real membership change, and removals recount.

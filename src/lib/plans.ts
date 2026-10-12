@@ -24,6 +24,12 @@ export const describeSeatLimit = (plan: unknown): string => {
   return limit === null ? 'Unlimited seats' : `Up to ${limit} seat${limit === 1 ? '' : 's'}`;
 };
 
+/** "3 team members" or "Unlimited team members", for pricing cards. */
+export const describeTeamSize = (plan: unknown): string => {
+  const limit = seatLimitForPlan(plan);
+  return limit === null ? 'Unlimited team members' : `${limit} team member${limit === 1 ? '' : 's'}`;
+};
+
 // --- What each billing status means --------------------------------------------------------------
 
 export interface StatusPolicy {
