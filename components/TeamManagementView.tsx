@@ -4,6 +4,7 @@ import { useAuth, inviteId } from '../src/contexts/AuthContext';
 import { db } from '../src/lib/firebase';
 import { collection, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, query, where } from 'firebase/firestore';
 import { OrgMember, UserRole, Invitation, USER_ROLES, PLAN_LABELS } from '../types';
+import { evaluateSeats, describeSeatLimit } from '../src/lib/plans';
 
 const formatJoined = (value: string) => {
   const date = new Date(value);
@@ -21,11 +22,14 @@ export const TeamManagementView: React.FC = () => {
   const [isSending, setIsSending] = useState(false);
 
   const isAdmin = role === 'admin';
-  const seatsUsed = members.length + invitations.length;
-  // null is the explicit unlimited-seat entitlement for Compass Growth.
-  const seatLimit = billing?.seatLimit ?? 8;
-  const hasUnlimitedSeats = seatLimit === null;
-  const hasAvailableSeat = hasUnlimitedSeats || seatsUsed < seatLimit;
+  const [teamError, setTeamError] = useState<string | null>(null);
+  // Seats come from the PLAN (never the stored seatLimit, and never `?? 8`, which turns "unlimited" into 8).
+  const plan = billing?.plan ?? 'trial';
+  const seats = evaluateSeats({ plan, status: billing?.status ?? 'trialing', members: members.length, pendingInvites: invitations.length });
+  const seatsUsed = seats.used;
+  const seatLimit = seats.limit;
+  const hasUnlimitedSeats = seats.unlimited;
+  const hasAvailableSeat = seats.canAdd;
 
   useEffect(() => {
     if (!organization) return;
@@ -55,7 +59,7 @@ export const TeamManagementView: React.FC = () => {
       return;
     }
     if (!hasAvailableSeat) {
-      setInviteError(`All ${seatLimit} seats are taken. Remove a member, revoke an invitation, or upgrade your plan first.`);
+      setInviteError(seats.message);
       return;
     }
     setIsSending(true);
@@ -91,10 +95,21 @@ export const TeamManagementView: React.FC = () => {
 
   const handleDeleteMember = async (docId: string) => {
     if (!isAdmin || !organization || !confirm('Are you sure you want to remove this member?')) return;
+    setTeamError(null);
     try {
-      await deleteDoc(doc(db, `organizations/${organization.id}/members`, docId));
-      await updateDoc(doc(db, 'organizations', organization.id), { memberCount: Math.max(0, members.length - 1) });
-    } catch (error) { console.error('Could not remove member:', error); }
+      // The server removes the member and recounts in one step; the browser cannot (the rules forbid it),
+      // which is what keeps the member counter from ever drifting.
+      const idToken = await user!.getIdToken();
+      const res = await fetch('/api/remove-member', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ orgId: organization.id, userId: docId }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Could not remove that member.');
+    } catch (error: any) {
+      console.error('Could not remove member:', error);
+      setTeamError(error.message || 'Could not remove that member. Please try again.');
+    }
   };
 
   return (
@@ -103,7 +118,7 @@ export const TeamManagementView: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-ivory flex items-center gap-2"><Users className="text-teal" /> Team Management</h2>
           <p className="text-inkmute">
-            {billing ? PLAN_LABELS[billing.plan] : 'Trial'} plan — {hasUnlimitedSeats ? 'unlimited seats' : `limit: ${seatLimit} seats`}, including pending invitations.
+            {PLAN_LABELS[plan as keyof typeof PLAN_LABELS] ?? PLAN_LABELS.trial} plan: {describeSeatLimit(plan)}{hasUnlimitedSeats ? '' : ', including pending invitations'}.
           </p>
         </div>
         {isAdmin && hasAvailableSeat && (
@@ -112,6 +127,14 @@ export const TeamManagementView: React.FC = () => {
           </button>
         )}
       </div>
+
+      {teamError && <p role="alert" className="text-sm text-alert bg-alert/10 border border-alert/25 rounded-xl px-4 py-3">{teamError}</p>}
+      {seats.blockedBy && seats.blockedBy !== 'full' && (
+        <p role="status" className="text-sm text-parchment bg-brass/10 border border-brass/30 rounded-xl px-4 py-3">{seats.message}</p>
+      )}
+      {seats.blockedBy === 'full' && isAdmin && (
+        <p role="status" className="text-sm text-parchment bg-brass/10 border border-brass/30 rounded-xl px-4 py-3">{seats.message}</p>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-surface p-6 rounded-3xl border border-hairline shadow-sm">

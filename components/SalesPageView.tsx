@@ -1,3 +1,4 @@
+import { describeTeamSize } from '../src/lib/plans';
 import React, { useState } from 'react';
 import {
   ArrowRight,
@@ -98,7 +99,7 @@ const PLANS: Plan[] = [
     price: '$49',
     tagline: 'Know where your nonprofit stands.',
     audience: 'For smaller nonprofits building a disciplined approach to grant and impact management.',
-    members: '3 team members',
+    members: describeTeamSize('starter'),
     features: [
       'Grant tracking',
       'KPI & impact tracking',
@@ -114,7 +115,7 @@ const PLANS: Plan[] = [
     price: '$99',
     tagline: 'Turn your data into management intelligence.',
     audience: 'For growing nonprofits managing multiple grants, programs, and reporting requirements.',
-    members: '8 team members',
+    members: describeTeamSize('growth'),
     everythingIn: 'Starter',
     features: [
       'Subgrantee tracking',
@@ -130,8 +131,8 @@ const PLANS: Plan[] = [
     name: 'Compass Pro',
     price: '$199',
     tagline: 'Build a stronger funding and impact operation.',
-    audience: 'For established nonprofits with larger teams and more complex grant portfolios.',
-    members: '20 team members',
+    audience: 'For established nonprofits with complex grant portfolios and heavier reporting needs.',
+    members: describeTeamSize('pro'),
     everythingIn: 'Growth',
     features: [
       'Unlimited AI Impact Reports*',

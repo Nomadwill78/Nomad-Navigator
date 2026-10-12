@@ -17,16 +17,26 @@ service cloud.firestore {
       return hasVerifiedEmail() && exists(inviteRef()) && get(inviteRef()).data.orgId == orgId && get(inviteRef()).data.status == 'pending';
     }
 
-    // null is the explicit unlimited-seat entitlement used by Compass Growth.
-    function orgSeatLimit(orgId) {
-      return exists(/databases/$(database)/documents/organizations/$(orgId)/billing/subscription)
-        ? get(/databases/$(database)/documents/organizations/$(orgId)/billing/subscription).data.seatLimit
-        : 8;
+    // ---- Seats ----------------------------------------------------------------------------------
+    // The seat limit comes from the plan NAME, never from a stored number, so it cannot drift.
+    // KEEP THIS TABLE IN STEP WITH PLAN_SEAT_LIMITS IN types.ts (tests/rules checks that they match).
+    // null means unlimited. An unknown plan gets 0, so nobody new can join, instead of unlimited seats.
+    function seatLimitOf(plan) {
+      return plan == 'trial' ? 8 : (plan == 'starter' ? 3 : ((plan == 'growth' || plan == 'pro') ? null : 0));
     }
 
-    function hasAvailableSeat(orgId, memberCount) {
-      let limit = orgSeatLimit(orgId);
-      return limit == null || memberCount < limit;
+    function billingPath(orgId) { return /databases/$(database)/documents/organizations/$(orgId)/billing/subscription; }
+    // An organization with no billing document yet is on the trial.
+    function orgPlan(orgId) { return exists(billingPath(orgId)) ? get(billingPath(orgId)).data.plan : 'trial'; }
+    function orgStatus(orgId) { return exists(billingPath(orgId)) ? get(billingPath(orgId)).data.status : 'trialing'; }
+    // A failed payment (past_due) or an ended subscription (canceled) keeps everyone's access but adds no new members.
+    function statusAllowsNewSeats(status) { return status in ['trialing', 'active']; }
+
+    // May the organization hold `newCount` members after this write? newCount counts the person being added,
+    // so the check is "<=": exactly as many members as the limit are allowed, and no more.
+    function canHold(orgId, newCount) {
+      let limit = seatLimitOf(orgPlan(orgId));
+      return statusAllowsNewSeats(orgStatus(orgId)) && (limit == null || newCount <= limit);
     }
 
     function isValidOrganization(data) {
@@ -78,30 +88,53 @@ service cloud.firestore {
 
     match /organizations/{orgId} {
       allow get: if isOrgMember(orgId) || hasPendingInvite(orgId);
-      allow create: if isSignedIn() && isValidOrganization(incoming()) && incoming().creatorId == request.auth.uid && isValidId(orgId);
+      // A new organization starts with exactly one member, its creator, added in the same commit.
+      allow create: if isSignedIn() && isValidOrganization(incoming()) && incoming().creatorId == request.auth.uid && isValidId(orgId) &&
+        incoming().memberCount == 1 &&
+        existsAfter(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+      // memberCount is a counter that only moves with a real membership change:
+      //  - an admin can edit the organization but can NEVER set memberCount (it must stay as it is);
+      //  - an invitee can add exactly 1, and only in the same commit that creates their own membership;
+      //  - removals go through the server (which recounts the members), so no client can lower it.
       allow update: if
-        (hasRole(orgId, ['admin']) && isValidOrganization(incoming()) && incoming().creatorId == existing().creatorId)
+        (hasRole(orgId, ['admin']) && isValidOrganization(incoming()) && incoming().creatorId == existing().creatorId &&
+         incoming().memberCount == existing().memberCount)
         ||
         (hasPendingInvite(orgId) && incoming().diff(existing()).affectedKeys().hasOnly(['memberCount']) &&
-         incoming().memberCount == existing().memberCount + 1 && hasAvailableSeat(orgId, incoming().memberCount));
+         incoming().memberCount == existing().memberCount + 1 &&
+         !exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
+         existsAfter(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
+         canHold(orgId, incoming().memberCount));
 
       match /members/{userId} {
         allow read: if isOrgMember(orgId);
-        allow create: if isValidOrgMember(incoming()) && incoming().userId == userId &&
-          hasAvailableSeat(orgId, getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.memberCount) &&
+        // Only two ways in, and only for yourself:
+        //  1. you created this organization (it does not exist yet; it and you are created together as its first admin), or
+        //  2. you hold a pending invitation, and the organization's memberCount goes up by exactly 1 in the same commit
+        //     while the seat limit still has room. (An admin cannot add members directly.)
+        allow create: if isValidOrgMember(incoming()) && incoming().userId == userId && userId == request.auth.uid &&
           (
-            (isSignedIn() && userId == request.auth.uid && getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.creatorId == request.auth.uid)
+            (!exists(/databases/$(database)/documents/organizations/$(orgId)) &&
+             getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.creatorId == request.auth.uid &&
+             getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.memberCount == 1 &&
+             incoming().role == 'admin')
             ||
-            (userId == request.auth.uid && hasPendingInvite(orgId) && incoming().role == get(inviteRef()).data.role && incoming().email.lower() == authEmail())
-            ||
-            (hasRole(orgId, ['admin']))
+            (hasPendingInvite(orgId) && incoming().role == get(inviteRef()).data.role && incoming().email.lower() == authEmail() &&
+             getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.memberCount ==
+               get(/databases/$(database)/documents/organizations/$(orgId)).data.memberCount + 1 &&
+             canHold(orgId, getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.memberCount))
           );
-        allow update: if hasRole(orgId, ['admin']) && isValidOrgMember(incoming()) && incoming().userId == existing().userId && userId != request.auth.uid;
-        allow delete: if hasRole(orgId, ['admin']) && userId != request.auth.uid && userId != get(/databases/$(database)/documents/organizations/$(orgId)).data.creatorId;
+        // Roles can change, but not your own, and not the owner's: an organization always keeps its owner as an admin.
+        allow update: if hasRole(orgId, ['admin']) && isValidOrgMember(incoming()) && incoming().userId == existing().userId &&
+          userId != request.auth.uid && userId != get(/databases/$(database)/documents/organizations/$(orgId)).data.creatorId;
+        // Removing a member also lowers memberCount, which a client cannot do safely, so removal is done by the
+        // server (POST /api/remove-member), which deletes the member and recounts in one transaction.
+        allow delete: if false;
       }
 
       match /billing/{docId} {
-        allow get: if isOrgMember(orgId);
+        // A pending invitee may read the plan (the app checks it before joining and says why a seat is not free).
+        allow get: if isOrgMember(orgId) || hasPendingInvite(orgId);
         allow list: if false;
         allow create: if docId == 'subscription' && isSignedIn() &&
                          getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.creatorId == request.auth.uid &&
@@ -143,7 +176,7 @@ service cloud.firestore {
       allow get: if isSignedIn() && (inviteEmail == authEmail() || hasRole(resource.data.orgId, ['admin']));
       allow list: if isSignedIn() && hasRole(resource.data.orgId, ['admin']);
       allow create: if isValidInvitation(incoming()) && inviteEmail == incoming().email && hasRole(incoming().orgId, ['admin']) &&
-                       hasAvailableSeat(incoming().orgId, get(/databases/$(database)/documents/organizations/$(incoming().orgId)).data.memberCount);
+                       canHold(incoming().orgId, get(/databases/$(database)/documents/organizations/$(incoming().orgId)).data.memberCount + 1);
       allow update: if false;
       allow delete: if isSignedIn() && (inviteEmail == authEmail() || hasRole(resource.data.orgId, ['admin']));
     }
