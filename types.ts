@@ -151,15 +151,24 @@ export interface Organization {
 
 /**
  * THE AUTHORITATIVE PLAN MODEL.
- * `seatLimit` is null for an unlimited-seat plan (currently Growth).
+ * Seat limits live in PLAN_SEAT_LIMITS below.
  */
 export type PlanId = 'trial' | 'starter' | 'growth' | 'pro';
+export type BillingStatus = 'trialing' | 'active' | 'past_due' | 'canceled';
 
+/**
+ * Team seats per plan. THE ONE PLACE this is decided. The server, the app and the database rules
+ * (firestore.rules, checked against this table by a test) all follow it. `null` means unlimited.
+ *
+ * Each step up never has fewer seats than the one below it:
+ *   Trial 8, Starter 3, Growth unlimited, Pro unlimited.
+ * Pro is set apart by AI report volume and onboarding, not by a smaller team cap.
+ */
 export const PLAN_SEAT_LIMITS: Record<PlanId, number | null> = {
   trial: 8,
   starter: 3,
   growth: null,
-  pro: 20,
+  pro: null,
 };
 
 export const PLAN_LABELS: Record<PlanId, string> = {
@@ -171,12 +180,17 @@ export const PLAN_LABELS: Record<PlanId, string> = {
 
 export interface OrgBilling {
   plan: PlanId;
-  status: 'trialing' | 'active' | 'past_due' | 'canceled';
-  /** Null means unlimited seats. */
+  status: BillingStatus;
+  /**
+   * For display only. Entitlements are always worked out from `plan` (see src/lib/plans.ts),
+   * never from this stored copy, so it can never drift out of step. Null means unlimited.
+   */
   seatLimit: number | null;
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
   currentPeriodEnd?: string;
+  /** True when the subscription is set to end at the end of the paid period. */
+  cancelAtPeriodEnd?: boolean;
   updatedAt: string;
 }
 

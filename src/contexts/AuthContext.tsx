@@ -2,9 +2,10 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signOut, sendEmailVerification, reload } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot, collection, query, where, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
-import { UserProfile, Organization, OrgMember, UserRole, Invitation, OrgBilling, PLAN_SEAT_LIMITS } from '../../types';
+import { UserProfile, Organization, OrgMember, UserRole, Invitation, OrgBilling } from '../../types';
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 import { clearLegacyLocalData } from '../lib/orgData';
+import { createOrganizationTxn, acceptInvitationTxn } from '../lib/membership';
 
 export const inviteId = (email: string) => email.trim().toLowerCase();
 
@@ -181,16 +182,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const orgId = `org_${Date.now()}`;
     const userEmail = user.email || '';
     try {
-      await runTransaction(db, async (transaction) => {
-        const orgRef = doc(db, 'organizations', orgId);
-        const memberRef = doc(db, `organizations/${orgId}/members`, user.uid);
-        const billingRef = doc(db, `organizations/${orgId}/billing`, 'subscription');
-        const profileRef = doc(db, 'users', user.uid);
-        transaction.set(orgRef, { name, creatorId: user.uid, createdAt: serverTimestamp(), memberCount: 1 });
-        transaction.set(memberRef, { userId: user.uid, email: userEmail, role: 'admin', joinedAt: serverTimestamp() });
-        transaction.set(billingRef, { plan: 'trial', status: 'trialing', seatLimit: PLAN_SEAT_LIMITS.trial, updatedAt: new Date().toISOString() });
-        transaction.update(profileRef, { currentOrgId: orgId });
-      });
+      await createOrganizationTxn(db, { orgId, name, uid: user.uid, email: userEmail });
       clearLegacyLocalData();
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `organizations/${orgId}`);
@@ -205,28 +197,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     if (!user.email) throw new Error('Your account has no email address, so this invitation cannot be matched.');
 
-    const orgRef = doc(db, 'organizations', invitation.orgId);
-    const billingRef = doc(db, `organizations/${invitation.orgId}/billing`, 'subscription');
-
-    await runTransaction(db, async (transaction) => {
-      const orgSnap = await transaction.get(orgRef);
-      if (!orgSnap.exists()) throw new Error('That organization no longer exists. Ask your administrator to re-invite you.');
-      const billingSnap = await transaction.get(billingRef);
-      const seatLimit: number | null = billingSnap.exists() ? (billingSnap.data().seatLimit as number | null) : 8;
-      const currentCount = (orgSnap.data().memberCount as number) ?? 0;
-
-      // null is the explicit unlimited-seat entitlement used by Growth.
-      if (seatLimit !== null && currentCount >= seatLimit) {
-        throw new Error(`${invitation.orgName} has no seats left (limit ${seatLimit}). Ask an administrator to free one up or upgrade the plan.`);
-      }
-
-      transaction.set(doc(db, `organizations/${invitation.orgId}/members`, user.uid), {
-        userId: user.uid, email: user.email, role: invitation.role, joinedAt: new Date().toISOString(),
-      });
-      transaction.update(orgRef, { memberCount: currentCount + 1 });
-      transaction.update(doc(db, 'users', user.uid), { currentOrgId: invitation.orgId });
-      transaction.delete(doc(db, 'invitations', invitation.id));
-    });
+    await acceptInvitationTxn(db, { uid: user.uid, email: user.email, invitation });
 
     clearLegacyLocalData();
     setInvitation(null);
