@@ -21,6 +21,7 @@ import {
   updateGrant as updateGrantRemote,
 } from '../lib/orgData';
 import { generateId } from '../lib/id';
+import { ValidationError } from '../lib/grantValidation';
 
 export type SyncStatus = 'loading' | 'live' | 'cached' | 'error' | 'demo';
 
@@ -284,7 +285,11 @@ export function useOrgData(
           setSyncStatus('live');
         } catch (error) {
           console.error('Failed to save grant:', error);
-          failedGrantChanges.current.set(grantId, { ...failedGrantChanges.current.get(grantId), ...toWrite });
+          // A refused entry will never succeed on retry, so it is not held back (it would block every
+          // later save to this grant). The message tells the person exactly what to fix.
+          if (!(error instanceof ValidationError)) {
+            failedGrantChanges.current.set(grantId, { ...failedGrantChanges.current.get(grantId), ...toWrite });
+          }
           refreshUnsaved();
           setSyncStatus('error');
           setSyncError(describeError(error));
@@ -408,6 +413,8 @@ export function useOrgData(
 }
 
 function describeError(error: unknown): string {
+  // The person's own entry was refused: say exactly why, instead of blaming the connection.
+  if (error instanceof ValidationError) return `Not saved: ${error.message}`;
   const message = error instanceof Error ? error.message : String(error);
   if (message.includes('permission-denied') || message.includes('Missing or insufficient permissions')) {
     return "Your role doesn't allow this change, or you're no longer a member of this organization.";

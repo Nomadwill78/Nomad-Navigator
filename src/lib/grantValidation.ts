@@ -1,5 +1,14 @@
 import { Grant, GrantKPI, Program, Subgrantee, SubgranteeKPI } from '../../types';
 import { isValidMoney, MAX_MONEY, formatMoney } from './money';
+import { isValidEmail } from './email';
+
+/** A problem with what the person entered (as opposed to the database being unreachable). Its message is meant to be shown. */
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
 
 /**
  * Runtime validation for grants — the middle of the three enforcement layers
@@ -91,8 +100,8 @@ function validateTerms(input: GrantValidationInput): string | null {
       if (typeof r.title !== 'string' || r.title.trim().length === 0 || r.title.length > 300) return 'Every report needs a title.';
       if (typeof r.dueDate !== 'string' || !isValidDate(r.dueDate)) return `"${r.title}" has an invalid due date.`;
       if (!text(r.owner, 200)) return `"${r.title}" has an owner name that is too long.`;
-      if (r.ownerEmail !== undefined && r.ownerEmail !== '' && !(typeof r.ownerEmail === 'string' && r.ownerEmail.length <= 200 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.ownerEmail))) {
-        return `"${r.title}" has an invalid owner email.`;
+      if (r.ownerEmail !== undefined && r.ownerEmail !== '' && !isValidEmail(r.ownerEmail)) {
+        return `"${r.title}" has an invalid owner email (${String(r.ownerEmail).slice(0, 60)}). Use something like name@organization.org.`;
       }
       if (r.submittedDate !== undefined && !isValidDate(r.submittedDate)) return `"${r.title}" has an invalid submitted date.`;
     }

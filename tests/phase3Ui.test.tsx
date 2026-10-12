@@ -37,6 +37,36 @@ describe('Due Soon card', () => {
   });
 });
 
+describe('Reporting calendar panel: email and default date', () => {
+  it('shows why an invalid email is not saved, and never passes it on', () => {
+    const onChange = vi.fn();
+    render(<ReportingCalendarPanel grant={grant({ reports: [{ id: 'a', title: 'Q3', dueDate: plusDays(20), owner: 'Dana' }] })} canEdit onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText('Owner email for reminders'), { target: { value: 'not-an-email' } });
+    expect(screen.getByRole('alert').textContent).toMatch(/name@organization.org/);
+    expect(screen.getByRole('alert').textContent).toMatch(/Not saved yet/);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+  it('saves a valid email, and clearing it goes back to admins', () => {
+    const onChange = vi.fn();
+    render(<ReportingCalendarPanel grant={grant({ reports: [{ id: 'a', title: 'Q3', dueDate: plusDays(20), owner: 'Dana' }] })} canEdit onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText('Owner email for reminders'), { target: { value: 'dana@org.org' } });
+    expect(onChange.mock.calls[0][0].reports[0].ownerEmail).toBe('dana@org.org');
+    fireEvent.change(screen.getByLabelText('Owner email for reminders'), { target: { value: '' } });
+    expect(onChange.mock.calls[1][0].reports[0].ownerEmail).toBeUndefined();
+  });
+  it('tells you where reminders will go', () => {
+    render(<ReportingCalendarPanel grant={grant({ reports: [{ id: 'a', title: 'Q3', dueDate: plusDays(20), owner: '' }, { id: 'b', title: 'Q4', dueDate: plusDays(40), owner: '', ownerEmail: 'dana@org.org' }] })} canEdit onChange={() => {}} />);
+    expect(screen.getByText(/all admins of the organization \(no owner email set\)/)).toBeTruthy();
+    expect(screen.getByText(/Reminders go to dana@org.org/)).toBeTruthy();
+  });
+  it('a new report is due 30 days out, not today', () => {
+    const onChange = vi.fn();
+    render(<ReportingCalendarPanel grant={grant()} canEdit onChange={onChange} />);
+    fireEvent.click(screen.getByText('Add report'));
+    expect(onChange.mock.calls[0][0].reports[0].dueDate).toBe(plusDays(30));
+  });
+});
+
 describe('Reporting calendar panel', () => {
   it('adds a report and marks one submitted', () => {
     const onChange = vi.fn();

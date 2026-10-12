@@ -34,6 +34,15 @@ export function todayYmd(now: Date = new Date()): string {
   return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
 }
 
+/** The date n days after (or before, when negative) a YYYY-MM-DD date, as YYYY-MM-DD. Calendar arithmetic only, no time zones. */
+export function addDays(ymd: string, n: number): string {
+  const d = dayNumber(ymd);
+  if (d === null) return ymd;
+  const out = new Date((d + n) * 86_400_000);
+  const p = (x: number) => String(x).padStart(2, '0');
+  return `${out.getUTCFullYear()}-${p(out.getUTCMonth() + 1)}-${p(out.getUTCDate())}`;
+}
+
 /** 2026-01-01 -> "01/01/2026". Returns an em-dash-free placeholder for bad input. */
 export function formatYmd(ymd: string): string {
   const m = DAY_RE.exec(ymd ?? '');

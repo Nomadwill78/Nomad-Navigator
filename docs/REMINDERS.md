@@ -61,6 +61,7 @@ You get a list of who would be emailed, for which report, and why. To prove real
 
 - **503 "reminders are switched off"**: `CRON_SECRET` is not set.
 - **401**: the secret in your request does not match.
+- **`invalidOwnerEmails` is not 0 in the dry run**: a report has an owner email that is not a valid address (the app now refuses to save these, so this only happens with older data). The reminder goes to the admins instead, the admin email says so, and the run summary names the report. Fix the address on the grant's reporting calendar.
 - **Items with status `failed`**: the message says why. "Gmail rejected the login" means `GMAIL_APP_PASSWORD` is wrong, or is your normal password instead of an app password. Make a new app password and update it in Vercel.
 - **500 "No email sender is set up"**: `GMAIL_USER` and `GMAIL_APP_PASSWORD` are missing.
 - **Items with status `no_recipient`**: the report has no owner email and the organization has no admin email on file.

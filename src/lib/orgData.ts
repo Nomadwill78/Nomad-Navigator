@@ -11,7 +11,7 @@ import {
 import { db } from './firebase';
 import { DashboardStats, Grant, OrgSettings, Program } from '../../types';
 import { DEFAULT_FISCAL_START_MONTH, isValidStartMonth } from './fiscalYear';
-import { validateGrant, validateProgram } from './grantValidation';
+import { validateGrant, validateProgram, ValidationError } from './grantValidation';
 
 /**
  * Organization-scoped data access.
@@ -263,7 +263,7 @@ export async function persistStats(orgId: string, stats: DashboardStats): Promis
  */
 export async function createGrant(orgId: string, grant: Omit<Grant, 'id'>): Promise<string> {
   const invalid = validateGrant(grant);
-  if (invalid) throw new Error(invalid);
+  if (invalid) throw new ValidationError(invalid);
 
   const ref = doc(grantsCollection(orgId));
   await setDoc(ref, deepStripUndefined(sanitizeGrant({ ...grant, id: ref.id })) as unknown as Record<string, unknown>);
@@ -278,7 +278,7 @@ export async function createGrant(orgId: string, grant: Omit<Grant, 'id'>): Prom
  */
 export async function updateGrant(orgId: string, grantId: string, changes: Partial<Grant>): Promise<void> {
   const invalid = validateGrant(changes);
-  if (invalid) throw new Error(invalid);
+  if (invalid) throw new ValidationError(invalid);
 
   await updateDoc(grantDoc(orgId, grantId), buildGrantUpdate(changes));
 }
@@ -292,7 +292,7 @@ export async function deleteGrant(orgId: string, grantId: string): Promise<void>
 
 export async function createProgram(orgId: string, program: Omit<Program, 'id'>): Promise<string> {
   const invalid = validateProgram(program) ?? (program.name?.trim() ? null : 'Program name is required.');
-  if (invalid) throw new Error(invalid);
+  if (invalid) throw new ValidationError(invalid);
   const ref = doc(programsCollection(orgId));
   await setDoc(ref, stripUndefined({ ...program, id: ref.id }) as Record<string, unknown>);
   return ref.id;
@@ -300,7 +300,7 @@ export async function createProgram(orgId: string, program: Omit<Program, 'id'>)
 
 export async function updateProgram(orgId: string, programId: string, changes: Partial<Omit<Program, 'id'>>): Promise<void> {
   const invalid = validateProgram(changes);
-  if (invalid) throw new Error(invalid);
+  if (invalid) throw new ValidationError(invalid);
   await updateDoc(programDoc(orgId, programId), stripUndefined(changes as Record<string, unknown>));
 }
 

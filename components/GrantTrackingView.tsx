@@ -407,7 +407,7 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, pr
                   }`}>
                     {grant.status}
                   </span>
-                  <p className="text-xs font-bold text-inkfaint">{formatMoneyCompact(grant.amount)}</p>
+                  <p className="text-xs font-bold text-inkfaint">{formatMoney(grant.amount)}</p>
                 </div>
                 <h4 className="font-bold text-parchment line-clamp-1">{grant.name}</h4>
                 <p className="text-xs text-inkmute mb-3">{grant.funder}</p>

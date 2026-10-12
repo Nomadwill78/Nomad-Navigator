@@ -66,8 +66,8 @@ export const StatCard: React.FC<StatCardProps> = ({
         </div>
 
         <h3 className="text-inkfaint text-[0.6rem] font-mono2 uppercase tracking-[0.18em] mb-2">{title}</h3>
-        <div className="flex items-baseline gap-2">
-          <div className="font-display text-3xl font-semibold tracking-tight text-ivory">{value}</div>
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <div className="font-display text-3xl font-semibold tracking-tight text-ivory break-words min-w-0">{value}</div>
           {subValue && <span className="text-sm font-medium text-inkmute">{subValue}</span>}
         </div>
 

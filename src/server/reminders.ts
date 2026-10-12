@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { Grant } from '../../types';
 import { buildReminderEmail, planReminders, PlannedReminder } from '../lib/reporting';
+import { isValidEmail } from '../lib/email';
 
 /**
  * The daily reminder job. All real-world access (database, email) comes in through
@@ -26,12 +27,14 @@ export interface ReminderRunSummary {
   considered: number;
   sent: number;
   skippedNoRecipient: number;
+  /** Reports whose owner email was present but not a valid address, so the reminder went to admins instead. */
+  invalidOwnerEmails: number;
   failed: number;
   /** What was (or, in a dry run, would be) sent. */
-  items: { orgId: string; grantName: string; report: string; kind: string; to: string[]; status: 'sent' | 'would_send' | 'no_recipient' | 'failed'; error?: string }[];
+  items: { orgId: string; grantName: string; report: string; kind: string; to: string[]; status: 'sent' | 'would_send' | 'no_recipient' | 'failed'; error?: string; note?: string }[];
 }
 
-const looksLikeEmail = (v: string | undefined): v is string => !!v && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
+const looksLikeEmail = isValidEmail;
 
 export async function runReminders(opts: {
   store: ReminderStore;
@@ -42,7 +45,7 @@ export async function runReminders(opts: {
 }): Promise<ReminderRunSummary> {
   const { store, mailer, today, appUrl } = opts;
   const dryRun = !!opts.dryRun;
-  const summary: ReminderRunSummary = { today, dryRun, considered: 0, sent: 0, skippedNoRecipient: 0, failed: 0, items: [] };
+  const summary: ReminderRunSummary = { today, dryRun, considered: 0, sent: 0, skippedNoRecipient: 0, invalidOwnerEmails: 0, failed: 0, items: [] };
 
   for (const orgId of await store.listOrgIds()) {
     let planned: PlannedReminder[];
@@ -60,11 +63,18 @@ export async function runReminders(opts: {
     let adminEmails: string[] | null = null;
     for (const p of planned) {
       summary.considered += 1;
-      const base = { orgId, grantName: p.grantName, report: p.report.title, kind: p.kind };
+      const base: { orgId: string; grantName: string; report: string; kind: string; note?: string } = { orgId, grantName: p.grantName, report: p.report.title, kind: p.kind };
       let to: string[];
-      if (looksLikeEmail(p.report.ownerEmail)) {
-        to = [p.report.ownerEmail];
+      const ownerEmail = p.report.ownerEmail?.trim();
+      const ownerEmailProblem = ownerEmail && !looksLikeEmail(ownerEmail) ? ownerEmail : undefined;
+      if (ownerEmail && looksLikeEmail(ownerEmail)) {
+        to = [ownerEmail];
       } else {
+        if (ownerEmailProblem) {
+          // Never silent: it is counted, listed in the run summary, and the email itself says so.
+          summary.invalidOwnerEmails += 1;
+          base.note = `Owner email "${ownerEmailProblem.slice(0, 60)}" is not valid, so this went to the admins.`;
+        }
         adminEmails ??= (await store.listAdminEmails(orgId)).filter(looksLikeEmail);
         to = adminEmails;
       }
@@ -78,7 +88,7 @@ export async function runReminders(opts: {
         continue;
       }
       try {
-        await mailer.send({ to, ...buildReminderEmail(p, appUrl) });
+        await mailer.send({ to, ...buildReminderEmail(p, appUrl, ownerEmailProblem) });
         // Only after the email really went out, so a failure is retried tomorrow.
         await store.markSent(orgId, p.key, { to, sentAt: new Date().toISOString() });
         summary.sent += 1;

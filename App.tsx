@@ -1246,7 +1246,7 @@ const App: React.FC = () => {
 
                 {/* Historical Impact Chart */}
                 <div className="bg-surface p-8 rounded-xl border border-hairline hover:border-brass/30 transition-colors duration-300">
-                  <div className="flex items-center justify-between mb-8">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
                     <div>
                       <h3 className="font-display font-semibold text-ivory text-lg">Impact Trajectory</h3>
                       <p className="text-sm text-inkmute">Outcomes achieved over time</p>

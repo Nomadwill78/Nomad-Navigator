@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { CalendarClock, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 import { Grant, ReportDue, ReportStatus } from '../types';
 import { describeDue, daysUntil, reportStatus } from '../src/lib/reporting';
-import { formatYmd, todayYmd } from '../src/lib/overview';
+import { addDays, formatYmd, todayYmd } from '../src/lib/overview';
+import { isValidEmail, EMAIL_HELP } from '../src/lib/email';
 import { generateId } from '../src/lib/id';
 
 interface Props {
@@ -21,6 +22,44 @@ const STATUS_LABEL: Record<ReportStatus, string> = { upcoming: 'Upcoming', submi
 const field =
   'px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-sm text-parchment placeholder:text-inkfaint outline-none focus:ring-2 focus:ring-teal/40 disabled:opacity-60 disabled:cursor-not-allowed';
 
+/** A new report is due 30 days out, so it does not show as late the day after it is added. */
+export const DEFAULT_DUE_DAYS = 30;
+
+/**
+ * Keeps what was typed while typing, and saves only an address that looks right (or nothing at all).
+ * An invalid address shows why and is never saved, so reminders cannot quietly go somewhere else.
+ */
+const OwnerEmailField: React.FC<{ value: string | undefined; disabled: boolean; onCommit: (v: string | undefined) => void }> = ({ value, disabled, onCommit }) => {
+  const [text, setText] = useState(value ?? '');
+  const focused = useRef(false);
+  useEffect(() => { if (!focused.current) setText(value ?? ''); }, [value]);
+  const trimmed = text.trim();
+  const invalid = trimmed !== '' && !isValidEmail(trimmed);
+
+  return (
+    <div className="flex flex-col gap-1">
+      <input
+        disabled={disabled}
+        type="email"
+        value={text}
+        aria-label="Owner email for reminders"
+        aria-invalid={invalid || undefined}
+        onFocus={() => { focused.current = true; }}
+        onBlur={() => { focused.current = false; setText(value ?? ''); }}
+        onChange={(e) => {
+          setText(e.target.value);
+          const t = e.target.value.trim();
+          if (t === '') onCommit(undefined);
+          else if (isValidEmail(t)) onCommit(t);
+        }}
+        placeholder="Blank: reminders go to admins"
+        className={field}
+      />
+      {invalid && <span role="alert" className="text-[11px] text-alert normal-case font-normal leading-tight">{EMAIL_HELP} Not saved yet.</span>}
+    </div>
+  );
+};
+
 /** Every report this funder expects, with a due date, an owner and whether it has gone out. */
 export const ReportingCalendarPanel: React.FC<Props> = ({ grant, canEdit, onChange }) => {
   const today = todayYmd();
@@ -28,7 +67,7 @@ export const ReportingCalendarPanel: React.FC<Props> = ({ grant, canEdit, onChan
   const update = (id: string, changes: Partial<ReportDue>) =>
     onChange({ reports: (grant.reports ?? []).map((r) => (r.id === id ? { ...r, ...changes } : r)) });
   const add = () =>
-    onChange({ reports: [...(grant.reports ?? []), { id: generateId(), title: 'Progress report', dueDate: today, owner: '' }] });
+    onChange({ reports: [...(grant.reports ?? []), { id: generateId(), title: 'Progress report', dueDate: addDays(today, DEFAULT_DUE_DAYS), owner: '' }] });
   const remove = (id: string) => onChange({ reports: (grant.reports ?? []).filter((r) => r.id !== id) });
 
   return (
@@ -98,16 +137,14 @@ export const ReportingCalendarPanel: React.FC<Props> = ({ grant, canEdit, onChan
                   </label>
                   <label className="flex flex-col gap-1 text-[10px] text-inkfaint uppercase font-bold">
                     Owner email (for reminders)
-                    <input
-                      disabled={!canEdit}
-                      type="email"
-                      value={r.ownerEmail ?? ''}
-                      onChange={(e) => update(r.id, { ownerEmail: e.target.value || undefined })}
-                      placeholder="Blank: reminders go to admins"
-                      className={field}
-                    />
+                    <OwnerEmailField disabled={!canEdit} value={r.ownerEmail} onCommit={(v) => update(r.id, { ownerEmail: v })} />
                   </label>
                 </div>
+                {!r.submittedDate && (
+                  <p className="text-[11px] text-inkfaint">
+                    Reminders go to {r.ownerEmail ? r.ownerEmail : 'all admins of the organization (no owner email set)'}.
+                  </p>
+                )}
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-inkmute">
                   <span>
                     {r.submittedDate

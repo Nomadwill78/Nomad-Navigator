@@ -105,7 +105,7 @@ export function planReminders(
 
 export interface ReminderEmail { subject: string; text: string; }
 
-export function buildReminderEmail(p: PlannedReminder, appUrl?: string): ReminderEmail {
+export function buildReminderEmail(p: PlannedReminder, appUrl?: string, invalidOwnerEmail?: string): ReminderEmail {
   const when = p.daysUntil === 0 ? 'today' : p.daysUntil === 1 ? 'tomorrow' : `in ${p.daysUntil} days (${p.report.dueDate})`;
   const lines = [
     `Reminder: "${p.report.title}" for ${p.funder} is due ${when}.`,
@@ -115,6 +115,7 @@ export function buildReminderEmail(p: PlannedReminder, appUrl?: string): Reminde
     p.report.owner ? `Owner: ${p.report.owner}` : '',
     '',
     'Mark it submitted in Nomad Compass once it has been sent, and these reminders stop.',
+    invalidOwnerEmail ? `Note: the owner email saved on this report ("${invalidOwnerEmail.slice(0, 60)}") is not a valid address, so this reminder came to you as an admin. Please correct it on the grant's reporting calendar.` : '',
     appUrl ? appUrl : '',
   ].filter((l, i, arr) => !(l === '' && arr[i - 1] === ''));
   return { subject: `Report due ${p.daysUntil === 0 ? 'today' : `in ${p.daysUntil} day${p.daysUntil === 1 ? '' : 's'}`}: ${p.report.title} (${p.funder})`, text: lines.join('\n') };

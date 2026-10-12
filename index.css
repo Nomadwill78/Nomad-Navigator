@@ -43,7 +43,12 @@ body {
   pointer-events: none;
   z-index: 0;
 }
-.compass-canvas > * { position: relative; z-index: 1; }
+/* Lift the app above the graticule. This sits in the base layer on purpose: Tailwind's utilities live in a
+   later layer, so a layout class such as `fixed` (the sidebar) or `sticky` always wins over this rule. Left
+   unlayered, this rule overrode `fixed`, which doubled the sidebar's width and made the page scroll sideways. */
+@layer base {
+  .compass-canvas > * { position: relative; z-index: 1; }
+}
 
 /* dark recharts tooltip */
 .recharts-default-tooltip {
