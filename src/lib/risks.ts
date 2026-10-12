@@ -1,3 +1,4 @@
+import { formatMoney } from './money';
 import { Grant } from '../../types';
 import { checkOverspend, computePace, formatYmd, PACE_TOLERANCE_POINTS, todayYmd } from './overview';
 import { checkBudgetLines, computeMatch, listOutcomes } from './programs';
@@ -15,7 +16,7 @@ export interface Risk {
   detail: string;
 }
 
-const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
+const money = formatMoney;
 
 export function computeRisks(grants: Grant[], today: string = todayYmd(), fundingGap?: number | null): Risk[] {
   const risks: Risk[] = [];
@@ -85,7 +86,7 @@ export function computeRisks(grants: Grant[], today: string = todayYmd(), fundin
 
   for (const o of listOutcomes(live, today)) {
     for (const t of o.targets) {
-      if (t.health === 'on_track') continue;
+      if (t.health === 'on_track' || t.health === 'closed') continue;
       risks.push({
         severity: t.health === 'off_track' ? 80 : 50,
         title: `${t.funder}: "${o.name}" is ${t.health === 'off_track' ? 'off track' : 'at risk'}`,

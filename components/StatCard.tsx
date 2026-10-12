@@ -9,6 +9,8 @@ interface StatCardProps {
   trendDirection?: 'up' | 'down' | 'neutral';
   icon: React.ReactNode;
   description?: string;
+  /** A smaller second line under the description, for what is NOT in the number. */
+  footnote?: string;
   /** Two Bearings Rule: 'impact' draws the card in Signal Teal, 'funding' in
    *  Lamplit Brass for money, governance, and quality metrics. */
   accent?: 'impact' | 'funding';
@@ -23,6 +25,7 @@ export const StatCard: React.FC<StatCardProps> = ({
   trendDirection = 'neutral',
   icon,
   description,
+  footnote,
   accent: accentName = 'impact',
   sparklineData,
   subValue,
@@ -69,6 +72,7 @@ export const StatCard: React.FC<StatCardProps> = ({
         </div>
 
         {description && <p className="text-inkmute text-xs mt-1.5 leading-relaxed">{description}</p>}
+        {footnote && <p className="text-inkfaint text-[11px] mt-1 leading-relaxed">{footnote}</p>}
       </div>
 
       {/* Sparkline */}

@@ -44,26 +44,41 @@ export function formatYmd(ymd: string): string {
 
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
-/** Pending grants are not money the organization has yet, so they are left out. */
+/**
+ * "Awarded" means active and completed grants. A pending grant has not been awarded yet, so it is
+ * left out of every total, but it is reported separately (pendingAmount) so it is never invisible.
+ */
 const countsTowardTotals = (g: Grant) => g.status !== 'pending';
+
+const funderKey = (g: Grant) => (g.funder ?? '').trim().toLowerCase();
 
 export interface GrantTotals {
   totalAwarded: number;
   totalSpent: number;
+  /** Distinct funders among the grants counted in totalAwarded (active and completed). */
+  funderCount: number;
+  /** Of those, the funders with at least one active grant. */
   activeFunders: number;
+  /** Grants counted in totalAwarded. */
   grantCount: number;
+  /** Money on pending grants. Not in totalAwarded. */
+  pendingAmount: number;
+  pendingCount: number;
 }
 
 export function computeGrantTotals(grants: Grant[]): GrantTotals {
   const counted = grants.filter(countsTowardTotals);
-  const funders = new Set(
-    counted.filter((g) => g.status === 'active').map((g) => (g.funder ?? '').trim().toLowerCase()).filter(Boolean)
-  );
+  const pending = grants.filter((g) => !countsTowardTotals(g));
+  const funders = new Set(counted.map(funderKey).filter(Boolean));
+  const active = new Set(counted.filter((g) => g.status === 'active').map(funderKey).filter(Boolean));
   return {
     totalAwarded: counted.reduce((a, g) => a + num(g.amount), 0),
     totalSpent: counted.reduce((a, g) => a + num(g.spentAmount), 0),
-    activeFunders: funders.size,
+    funderCount: funders.size,
+    activeFunders: active.size,
     grantCount: counted.length,
+    pendingAmount: pending.reduce((a, g) => a + num(g.amount), 0),
+    pendingCount: pending.length,
   };
 }
 
@@ -105,7 +120,8 @@ export function computeFundingDiversity(grants: Grant[]): FunderShare[] {
 
 // --- Pace -----------------------------------------------------------------
 
-export type PaceStatus = 'on_track' | 'at_risk' | 'no_dates';
+/** 'closed' and 'not_started' are for completed and pending grants, which are never flagged. */
+export type PaceStatus = 'on_track' | 'at_risk' | 'no_dates' | 'closed' | 'not_started';
 
 export interface Pace {
   status: PaceStatus;
@@ -119,7 +135,7 @@ export interface Pace {
 export const PACE_TOLERANCE_POINTS = 10;
 
 export function computePace(
-  grant: Pick<Grant, 'amount' | 'spentAmount' | 'startDate' | 'endDate'>,
+  grant: Pick<Grant, 'amount' | 'spentAmount' | 'startDate' | 'endDate'> & { status?: Grant['status'] },
   today: string = todayYmd()
 ): Pace {
   const amount = num(grant.amount);
@@ -127,6 +143,9 @@ export function computePace(
   const start = dayNumber(grant.startDate);
   const end = dayNumber(grant.endDate);
   const now = dayNumber(today);
+  // A funder-closed grant has no pace to keep, and a pending one has not started: neither raises an alert.
+  if (grant.status === 'completed') return { status: 'closed', spentPercent, elapsedPercent: 100, gap: 0 };
+  if (grant.status === 'pending') return { status: 'not_started', spentPercent, elapsedPercent: 0, gap: 0 };
   if (start === null || end === null || now === null || end <= start) {
     return { status: 'no_dates', spentPercent, elapsedPercent: 0, gap: 0 };
   }
@@ -155,7 +174,8 @@ export function checkOverspend(grant: Pick<Grant, 'amount' | 'spentAmount'>): Ov
 
 // --- KPI rollup -----------------------------------------------------------
 
-export type KpiHealth = 'on_track' | 'at_risk' | 'off_track';
+/** 'closed' is the final result of a completed grant. It is shown, but it is never an alert. */
+export type KpiHealth = 'on_track' | 'at_risk' | 'off_track' | 'closed';
 
 export interface RolledKpi {
   id: string;
@@ -174,6 +194,8 @@ export interface KpiRollup {
   onTrack: number;
   atRisk: number;
   offTrack: number;
+  /** Final results from completed grants. Not counted as on track, at risk or off track. */
+  closed: number;
   /** KPIs with no target set. They are listed nowhere and never counted. */
   withoutTarget: number;
 }
@@ -190,8 +212,70 @@ export function kpiHealth(progressPercent: number, elapsedPercent: number): KpiH
   return 'on_track';
 }
 
+/** Health of one KPI on one grant. A completed grant's KPIs are final results, not alerts. */
+export function grantKpiHealth(grant: Pick<Grant, 'status'>, progressPercent: number, elapsedPercent: number): KpiHealth {
+  return grant.status === 'completed' ? 'closed' : kpiHealth(progressPercent, elapsedPercent);
+}
+
+export interface KpiPace {
+  /** One plain word for the badge. */
+  label: string;
+  tone: 'good' | 'warn' | 'neutral' | 'done';
+  /** One sentence that says why the badge says what it says. */
+  explanation: string;
+  progressPercent: number;
+}
+
+const pctText = (n: number) => `${Math.round(n)}%`;
+
+/**
+ * The status shown on a KPI. It compares progress with how much of the grant period has gone,
+ * so 41% done with 28% of the year gone is on track, and 67% done with 90% gone is not.
+ * The explanation spells out both numbers so the badge is never a mystery.
+ */
+export function resolveKpiPace(
+  kpi: { current: number; target: number },
+  grant: Pick<Grant, 'status' | 'startDate' | 'endDate'>,
+  today: string = todayYmd()
+): KpiPace {
+  const info = resolveKpiStatus(num(kpi.current), num(kpi.target));
+  const p = info.progressPercent;
+  if (info.status === 'no_target') {
+    return { label: 'No target', tone: 'neutral', explanation: 'Set a target to measure progress.', progressPercent: 0 };
+  }
+  if (info.status === 'not_started') {
+    return { label: 'Not started', tone: 'neutral', explanation: 'No progress has been entered yet.', progressPercent: 0 };
+  }
+  if (info.status === 'exceeded') {
+    return { label: 'Exceeded', tone: 'done', explanation: `${pctText(p)} of the target, above 100%.`, progressPercent: p };
+  }
+  if (info.status === 'met') {
+    return { label: 'Met', tone: 'done', explanation: 'The target has been reached.', progressPercent: p };
+  }
+  if (grant.status === 'completed') {
+    return { label: 'Final', tone: 'neutral', explanation: `Final result: ${pctText(p)} of the target when the grant closed.`, progressPercent: p };
+  }
+  const elapsed = computePace({ amount: 0, spentAmount: 0, startDate: grant.startDate, endDate: grant.endDate }, today);
+  if (elapsed.status === 'no_dates' || grant.status === 'pending') {
+    return { label: 'In progress', tone: 'neutral', explanation: `${pctText(p)} of the target. Add valid grant dates to compare against the timeline.`, progressPercent: p };
+  }
+  const e = elapsed.elapsedPercent;
+  const health = kpiHealth(p, e);
+  const both = `${pctText(p)} of the target with ${pctText(e)} of the grant period gone`;
+  if (health === 'on_track') {
+    return { label: 'On track', tone: 'good', explanation: `${both}. That is on pace.`, progressPercent: p };
+  }
+  const behind = Math.round(e - p);
+  return {
+    label: health === 'off_track' ? 'Off track' : 'At risk',
+    tone: 'warn',
+    explanation: `${both}. That is ${behind} points behind pace.`,
+    progressPercent: p,
+  };
+}
+
 export function rollUpKpis(grants: Grant[], today: string = todayYmd()): KpiRollup {
-  const out: KpiRollup = { kpis: [], onTrack: 0, atRisk: 0, offTrack: 0, withoutTarget: 0 };
+  const out: KpiRollup = { kpis: [], onTrack: 0, atRisk: 0, offTrack: 0, closed: 0, withoutTarget: 0 };
   for (const g of grants.filter(countsTowardTotals)) {
     const elapsed = computePace({ amount: 0, spentAmount: 0, startDate: g.startDate, endDate: g.endDate }, today)
       .elapsedPercent;
@@ -201,7 +285,7 @@ export function rollUpKpis(grants: Grant[], today: string = todayYmd()): KpiRoll
         out.withoutTarget += 1;
         continue;
       }
-      const health = kpiHealth(info.progressPercent, elapsed);
+      const health = grantKpiHealth(g, info.progressPercent, elapsed);
       out.kpis.push({
         id: `${g.id}:${k.id}`,
         name: k.name,
@@ -215,7 +299,8 @@ export function rollUpKpis(grants: Grant[], today: string = todayYmd()): KpiRoll
       });
       if (health === 'on_track') out.onTrack += 1;
       else if (health === 'at_risk') out.atRisk += 1;
-      else out.offTrack += 1;
+      else if (health === 'off_track') out.offTrack += 1;
+      else out.closed += 1;
     }
   }
   return out;

@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DashboardStats, Grant, Program } from '../../types';
+import { DashboardStats, Grant, OrgSettings, Program } from '../../types';
 import {
   EMPTY_STATS,
   createGrant as createGrantRemote,
   deleteGrant as deleteGrantRemote,
   persistStats,
+  DEFAULT_SETTINGS,
+  readCachedSettings,
+  saveSettings as saveSettingsRemote,
+  subscribeToSettings,
   createProgram as createProgramRemote,
   updateProgram as updateProgramRemote,
   deleteProgram as deleteProgramRemote,
@@ -24,6 +28,8 @@ interface UseOrgDataResult {
   stats: DashboardStats;
   grants: Grant[];
   programs: Program[];
+  settings: OrgSettings;
+  updateSettings: (settings: OrgSettings) => Promise<void>;
   createProgram: (program: Omit<Program, 'id'>) => Promise<string>;
   updateProgram: (programId: string, changes: Partial<Omit<Program, 'id'>>) => Promise<void>;
   deleteProgram: (programId: string) => void;
@@ -68,6 +74,7 @@ export function useOrgData(
   const [stats, setStatsState] = useState<DashboardStats>(EMPTY_STATS);
   const [grants, setGrantsState] = useState<Grant[]>([]);
   const [programs, setProgramsState] = useState<Program[]>([]);
+  const [settings, setSettingsState] = useState<OrgSettings>(DEFAULT_SETTINGS);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('loading');
   const [syncError, setSyncError] = useState<string | null>(null);
 
@@ -104,6 +111,7 @@ export function useOrgData(
     setStatsState(readCachedStats(orgId));
     setGrantsState(readCachedGrants(orgId));
     setProgramsState(readCachedPrograms(orgId));
+    setSettingsState(readCachedSettings(orgId));
     setSyncStatus(navigator.onLine ? 'loading' : 'cached');
 
     const unsubStats = subscribeToStats(
@@ -159,10 +167,21 @@ export function useOrgData(
       }
     );
 
+    const unsubSettings = subscribeToSettings(
+      orgId,
+      (next) => setSettingsState(next),
+      (error) => {
+        console.error('Settings sync failed:', error);
+        setSyncStatus('error');
+        setSyncError(describeError(error));
+      }
+    );
+
     return () => {
       unsubStats();
       unsubGrants();
       unsubPrograms();
+      unsubSettings();
     };
   }, [orgId, isDemoMode]);
 
@@ -172,6 +191,7 @@ export function useOrgData(
       setStatsState(demoStats);
       setGrantsState(demoGrants);
       setProgramsState(demoPrograms);
+      setSettingsState(DEFAULT_SETTINGS);
       setSyncStatus('demo');
       return;
     }
@@ -179,6 +199,7 @@ export function useOrgData(
       setStatsState(readCachedStats(orgId));
       setGrantsState(readCachedGrants(orgId));
       setProgramsState(readCachedPrograms(orgId));
+      setSettingsState(readCachedSettings(orgId));
       setSyncStatus(navigator.onLine ? 'loading' : 'cached');
     }
     // demoStats/demoGrants are module constants; re-running on identity is unnecessary
@@ -296,6 +317,24 @@ export function useOrgData(
     [orgId, isDemoMode]
   );
 
+  const updateSettings = useCallback(
+    async (next: OrgSettings): Promise<void> => {
+      if (isDemoMode) {
+        setSettingsState(next);
+        return;
+      }
+      if (!orgId) throw new Error('No active organization.');
+      try {
+        await saveSettingsRemote(orgId, next);
+      } catch (error) {
+        setSyncStatus('error');
+        setSyncError(describeError(error));
+        throw error;
+      }
+    },
+    [orgId, isDemoMode]
+  );
+
   // --- Program writes (immediate, not debounced: programs are edited in a form, not by keystroke) ---
   const createProgram = useCallback(
     async (program: Omit<Program, 'id'>): Promise<string> => {
@@ -365,7 +404,7 @@ export function useOrgData(
     };
   }, []);
 
-  return { stats, grants, programs, createProgram, updateProgram, deleteProgram, setStats, createGrant, updateGrant, deleteGrant, syncStatus, syncError, hasUnsavedChanges, retrySync };
+  return { stats, grants, programs, settings, updateSettings, createProgram, updateProgram, deleteProgram, setStats, createGrant, updateGrant, deleteGrant, syncStatus, syncError, hasUnsavedChanges, retrySync };
 }
 
 function describeError(error: unknown): string {

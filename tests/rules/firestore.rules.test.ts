@@ -110,3 +110,37 @@ describe('Phase 3 data', () => {
   it('no client can read the reminder log either', () =>
     assertFails(getDoc(doc(dbAs('admin'), `organizations/${ORG}/reminderLog/x`))));
 });
+
+describe('organization settings (fiscal year)', () => {
+  const save = (uid: string, data: Record<string, unknown>) => setDoc(doc(dbAs(uid), `organizations/${ORG}/settings/general`), data);
+  for (const r of roles) {
+    const allowed = r === 'admin';
+    it(`${r} ${allowed ? 'can' : 'cannot'} change the fiscal year`, () =>
+      allowed ? assertSucceeds(save(r, { fiscalYearStartMonth: 7 })) : assertFails(save(r, { fiscalYearStartMonth: 7 })));
+  }
+  it('every member can read it', async () => {
+    await assertSucceeds(save('admin', { fiscalYearStartMonth: 7 }));
+    await assertSucceeds(getDoc(doc(dbAs('viewer'), `organizations/${ORG}/settings/general`)));
+  });
+  it('rejects a bad month, extra fields and the wrong document name', async () => {
+    await assertFails(save('admin', { fiscalYearStartMonth: 13 }));
+    await assertFails(save('admin', { fiscalYearStartMonth: 0 }));
+    await assertFails(save('admin', { fiscalYearStartMonth: 6.5 }));
+    await assertFails(save('admin', { fiscalYearStartMonth: 7, extra: 'x' }));
+    await assertFails(setDoc(doc(dbAs('admin'), `organizations/${ORG}/settings/other`), { fiscalYearStartMonth: 7 }));
+  });
+});
+
+describe('money limits', () => {
+  const g = (over: Record<string, unknown>) => setDoc(doc(dbAs('admin'), `organizations/${ORG}/grants/gm`), {
+    id: 'gm', name: 'G', funder: 'F', amount: 1000, startDate: '2026-01-01', endDate: '2026-12-31', status: 'active', kpis: [], ...over,
+  });
+  it('accepts cents and the one billion limit', async () => {
+    await assertSucceeds(g({ amount: 47000.25, spentAmount: 1234.5 }));
+    await assertSucceeds(g({ amount: 1000000000 }));
+  });
+  it('rejects amounts above one billion', async () => {
+    await assertFails(g({ amount: 99000000000 }));
+    await assertFails(g({ spentAmount: 99000000000 }));
+  });
+});

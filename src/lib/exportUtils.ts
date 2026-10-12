@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { DashboardStats, Grant } from '../../types';
 import { resolveKpiStatus } from './kpiStatus';
+import { formatMoney } from './money';
 
 // Helper to flatten nested objects for CSV export
 function flattenObject(ob: any, prefix = ''): any {
@@ -159,7 +160,7 @@ export function exportDashboardPDF(stats: DashboardStats, grants: Grant[]) {
   // Stat boxes
   const statsList = [
     { label: 'Total People Served', val: stats.totalPeopleServed.toLocaleString() + ' beneficiaries' },
-    { label: 'Total Budget Spent', val: `$${stats.totalBudgetSpent.toLocaleString()}` },
+    { label: 'Total Budget Spent', val: `${formatMoney(stats.totalBudgetSpent)}` },
     { label: 'Average Cost Per Person', val: `$${stats.avgCostPerPerson.toFixed(2)}` },
     { label: 'Social SROI Ratio', val: `$${stats.sroi} generated per $1` },
     { label: 'Sector Benchmark', val: stats.benchmarkComparison }
@@ -193,7 +194,7 @@ export function exportDashboardPDF(stats: DashboardStats, grants: Grant[]) {
   y += 8;
 
   const tocList = [
-    { step: 'INPUT', desc: `Resources and budgets deployed: $${stats.totalBudgetSpent.toLocaleString()} total spent.` },
+    { step: 'INPUT', desc: `Resources and budgets deployed: ${formatMoney(stats.totalBudgetSpent)} total spent.` },
     { step: 'ACTIVITIES', desc: stats.theoryOfChange.activities },
     { step: 'OUTPUTS', desc: stats.theoryOfChange.outputs },
     { step: 'OUTCOMES', desc: stats.theoryOfChange.outcomes },
@@ -291,7 +292,7 @@ export function exportDashboardPDF(stats: DashboardStats, grants: Grant[]) {
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(15, 23, 42);
-    doc.text(`Budget Total: $${g.amount.toLocaleString()}   |   Spent: $${spent.toLocaleString()} (${pct}%)`, margin + 4, y + 17);
+    doc.text(`Budget Total: ${formatMoney(g.amount)}   |   Spent: ${formatMoney(spent)} (${pct}%)`, margin + 4, y + 17);
 
     // Mini spent progress bar
     doc.setFillColor(241, 245, 249);
@@ -386,7 +387,7 @@ export function exportGrantPortfolioPDF(grants: Grant[]) {
   doc.setFont('Helvetica', 'bold');
   doc.setFontSize(14);
   doc.setTextColor(15, 23, 42);
-  doc.text(`$${totalSpent.toLocaleString()} spent out of $${totalFunding.toLocaleString()} (${aggregatePercent.toFixed(1)}%)`, margin + 6, y + 14);
+  doc.text(`${formatMoney(totalSpent)} spent out of ${formatMoney(totalFunding)} (${aggregatePercent.toFixed(1)}%)`, margin + 6, y + 14);
 
   y += 32;
 
@@ -404,8 +405,8 @@ export function exportGrantPortfolioPDF(grants: Grant[]) {
     const details = [
       { k: 'Funder Organization', v: g.funder },
       { k: 'Project Timeline', v: `${g.startDate} to ${g.endDate}` },
-      { k: 'Authorized Grant Size', v: `$${g.amount.toLocaleString()}` },
-      { k: 'Current Spent Tally', v: `$${(g.spentAmount ?? 0).toLocaleString()} (${g.amount > 0 ? (((g.spentAmount ?? 0)/g.amount)*100).toFixed(1) : 0}%)` },
+      { k: 'Authorized Grant Size', v: `${formatMoney(g.amount)}` },
+      { k: 'Current Spent Tally', v: `${formatMoney((g.spentAmount ?? 0))} (${g.amount > 0 ? (((g.spentAmount ?? 0)/g.amount)*100).toFixed(1) : 0}%)` },
       { k: 'Grant Status', v: g.status.toUpperCase() }
     ];
 
@@ -458,7 +459,7 @@ export function exportGrantPortfolioPDF(grants: Grant[]) {
         doc.setFont('Helvetica', 'normal');
         doc.setFontSize(8.5);
         doc.setTextColor(71, 85, 105);
-        doc.text(`- ${sub.name} • Allocation: $${sub.allocatedAmount.toLocaleString()} • Status: ${sub.status}`, margin + 8, y);
+        doc.text(`- ${sub.name} • Allocation: ${formatMoney(sub.allocatedAmount)} • Status: ${sub.status}`, margin + 8, y);
         y += 5;
       });
     }

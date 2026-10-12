@@ -1,3 +1,4 @@
+import { formatMoney } from './money';
 import { jsPDF } from 'jspdf';
 import { Grant, Program } from '../../types';
 import { checkOverspend, computePace, formatYmd, todayYmd } from './overview';
@@ -19,7 +20,7 @@ const GOLD: [number, number, number] = [255, 179, 0];
 const SAND: [number, number, number] = [244, 241, 234];
 const MUTED: [number, number, number] = [92, 107, 124];
 
-const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
+const money = formatMoney;
 const pct = (n: number) => `${Math.round(n)}%`;
 const num = (n: number) => n.toLocaleString('en-US');
 
@@ -184,7 +185,7 @@ export function buildFunderReport(input: FunderReportInput) {
       name: k.name,
       result: `${num(k.current)} of ${num(k.target)} ${k.unit}`.trim(),
       progress: info.status === 'no_target' ? 'No target set' : `${pct(info.progressPercent)} of target`,
-      health: health === 'off_track' ? 'Off track' : health === 'at_risk' ? 'At risk' : info.status === 'no_target' ? '' : 'On track',
+      health: health === 'closed' ? 'Final result' : health === 'off_track' ? 'Off track' : health === 'at_risk' ? 'At risk' : info.status === 'no_target' ? '' : 'On track',
       baseline: change ? `Baseline ${num(k.baseline!)}, change ${change.change >= 0 ? '+' : ''}${num(change.change)}${change.percent !== null ? ` (${change.percent >= 0 ? '+' : ''}${change.percent}%)` : ''}` : '',
       definition: k.definition ?? '',
       dataSource: k.dataSource ?? '',
@@ -242,7 +243,7 @@ export function renderFunderReport(input: FunderReportInput): jsPDF {
   ]);
   if (r.overspend.over) {
     c.paragraph(`Spending is ${money(r.overspend.amount)} over the award.`, { bold: true });
-  } else if (r.paceStatus === 'at_risk') {
+  } else if (r.paceStatus === 'at_risk') { // never true for completed or pending grants
     c.paragraph(`Spending and elapsed time are more than 10 points apart (${pct(r.percentSpent)} spent, ${pct(r.percentElapsed)} of the period gone).`, { color: MUTED });
   }
 

@@ -252,6 +252,12 @@ export interface Grant {
   reports?: ReportDue[];
 }
 
+/** Organization-wide settings. Only an admin can change them. */
+export interface OrgSettings {
+  /** The month the fiscal year starts: 1 = January, 7 = July. */
+  fiscalYearStartMonth: number;
+}
+
 /** A program is what the organization runs; several grants from different funders can pay for it. */
 export interface Program {
   id: string;

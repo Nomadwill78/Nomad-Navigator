@@ -1,4 +1,5 @@
 import { Grant, GrantKPI, Program, Subgrantee, SubgranteeKPI } from '../../types';
+import { isValidMoney, MAX_MONEY, formatMoney } from './money';
 
 /**
  * Runtime validation for grants — the middle of the three enforcement layers
@@ -64,7 +65,8 @@ const VALID_FREQUENCIES = ['monthly', 'quarterly', 'semiannual', 'annual', 'none
 const VALID_CATEGORIES = ['personnel', 'supplies', 'partner_pass_through', 'other'];
 const VALID_REPORTING = ['current', 'late', 'not_started'];
 
-const isMoney = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+const isMoney = isValidMoney;
+const TOO_BIG = `Amounts above ${formatMoney(MAX_MONEY)} are not accepted.`;
 
 /** The Phase 2 grant fields. Each is optional; only the ones present are checked. */
 function validateTerms(input: GrantValidationInput): string | null {
@@ -77,8 +79,8 @@ function validateTerms(input: GrantValidationInput): string | null {
   if (input.allowedUses !== undefined && (typeof input.allowedUses !== 'string' || input.allowedUses.length > 2000)) {
     return 'Allowed uses is too long.';
   }
-  if (input.matchRequired !== undefined && !isMoney(input.matchRequired)) return 'Required match must be a non-negative number.';
-  if (input.matchSecured !== undefined && !isMoney(input.matchSecured)) return 'Secured match must be a non-negative number.';
+  if (input.matchRequired !== undefined && !isMoney(input.matchRequired)) return `Required match must be a non-negative number. ${TOO_BIG}`;
+  if (input.matchSecured !== undefined && !isMoney(input.matchSecured)) return `Secured match must be a non-negative number. ${TOO_BIG}`;
   if (input.reportFrequency !== undefined && !VALID_FREQUENCIES.includes(input.reportFrequency)) {
     return 'Report frequency is invalid.';
   }
@@ -119,15 +121,13 @@ export function validateGrant(input: GrantValidationInput): string | null {
   }
 
   if (input.amount !== undefined) {
-    if (typeof input.amount !== 'number' || !Number.isFinite(input.amount) || input.amount < 0) {
-      return 'Award amount must be a non-negative number.';
-    }
+    if (typeof input.amount === 'number' && input.amount > MAX_MONEY) return `Award amount: ${TOO_BIG}`;
+    if (!isMoney(input.amount)) return 'Award amount must be a non-negative number.';
   }
 
   if (input.spentAmount !== undefined) {
-    if (typeof input.spentAmount !== 'number' || !Number.isFinite(input.spentAmount) || input.spentAmount < 0) {
-      return 'Spent amount must be a non-negative number.';
-    }
+    if (typeof input.spentAmount === 'number' && input.spentAmount > MAX_MONEY) return `Spent amount: ${TOO_BIG}`;
+    if (!isMoney(input.spentAmount)) return 'Spent amount must be a non-negative number.';
   }
 
   if (input.startDate !== undefined && !isValidDate(input.startDate)) return 'Start date is invalid.';
@@ -157,8 +157,8 @@ export function validateGrant(input: GrantValidationInput): string | null {
     if (input.subgrantees.length > MAX_LIST_LENGTH) return 'Too many subgrantees on one grant.';
     for (const sub of input.subgrantees) {
       if (typeof sub.name !== 'string' || sub.name.trim().length === 0) return 'Every subgrantee needs a name.';
-      if (typeof sub.allocatedAmount !== 'number' || !Number.isFinite(sub.allocatedAmount) || sub.allocatedAmount < 0) {
-        return `Subgrantee "${sub.name}" has an invalid allocation amount.`;
+      if (!isMoney(sub.allocatedAmount)) {
+        return `Subgrantee "${sub.name}" has an invalid allocation amount. ${TOO_BIG}`;
       }
       if (!VALID_SUBGRANTEE_STATUSES.includes(sub.status)) return `Subgrantee "${sub.name}" has an invalid status.`;
       if (sub.drawnAmount !== undefined && !isMoney(sub.drawnAmount)) return `Subgrantee "${sub.name}" has an invalid drawn amount.`;
