@@ -60,9 +60,11 @@ import { useAuth } from './src/contexts/AuthContext';
 import { useOrgData } from './src/hooks/useOrgData';
 import { computeGrantTotals, computeFundingDiversity, rollUpKpis } from './src/lib/overview';
 import { filterGrants, availableYears, isFilterActive, NO_FILTER, GrantFilter } from './src/lib/programs';
+import { fiscalYearLabel } from './src/lib/fiscalYear';
 import { ProgramsView } from './components/ProgramsView';
 import { DueSoonCard } from './components/DueSoonCard';
 import { aggregateBreakdown } from './src/lib/kpiHistory';
+import { formatMoney } from './src/lib/money';
 import { generateImpactReport } from './services/geminiService';
 import { DashboardStats, ProgramMetric, Grant, Opportunity, Program, ROLE_PERMISSIONS } from './types';
 import { Analytics } from '@vercel/analytics/react';
@@ -433,7 +435,7 @@ const App: React.FC = () => {
 
   // Grants and metrics live in Firestore under this organization, so every member
   // of the org sees the same numbers. Demo mode is served from memory and never written.
-  const { stats, grants, programs, createProgram, updateProgram, deleteProgram, setStats, createGrant, updateGrant, deleteGrant, syncStatus, syncError, hasUnsavedChanges, retrySync } = useOrgData(
+  const { stats, grants, programs, settings, updateSettings, createProgram, updateProgram, deleteProgram, setStats, createGrant, updateGrant, deleteGrant, syncStatus, syncError, hasUnsavedChanges, retrySync } = useOrgData(
     organization?.id ?? null,
     isDemoMode,
     DEMO_STATS,
@@ -447,9 +449,10 @@ const App: React.FC = () => {
   // Every Overview figure below is computed from the grants the user entered.
   // Nothing here is a default, an estimate, or a placeholder number.
   const [filter, setFilter] = useState<GrantFilter>(NO_FILTER);
-  const filtered = useMemo(() => filterGrants(grants, filter), [grants, filter]);
+  const fyStart = settings.fiscalYearStartMonth;
+  const filtered = useMemo(() => filterGrants(grants, filter, fyStart), [grants, filter, fyStart]);
   const filterOn = isFilterActive(filter);
-  const years = useMemo(() => availableYears(grants), [grants]);
+  const years = useMemo(() => availableYears(grants, fyStart), [grants, fyStart]);
   const totals = useMemo(() => computeGrantTotals(filtered), [filtered]);
   const diversity = useMemo(() => computeFundingDiversity(filtered), [filtered]);
   const kpiRollup = useMemo(() => rollUpKpis(filtered), [filtered]);
@@ -907,7 +910,11 @@ const App: React.FC = () => {
           ) : activeView === 'billing' ? (
             <BillingView />
           ) : activeView === 'settings' ? (
-            <SettingsView />
+            <SettingsView
+              fiscalYearStartMonth={settings.fiscalYearStartMonth}
+              canChangeFiscalYear={role === 'admin'}
+              onFiscalYearChange={(m) => updateSettings({ ...settings, fiscalYearStartMonth: m })}
+            />
           ) : (
             <>
               {/* Dashboard Header */}
@@ -916,7 +923,7 @@ const App: React.FC = () => {
                   <p className="font-mono2 text-[0.62rem] tracking-[0.28em] uppercase text-brass mb-1.5">Bearing · Program Impact</p>
                   <h1 className="font-display text-4xl font-semibold text-ivory tracking-tight">Program Impact</h1>
                   <p className="text-inkmute mt-1.5 flex items-center gap-2 text-sm font-mono2">
-                    {`FY ${new Date().getFullYear()}`} <span className="w-1 h-1 rounded-full bg-inkfaint"></span>{' '}
+                    {filter.year === 'all' ? 'All years' : fiscalYearLabel(filter.year, fyStart)} <span className="w-1 h-1 rounded-full bg-inkfaint"></span>{' '}
                     {isDemoMode
                       ? 'Demo data'
                       : stats.dataQuality.lastUpdated && stats.dataQuality.lastUpdated !== '—'
@@ -976,7 +983,7 @@ const App: React.FC = () => {
                     </select>
                   </label>
                   <label className="flex items-center gap-2 text-xs text-inkfaint">
-                    Year
+                    Fiscal year
                     <select
                       value={String(filter.year)}
                       onChange={(e) => setFilter({ ...filter, year: e.target.value === 'all' ? 'all' : Number(e.target.value) })}
@@ -984,7 +991,7 @@ const App: React.FC = () => {
                     >
                       <option value="all">All years</option>
                       {years.map((y) => (
-                        <option key={y} value={y}>{y}</option>
+                        <option key={y} value={y}>{fiscalYearLabel(y, fyStart)}</option>
                       ))}
                     </select>
                   </label>
@@ -993,6 +1000,7 @@ const App: React.FC = () => {
                       <button onClick={() => setFilter(NO_FILTER)} className="text-xs text-brassbright font-semibold underline">Clear filters</button>
                       <p className="text-xs text-inkmute basis-full">
                         Showing {filtered.length} of {grants.length} {grants.length === 1 ? 'grant' : 'grants'}. Funding, funders and key indicators follow the filter.
+                        {filter.year !== 'all' && ' A grant is included if it is active at any point in the fiscal year, so a grant that spans two fiscal years appears in both.'}
                         People served, demographics and service areas are entered for the whole organization, so they are not filtered.
                       </p>
                     </>
@@ -1060,7 +1068,7 @@ const App: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center relative z-10">
                         <div className="flex flex-col group">
                             <span className="text-[0.6rem] text-inkfaint font-mono2 mb-1.5 uppercase tracking-[0.16em]">Input</span>
-                            <span className="font-display text-xl font-semibold text-parchment group-hover:text-brassbright transition-colors">{totals.totalSpent > 0 ? `$${totals.totalSpent.toLocaleString()} spent` : 'No spending entered'}</span>
+                            <span className="font-display text-xl font-semibold text-parchment group-hover:text-brassbright transition-colors">{totals.totalSpent > 0 ? `${formatMoney(totals.totalSpent)} spent` : 'No spending entered'}</span>
                         </div>
                         <div className="hidden md:flex justify-center text-inkfaint"><ArrowRight size={18} /></div>
                         <div className="flex flex-col group">
@@ -1086,12 +1094,17 @@ const App: React.FC = () => {
                 
                 <StatCard
                   title="Funding"
-                  value={totals.grantCount > 0 ? `$${totals.totalAwarded.toLocaleString()}` : '—'}
+                  value={totals.grantCount > 0 ? `${formatMoney(totals.totalAwarded)}` : '—'}
                   subValue={totals.grantCount > 0 ? 'awarded' : undefined}
                   description={
                     totals.grantCount > 0
-                      ? `$${totals.totalSpent.toLocaleString()} spent from ${totals.activeFunders} active ${totals.activeFunders === 1 ? 'funder' : 'funders'}`
+                      ? `${formatMoney(totals.totalSpent)} spent across ${totals.funderCount} ${totals.funderCount === 1 ? 'funder' : 'funders'}${totals.activeFunders !== totals.funderCount ? ` (${totals.activeFunders} active)` : ''}`
                       : filterOn ? 'No grants match these filters' : 'Add a grant to see funding totals'
+                  }
+                  footnote={
+                    totals.pendingCount > 0
+                      ? `Not counted: ${formatMoney(totals.pendingAmount)} on ${totals.pendingCount} pending ${totals.pendingCount === 1 ? 'grant' : 'grants'}. Totals cover active and completed grants.`
+                      : totals.grantCount > 0 ? 'Totals cover active and completed grants.' : undefined
                   }
                   icon={<Target />}
                   accent="impact"
@@ -1233,7 +1246,7 @@ const App: React.FC = () => {
 
                 {/* Historical Impact Chart */}
                 <div className="bg-surface p-8 rounded-xl border border-hairline hover:border-brass/30 transition-colors duration-300">
-                  <div className="flex items-center justify-between mb-8">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
                     <div>
                       <h3 className="font-display font-semibold text-ivory text-lg">Impact Trajectory</h3>
                       <p className="text-sm text-inkmute">Outcomes achieved over time</p>

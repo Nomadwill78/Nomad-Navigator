@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   filterGrants, availableYears, checkBudgetLines, computeMatch, linkSharedKpi, syncSharedCurrent,
-  listOutcomes, computePartnerSpend, rollUpProgram, grantTouchesYear, UNASSIGNED,
+  listOutcomes, computePartnerSpend, rollUpProgram, UNASSIGNED,
 } from '../src/lib/programs';
 import type { Grant } from '../types';
 
@@ -32,10 +32,8 @@ describe('task 10: program holds 4 grants', () => {
   });
 });
 
-describe('task 16: year filter', () => {
+describe('task 16: year filter (calendar fiscal year)', () => {
   it('keeps grants whose dates touch the year', () => {
-    expect(grantTouchesYear({ startDate: '2026-07-01', endDate: '2027-06-30' }, 2027)).toBe(true);
-    expect(grantTouchesYear({ startDate: '2026-07-01', endDate: '2027-06-30' }, 2028)).toBe(false);
     expect(filterGrants(memphis(), { programId: 'all', year: 2027 }).map((x) => x.id)).toEqual(['city', 'bank']);
   });
   it('lists years newest first', () => {

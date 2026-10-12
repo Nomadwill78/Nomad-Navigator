@@ -9,8 +9,9 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { DashboardStats, Grant, Program } from '../../types';
-import { validateGrant, validateProgram } from './grantValidation';
+import { DashboardStats, Grant, OrgSettings, Program } from '../../types';
+import { DEFAULT_FISCAL_START_MONTH, isValidStartMonth } from './fiscalYear';
+import { validateGrant, validateProgram, ValidationError } from './grantValidation';
 
 /**
  * Organization-scoped data access.
@@ -54,6 +55,7 @@ const grantsCollection = (orgId: string) => collection(db, `organizations/${orgI
 const grantDoc = (orgId: string, grantId: string) => doc(db, `organizations/${orgId}/grants`, grantId);
 const programsCollection = (orgId: string) => collection(db, `organizations/${orgId}/programs`);
 const programDoc = (orgId: string, programId: string) => doc(db, `organizations/${orgId}/programs`, programId);
+const settingsDoc = (orgId: string) => doc(db, `organizations/${orgId}/settings`, 'general');
 const statsDoc = (orgId: string) => doc(db, `organizations/${orgId}/metrics`, 'dashboard');
 
 // --- Offline mirror -------------------------------------------------------
@@ -61,6 +63,7 @@ const statsDoc = (orgId: string) => doc(db, `organizations/${orgId}/metrics`, 'd
 const statsCacheKey = (orgId: string) => `nomad_compass_stats_${orgId}`;
 const grantsCacheKey = (orgId: string) => `nomad_compass_grants_${orgId}`;
 const programsCacheKey = (orgId: string) => `nomad_compass_programs_${orgId}`;
+const settingsCacheKey = (orgId: string) => `nomad_compass_settings_${orgId}`;
 
 function readCache<T>(key: string, fallback: T): T {
   try {
@@ -80,6 +83,14 @@ function writeCache(key: string, value: unknown) {
 }
 
 export const readCachedStats = (orgId: string) => readCache<DashboardStats>(statsCacheKey(orgId), EMPTY_STATS);
+export const DEFAULT_SETTINGS: OrgSettings = { fiscalYearStartMonth: DEFAULT_FISCAL_START_MONTH };
+
+/** A missing or damaged settings document falls back to the defaults, never to nothing. */
+export function hydrateSettings(raw: Partial<OrgSettings> | undefined): OrgSettings {
+  return { fiscalYearStartMonth: isValidStartMonth(raw?.fiscalYearStartMonth) ? raw!.fiscalYearStartMonth! : DEFAULT_SETTINGS.fiscalYearStartMonth };
+}
+
+export const readCachedSettings = (orgId: string) => hydrateSettings(readCache<Partial<OrgSettings>>(settingsCacheKey(orgId), {}));
 export const readCachedPrograms = (orgId: string) => readCache<Program[]>(programsCacheKey(orgId), []);
 export const readCachedGrants = (orgId: string) => readCache<Grant[]>(grantsCacheKey(orgId), []);
 
@@ -202,6 +213,27 @@ export function subscribeToPrograms(
   );
 }
 
+export function subscribeToSettings(
+  orgId: string,
+  onData: (settings: OrgSettings) => void,
+  onError: (error: Error) => void
+): Unsubscribe {
+  return onSnapshot(
+    settingsDoc(orgId),
+    (snap) => {
+      const settings = hydrateSettings(snap.exists() ? (snap.data() as Partial<OrgSettings>) : undefined);
+      writeCache(settingsCacheKey(orgId), settings);
+      onData(settings);
+    },
+    (error) => onError(error)
+  );
+}
+
+export async function saveSettings(orgId: string, settings: OrgSettings): Promise<void> {
+  if (!isValidStartMonth(settings.fiscalYearStartMonth)) throw new Error('Choose a month from January to December.');
+  await setDoc(settingsDoc(orgId), { fiscalYearStartMonth: settings.fiscalYearStartMonth });
+}
+
 export function subscribeToStats(
   orgId: string,
   onData: (stats: DashboardStats) => void,
@@ -231,7 +263,7 @@ export async function persistStats(orgId: string, stats: DashboardStats): Promis
  */
 export async function createGrant(orgId: string, grant: Omit<Grant, 'id'>): Promise<string> {
   const invalid = validateGrant(grant);
-  if (invalid) throw new Error(invalid);
+  if (invalid) throw new ValidationError(invalid);
 
   const ref = doc(grantsCollection(orgId));
   await setDoc(ref, deepStripUndefined(sanitizeGrant({ ...grant, id: ref.id })) as unknown as Record<string, unknown>);
@@ -246,7 +278,7 @@ export async function createGrant(orgId: string, grant: Omit<Grant, 'id'>): Prom
  */
 export async function updateGrant(orgId: string, grantId: string, changes: Partial<Grant>): Promise<void> {
   const invalid = validateGrant(changes);
-  if (invalid) throw new Error(invalid);
+  if (invalid) throw new ValidationError(invalid);
 
   await updateDoc(grantDoc(orgId, grantId), buildGrantUpdate(changes));
 }
@@ -260,7 +292,7 @@ export async function deleteGrant(orgId: string, grantId: string): Promise<void>
 
 export async function createProgram(orgId: string, program: Omit<Program, 'id'>): Promise<string> {
   const invalid = validateProgram(program) ?? (program.name?.trim() ? null : 'Program name is required.');
-  if (invalid) throw new Error(invalid);
+  if (invalid) throw new ValidationError(invalid);
   const ref = doc(programsCollection(orgId));
   await setDoc(ref, stripUndefined({ ...program, id: ref.id }) as Record<string, unknown>);
   return ref.id;
@@ -268,7 +300,7 @@ export async function createProgram(orgId: string, program: Omit<Program, 'id'>)
 
 export async function updateProgram(orgId: string, programId: string, changes: Partial<Omit<Program, 'id'>>): Promise<void> {
   const invalid = validateProgram(changes);
-  if (invalid) throw new Error(invalid);
+  if (invalid) throw new ValidationError(invalid);
   await updateDoc(programDoc(orgId, programId), stripUndefined(changes as Record<string, unknown>));
 }
 

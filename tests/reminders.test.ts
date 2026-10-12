@@ -142,3 +142,27 @@ describe('Gmail mailer', () => {
     expect(() => createMailer({ GMAIL_USER: 'me@gmail.com' })).toThrow(/GMAIL_APP_PASSWORD/); // went down the Gmail path
   });
 });
+
+describe('issue 5: an invalid owner email is never silent', () => {
+  it('falls back to the admins, counts it, lists it, and tells the admins in the email', async () => {
+    const { store } = fakeStore({ grants: [grant([R('r1', '2026-10-20', { ownerEmail: 'not-an-email' })])], admins: ['admin@org.org'] });
+    const { mailer, sent } = okMailer();
+    const out = await runReminders({ store, mailer, today: '2026-10-06' });
+    expect(sent[0].to).toEqual(['admin@org.org']);
+    expect(out.invalidOwnerEmails).toBe(1);
+    expect(out.items[0].note).toMatch(/not-an-email.*not valid.*admins/);
+    expect(sent[0].text).toMatch(/not-an-email.*not a valid address/);
+  });
+  it('a dry run reports it too, so it is seen before anything is sent', async () => {
+    const { store } = fakeStore({ grants: [grant([R('r1', '2026-10-20', { ownerEmail: 'nope' })])] });
+    const out = await runReminders({ store, mailer: { send: async () => {} }, today: '2026-10-06', dryRun: true });
+    expect(out.invalidOwnerEmails).toBe(1);
+    expect(out.items[0].status).toBe('would_send');
+  });
+  it('a valid or blank owner email adds no warning', async () => {
+    const { store } = fakeStore({ grants: [grant([R('a', '2026-10-20', { ownerEmail: 'd@o.org' }), R('b', '2026-10-21')])] });
+    const out = await runReminders({ store, mailer: okMailer().mailer, today: '2026-10-06' });
+    expect(out.invalidOwnerEmails).toBe(0);
+    expect(out.items.every((i) => !i.note)).toBe(true);
+  });
+});

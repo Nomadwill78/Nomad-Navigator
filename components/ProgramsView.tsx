@@ -3,6 +3,7 @@ import { Layers, Plus, Trash2, Edit2, AlertTriangle, Users, Link2, FileDown } fr
 import { Grant, Program } from '../types';
 import { rollUpProgram, Outcome } from '../src/lib/programs';
 import { formatYmd, todayYmd } from '../src/lib/overview';
+import { formatMoney, parseMoney } from '../src/lib/money';
 import { exportBoardSummaryPDF } from '../src/lib/reportPdf';
 
 interface Props {
@@ -20,16 +21,17 @@ interface Props {
 type Draft = { name: string; description: string; populationServed: string; startDate: string; endDate: string; budgetNeed: string };
 const EMPTY_DRAFT: Draft = { name: '', description: '', populationServed: '', startDate: '', endDate: '', budgetNeed: '' };
 
-const money = (v: number) => `$${v.toLocaleString()}`;
+const money = formatMoney;
 const field =
   'w-full px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-sm text-parchment placeholder:text-inkfaint outline-none focus:ring-2 focus:ring-teal/40';
 const labelCls = 'flex flex-col gap-1 text-xs text-inkfaint';
 
-const HEALTH_TEXT = { on_track: 'On track', at_risk: 'At risk', off_track: 'Off track' } as const;
+const HEALTH_TEXT = { on_track: 'On track', at_risk: 'At risk', off_track: 'Off track', closed: 'Final' } as const;
 const HEALTH_STYLE = {
   on_track: 'text-teal bg-teal/10 border-teal/25',
   at_risk: 'text-brassbright bg-brass/10 border-brass/30',
   off_track: 'text-parchment bg-abyss border-hairline',
+  closed: 'text-inkmute bg-abyss border-hairline',
 } as const;
 
 const OutcomeRow: React.FC<{ outcome: Outcome }> = ({ outcome }) => (
@@ -99,8 +101,9 @@ export const ProgramsView: React.FC<Props> = ({ programs, grants, canEdit, canDe
   const save = async () => {
     setError(null);
     if (!draft.name.trim()) return setError('Enter a program name before saving.');
-    const need = draft.budgetNeed.trim() === '' ? undefined : Number(draft.budgetNeed);
-    if (need !== undefined && (!Number.isFinite(need) || need < 0)) return setError('Program cost must be a number that is not negative.');
+    const parsedNeed = draft.budgetNeed.trim() === '' ? null : parseMoney(draft.budgetNeed);
+    if (parsedNeed && 'reason' in parsedNeed) return setError(`Program cost: ${parsedNeed.reason}`);
+    const need = parsedNeed && 'value' in parsedNeed ? parsedNeed.value : undefined;
     const body = {
       name: draft.name.trim(), description: draft.description.trim(), populationServed: draft.populationServed.trim(),
       startDate: draft.startDate, endDate: draft.endDate, ...(need !== undefined ? { budgetNeed: need } : {}),
@@ -143,7 +146,7 @@ export const ProgramsView: React.FC<Props> = ({ programs, grants, canEdit, canDe
           <input className={field} value={draft.populationServed} onChange={(e) => setDraft({ ...draft, populationServed: e.target.value })} placeholder="For example: youth ages 16 to 24" />
         </label>
         <label className={labelCls}>What it costs to run ($, optional)
-          <input className={field} type="number" min={0} value={draft.budgetNeed} onChange={(e) => setDraft({ ...draft, budgetNeed: e.target.value })} placeholder="Used to show the funding gap" />
+          <input className={field} type="text" inputMode="decimal" value={draft.budgetNeed} onChange={(e) => setDraft({ ...draft, budgetNeed: e.target.value })} placeholder="Used to show the funding gap" />
         </label>
         <label className={labelCls}>Start date
           <input className={field} type="date" value={draft.startDate} onChange={(e) => setDraft({ ...draft, startDate: e.target.value })} />

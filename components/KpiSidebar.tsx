@@ -10,12 +10,14 @@ const HEALTH_LABEL: Record<KpiHealth, string> = {
   on_track: 'On track',
   at_risk: 'At risk',
   off_track: 'Off track',
+  closed: 'Final',
 };
 
 const HEALTH_STYLE: Record<KpiHealth, string> = {
   on_track: 'text-teal bg-teal/10 border-teal/25',
   at_risk: 'text-brassbright bg-brass/10 border-brass/30',
   off_track: 'text-parchment bg-abyss border-hairline',
+  closed: 'text-inkmute bg-abyss border-hairline',
 };
 
 /**
@@ -24,7 +26,7 @@ const HEALTH_STYLE: Record<KpiHealth, string> = {
  * says so and points to where to add one.
  */
 export const KpiSidebar: React.FC<KpiSidebarProps> = ({ rollup }) => {
-  const { kpis, onTrack, atRisk, offTrack, withoutTarget } = rollup;
+  const { kpis, onTrack, atRisk, offTrack, closed, withoutTarget } = rollup;
 
   return (
     <div className="bg-surface p-6 rounded-xl border border-hairline hover:border-brass/30 transition-colors duration-300 space-y-6">
@@ -52,6 +54,12 @@ export const KpiSidebar: React.FC<KpiSidebarProps> = ({ rollup }) => {
               </div>
             ))}
           </div>
+
+          {closed > 0 && (
+            <p className="text-xs text-inkmute">
+              {closed} {closed === 1 ? 'result is' : 'results are'} final, from completed grants, and not counted above.
+            </p>
+          )}
 
           <div className="space-y-4">
             {kpis.map((kpi) => (

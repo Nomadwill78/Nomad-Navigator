@@ -51,8 +51,8 @@ service cloud.firestore {
     function isValidGrant(data, grantId) {
       return data.name is string && data.name.size() > 0 && data.name.size() < 300 &&
              data.funder is string && data.funder.size() > 0 && data.funder.size() < 300 &&
-             data.amount is number && data.amount > 0 &&
-             (!('spentAmount' in data) || (data.spentAmount is number && data.spentAmount >= 0)) &&
+             data.amount is number && data.amount > 0 && data.amount <= 1000000000 &&
+             (!('spentAmount' in data) || (data.spentAmount is number && data.spentAmount >= 0 && data.spentAmount <= 1000000000)) &&
              data.startDate is string && data.startDate.matches('^\\d{4}-\\d{2}-\\d{2}$') &&
              data.endDate is string && data.endDate.matches('^\\d{4}-\\d{2}-\\d{2}$') &&
              data.status in ['active', 'pending', 'completed'] && data.kpis is list && data.kpis.size() <= 200 &&
@@ -65,7 +65,7 @@ service cloud.firestore {
              (!('populationServed' in data) || (data.populationServed is string && data.populationServed.size() <= 1000)) &&
              (!('startDate' in data) || (data.startDate is string && (data.startDate == '' || data.startDate.matches('^\\d{4}-\\d{2}-\\d{2}$')))) &&
              (!('endDate' in data) || (data.endDate is string && (data.endDate == '' || data.endDate.matches('^\\d{4}-\\d{2}-\\d{2}$')))) &&
-             (!('budgetNeed' in data) || (data.budgetNeed is number && data.budgetNeed >= 0)) &&
+             (!('budgetNeed' in data) || (data.budgetNeed is number && data.budgetNeed >= 0 && data.budgetNeed <= 1000000000)) &&
              data.id == programId;
     }
 
@@ -113,6 +113,14 @@ service cloud.firestore {
         allow get, list: if isOrgMember(orgId);
         allow create, update: if hasRole(orgId, ['admin', 'grant_coordinator']) && isValidGrant(incoming(), grantId);
         allow delete: if hasRole(orgId, ['admin']);
+      }
+
+      match /settings/{docId} {
+        allow get, list: if isOrgMember(orgId);
+        allow create, update: if docId == 'general' && hasRole(orgId, ['admin']) &&
+          incoming().keys().hasOnly(['fiscalYearStartMonth']) &&
+          incoming().fiscalYearStartMonth is int && incoming().fiscalYearStartMonth >= 1 && incoming().fiscalYearStartMonth <= 12;
+        allow delete: if false;
       }
 
       match /programs/{programId} {

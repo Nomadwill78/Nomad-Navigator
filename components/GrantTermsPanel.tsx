@@ -3,6 +3,8 @@ import { Plus, Trash2, AlertTriangle, FileText } from 'lucide-react';
 import { BudgetCategory, BudgetLine, Grant, GrantReportFrequency, Program } from '../types';
 import { BUDGET_CATEGORY_LABELS, checkBudgetLines, computeMatch } from '../src/lib/programs';
 import { generateId } from '../src/lib/id';
+import { formatMoney } from '../src/lib/money';
+import { MoneyInput } from './MoneyInput';
 
 interface Props {
   grant: Grant;
@@ -22,8 +24,7 @@ const FREQUENCY_LABELS: Record<GrantReportFrequency, string> = {
 const field =
   'w-full px-3 py-2 bg-ink/70 border border-hairline rounded-lg text-sm text-parchment placeholder:text-inkfaint outline-none focus:ring-2 focus:ring-teal/40 disabled:opacity-60 disabled:cursor-not-allowed';
 const label = 'text-[10px] text-inkfaint uppercase font-bold block mb-1';
-const money = (v: number) => `$${v.toLocaleString()}`;
-const toMoney = (raw: string) => Math.max(0, parseFloat(raw) || 0);
+const money = formatMoney;
 
 /**
  * The terms a funder attached to a grant (program, restriction, match, report
@@ -91,26 +92,26 @@ export const GrantTermsPanel: React.FC<Props> = ({ grant, programs, canEdit, onC
         </label>
         <label>
           <span className={label}>Required match ($)</span>
-          <input
+          <MoneyInput
             disabled={!canEdit}
-            type="number"
-            min={0}
-            value={grant.matchRequired ?? ''}
-            onChange={(e) => onChange({ matchRequired: e.target.value === '' ? undefined : toMoney(e.target.value) })}
-            className={field}
+            allowEmpty
+            value={grant.matchRequired}
+            onCommit={(v) => onChange({ matchRequired: v })}
+            ariaLabel="Required match"
             placeholder="0 if none"
+            className={field}
           />
         </label>
         <label>
           <span className={label}>Match secured so far ($)</span>
-          <input
+          <MoneyInput
             disabled={!canEdit}
-            type="number"
-            min={0}
-            value={grant.matchSecured ?? ''}
-            onChange={(e) => onChange({ matchSecured: e.target.value === '' ? undefined : toMoney(e.target.value) })}
-            className={field}
+            allowEmpty
+            value={grant.matchSecured}
+            onCommit={(v) => onChange({ matchSecured: v })}
+            ariaLabel="Match secured"
             placeholder="0"
+            className={field}
           />
         </label>
         <label>
@@ -169,23 +170,19 @@ export const GrantTermsPanel: React.FC<Props> = ({ grant, programs, canEdit, onC
                     <option key={c} value={c}>{BUDGET_CATEGORY_LABELS[c]}</option>
                   ))}
                 </select>
-                <input
+                <MoneyInput
                   disabled={!canEdit}
-                  type="number"
-                  min={0}
                   value={l.budgeted}
-                  onChange={(e) => updateLine(l.id, { budgeted: toMoney(e.target.value) })}
+                  onCommit={(v) => updateLine(l.id, { budgeted: v ?? 0 })}
+                  ariaLabel="Budgeted amount"
                   className={field}
-                  aria-label="Budgeted amount"
                 />
-                <input
+                <MoneyInput
                   disabled={!canEdit}
-                  type="number"
-                  min={0}
                   value={l.spent}
-                  onChange={(e) => updateLine(l.id, { spent: toMoney(e.target.value) })}
+                  onCommit={(v) => updateLine(l.id, { spent: v ?? 0 })}
+                  ariaLabel="Spent amount"
                   className={field}
-                  aria-label="Spent amount"
                 />
                 {canEdit ? (
                   <button onClick={() => removeLine(l.id)} title="Remove line" className="p-1.5 text-inkfaint hover:text-alert rounded-lg">

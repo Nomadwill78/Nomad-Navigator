@@ -1,6 +1,7 @@
 import { BudgetCategory, BudgetLine, Grant, GrantKPI, Program } from '../../types';
 import { resolveKpiStatus } from './kpiStatus';
-import { computeGrantTotals, dayNumber, computePace, kpiHealth, KpiHealth } from './overview';
+import { fiscalYearOf, grantTouchesFiscalYear, DEFAULT_FISCAL_START_MONTH } from './fiscalYear';
+import { computeGrantTotals, dayNumber, computePace, grantKpiHealth, KpiHealth } from './overview';
 
 /**
  * Program-level calculations. Same rule as overview.ts: every figure is
@@ -19,40 +20,29 @@ export const UNASSIGNED = 'none';
 export interface GrantFilter {
   /** 'all', 'none' (grants with no program), or a program id. */
   programId: string;
-  /** 'all' or a calendar year such as 2026. */
+  /** 'all' or a fiscal year such as 2027 (see fiscalYear.ts for how years are named). */
   year: number | 'all';
 }
 
 export const NO_FILTER: GrantFilter = { programId: ALL, year: 'all' };
 
-/** True when the grant's dates touch the calendar year at all. */
-export function grantTouchesYear(grant: Pick<Grant, 'startDate' | 'endDate'>, year: number): boolean {
-  const start = dayNumber(grant.startDate);
-  const end = dayNumber(grant.endDate);
-  const first = dayNumber(`${year}-01-01`);
-  const last = dayNumber(`${year}-12-31`);
-  if (start === null || end === null || first === null || last === null) return false;
-  return start <= last && end >= first;
-}
-
-export function filterGrants(grants: Grant[], filter: GrantFilter): Grant[] {
+export function filterGrants(grants: Grant[], filter: GrantFilter, startMonth: number = DEFAULT_FISCAL_START_MONTH): Grant[] {
   return grants.filter((g) => {
     if (filter.programId === UNASSIGNED && g.programId) return false;
     if (filter.programId !== ALL && filter.programId !== UNASSIGNED && g.programId !== filter.programId) return false;
-    if (filter.year !== 'all' && !grantTouchesYear(g, filter.year)) return false;
+    if (filter.year !== 'all' && !grantTouchesFiscalYear(g, filter.year, startMonth)) return false;
     return true;
   });
 }
 
-/** Years that at least one grant touches, newest first. */
-export function availableYears(grants: Grant[]): number[] {
+/** Fiscal years that at least one grant is active in, newest first. */
+export function availableYears(grants: Grant[], startMonth: number = DEFAULT_FISCAL_START_MONTH): number[] {
   const years = new Set<number>();
   for (const g of grants) {
-    if (dayNumber(g.startDate) === null || dayNumber(g.endDate) === null) continue;
-    const s = Number(g.startDate.slice(0, 4));
-    const e = Number(g.endDate.slice(0, 4));
-    if (e < s || e - s > 30) continue;
-    for (let y = s; y <= e; y++) years.add(y);
+    const first = fiscalYearOf(g.startDate, startMonth);
+    const last = fiscalYearOf(g.endDate, startMonth);
+    if (first === null || last === null || last < first || last - first > 30) continue;
+    for (let y = first; y <= last; y++) years.add(y);
   }
   return [...years].sort((a, b) => b - a);
 }
@@ -228,7 +218,7 @@ export function listOutcomes(grants: Grant[], today?: string): Outcome[] {
           funder: g.funder,
           target: num(k.target),
           progressPercent: info.progressPercent,
-          health: kpiHealth(info.progressPercent, elapsed),
+          health: grantKpiHealth(g, info.progressPercent, elapsed),
         });
       }
       byKey.set(key, entry);

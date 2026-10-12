@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   dayNumber, formatYmd, computeGrantTotals, computeFundingDiversity, computePace,
-  checkOverspend, rollUpKpis, computePartnerCompliance, kpiHealth,
+  checkOverspend, rollUpKpis, computePartnerCompliance, kpiHealth, resolveKpiPace,
 } from '../src/lib/overview';
 import type { Grant } from '../types';
 
@@ -28,7 +28,7 @@ describe('Phase 1 task 1: grant totals', () => {
     expect(t.activeFunders).toBe(4);
   });
   it('is all zeros for no grants and ignores pending grants and bad numbers', () => {
-    expect(computeGrantTotals([])).toEqual({ totalAwarded: 0, totalSpent: 0, activeFunders: 0, grantCount: 0 });
+    expect(computeGrantTotals([])).toEqual({ totalAwarded: 0, totalSpent: 0, funderCount: 0, activeFunders: 0, grantCount: 0, pendingAmount: 0, pendingCount: 0 });
     const t = computeGrantTotals([grant({ id: 'p', status: 'pending' }), grant({ id: 'n', amount: NaN as any })]);
     expect(t.totalAwarded).toBe(0);
   });
@@ -124,5 +124,75 @@ describe('Phase 1 task 9: pace rule', () => {
     const p = computePace({ amount: 100, spentAmount: 50, startDate: '', endDate: '' });
     expect(p.status).toBe('no_dates');
     expect(Number.isFinite(p.gap)).toBe(true);
+  });
+});
+
+describe('issue 3: consistent totals', () => {
+  const mixed = () => [
+    grant({ id: 'a', funder: 'Alpha', amount: 100000, spentAmount: 40000 }),
+    grant({ id: 'b', funder: 'Beta', amount: 50000, spentAmount: 10000 }),
+    grant({ id: 'c', funder: 'Gamma', amount: 25000, spentAmount: 0 }),
+    grant({ id: 'd', funder: 'Harbor', amount: 120000, spentAmount: 120000, status: 'completed' }),
+    grant({ id: 'p', funder: 'Pending Co', amount: 315000, spentAmount: 0, status: 'pending' }),
+  ];
+  it('awarded covers active and completed grants, and the pending money is reported on its own', () => {
+    const t = computeGrantTotals(mixed());
+    expect(t.totalAwarded).toBe(295000); // 100k + 50k + 25k + 120k completed, no 315k pending
+    expect(t.pendingAmount).toBe(315000);
+    expect(t.pendingCount).toBe(1);
+  });
+  it('the funder count matches the funders behind the awarded total, so it agrees with the diversity chart', () => {
+    const t = computeGrantTotals(mixed());
+    expect(t.funderCount).toBe(4); // Alpha, Beta, Gamma and the completed Harbor
+    expect(t.activeFunders).toBe(3);
+    expect(computeFundingDiversity(mixed()).length).toBe(t.funderCount);
+  });
+});
+
+describe('issue 4: completed grants raise no alerts', () => {
+  const closed = { amount: 100, spentAmount: 0, startDate: '2025-01-01', endDate: '2025-12-31', status: 'completed' as const };
+  it('a completed grant at 100% elapsed with nothing spent is not flagged', () => {
+    const p = computePace(closed, '2026-10-06');
+    expect(p.status).toBe('closed');
+    expect(p.status).not.toBe('at_risk');
+  });
+  it('an active grant in the same position still is', () => {
+    expect(computePace({ ...closed, status: 'active' }, '2026-10-06').status).toBe('at_risk');
+  });
+  it('a pending grant is not flagged either', () => {
+    expect(computePace({ ...closed, status: 'pending' }, '2026-10-06').status).toBe('not_started');
+  });
+  it('a completed grant KPI at 41% is a final result, not off track', () => {
+    const g = grant({ id: 'c', status: 'completed', startDate: '2025-01-01', endDate: '2025-12-31', kpis: [{ id: 'k', name: 'K', target: 100, current: 41, unit: 'x' }] });
+    const r = rollUpKpis([g], '2026-10-06');
+    expect(r.kpis[0].health).toBe('closed');
+    expect(r.offTrack + r.atRisk + r.onTrack).toBe(0);
+    expect(r.closed).toBe(1);
+  });
+});
+
+describe('small issue: KPI status says why', () => {
+  const g = { status: 'active' as const, startDate: '2026-01-01', endDate: '2026-12-31' };
+  // 2026-04-10 is day 99 of 364, about 27% elapsed
+  it('41% progress with about 28% of the year gone is on track, and says so', () => {
+    const r = resolveKpiPace({ current: 41, target: 100 }, g, '2026-04-12');
+    expect(r.label).toBe('On track');
+    expect(r.explanation).toMatch(/41% of the target with 28% of the grant period gone/);
+    expect(r.explanation).toMatch(/on pace/);
+  });
+  it('the same 41% late in the year is behind pace and gives the gap', () => {
+    const r = resolveKpiPace({ current: 41, target: 100 }, g, '2026-10-06');
+    expect(r.label).toBe('Off track');
+    expect(r.explanation).toMatch(/points behind pace/);
+  });
+  it('67% at 90% elapsed is not "on track" just because it is over 50%', () => {
+    expect(resolveKpiPace({ current: 67, target: 100 }, g, '2026-11-25').label).not.toBe('On track');
+  });
+  it('met, exceeded, final and no-date cases explain themselves', () => {
+    expect(resolveKpiPace({ current: 100, target: 100 }, g).label).toBe('Met');
+    expect(resolveKpiPace({ current: 150, target: 100 }, g).label).toBe('Exceeded');
+    expect(resolveKpiPace({ current: 41, target: 100 }, { ...g, status: 'completed' }).explanation).toMatch(/Final result: 41%/);
+    expect(resolveKpiPace({ current: 41, target: 100 }, { status: 'active', startDate: '', endDate: '' }).label).toBe('In progress');
+    expect(resolveKpiPace({ current: 5, target: 0 }, g).label).toBe('No target');
   });
 });
