@@ -1,32 +1,69 @@
 import express from "express";
 import { timingSafeEqual } from "node:crypto";
-import { getStripe, priceIdForPlan, requireOrgAdmin, isAuthError, getAdmin } from "./stripeAdmin";
+import { getStripe, requireOrgAdmin, isAuthError, getAdmin, getBillingStore } from "./stripeAdmin";
 import { runReminders, createMailer, createFirestoreReminderStore } from "./reminders";
+import {
+  BillingError, changePlan, createCheckout, resolveReturnBase, assertBillingAllowed,
+  type BillingStore, type Env, type StripeLike,
+} from "./billing";
+import { MemberError, reconcileMemberCount, removeMemberAndRecount } from "./firestoreStores";
 
-const respondToAuthError = (error: any, res: express.Response): boolean => {
+/** Everything the routes need from the outside world. Real by default; tests pass fakes. */
+export interface ApiDeps {
+  env: Env;
+  stripe: () => StripeLike;
+  store: () => BillingStore;
+  requireOrgAdmin: (authHeader: string | string[] | undefined, orgId: string) => Promise<string>;
+  removeMember: (args: { orgId: string; userId: string; requesterUid: string }) => Promise<{ memberCount: number }>;
+  reconcileMembers: (orgId: string) => Promise<{ before: number | undefined; after: number }>;
+}
+
+const realDeps = (): ApiDeps => ({
+  env: process.env,
+  stripe: () => getStripe() as unknown as StripeLike,
+  store: getBillingStore,
+  requireOrgAdmin,
+  removeMember: (args) => removeMemberAndRecount(getAdmin().db, args),
+  reconcileMembers: (orgId) => reconcileMemberCount(getAdmin().db, orgId),
+});
+
+/** One place that turns a failure into the right HTTP answer with a plain-language message. */
+function respondToError(error: any, res: express.Response, what: string): void {
   if (isAuthError(error)) {
-    res.status(403).json({ error: "You must be an admin of this organization." });
-    return true;
+    res.status(error.message === "UNAUTHENTICATED" ? 401 : 403).json({ error: error.message === "UNAUTHENTICATED" ? "Please sign in again." : "You must be an admin of this organization." });
+    return;
   }
-  return false;
-};
+  if (error instanceof BillingError || error instanceof MemberError) {
+    res.status(error.httpStatus).json({ error: error.message, code: error.code });
+    return;
+  }
+  console.error(`${what} error:`, error);
+  res.status(500).json({ error: "Something went wrong on our side. Please try again." });
+}
 
 /**
- * The three JSON-in/JSON-out API routes, as a standalone Express app. Used
- * both by the local dev server (mounted inside server.ts's root app) and by
- * the Vercel catch-all function (api/[...path].ts, exported directly as the
- * handler) — deliberately does NOT include the Stripe webhook route, which
- * needs the raw request body and is handled separately (see
- * api/stripe-webhook.ts and stripeAdmin.ts's handleStripeWebhookEvent).
+ * The JSON-in/JSON-out API routes, as a standalone Express app. Used both by the local dev server (mounted
+ * inside server.ts's root app) and by the Vercel catch-all function (api/[...path].ts, exported directly as
+ * the handler). It deliberately does NOT include the Stripe webhook route, which needs the raw request body
+ * and is handled separately (see api/stripe-webhook.ts and stripeAdmin.ts's handleStripeWebhookEvent).
  */
-export function createApiApp(): express.Express {
+export function createApiApp(overrides: Partial<ApiDeps> = {}): express.Express {
+  const deps: ApiDeps = { ...realDeps(), ...overrides };
   const app = express();
   app.use(express.json());
 
+  // A one-off donation. The amount is whole US cents, between $1 and $10,000.
   app.post("/api/create-checkout-session", async (req, res) => {
     try {
-      const stripeInstance = getStripe();
-      const session = await stripeInstance.checkout.sessions.create({
+      const raw = req.body?.amount;
+      const amount = raw === undefined ? 2500 : Number(raw);
+      if (!Number.isInteger(amount) || amount < 100 || amount > 1_000_000) {
+        res.status(400).json({ error: "Donation amount must be between $1.00 and $10,000.00." });
+        return;
+      }
+      assertBillingAllowed(deps.env);
+      const base = resolveReturnBase(req.headers.origin as string | undefined, deps.env);
+      const session = await deps.stripe().checkout.sessions.create({
         payment_method_types: ["card"],
         line_items: [
           {
@@ -36,64 +73,55 @@ export function createApiApp(): express.Express {
                 name: "Nomad Compass - Impact Donation",
                 description: "Support nonprofit impact tracking and reporting.",
               },
-              unit_amount: req.body.amount || 2500, // Default to $25.00
+              unit_amount: amount,
             },
             quantity: 1,
           },
         ],
         mode: "payment",
-        success_url: `${req.headers.origin}/?payment=success`,
-        cancel_url: `${req.headers.origin}/?payment=cancel`,
+        success_url: `${base}/?payment=success`,
+        cancel_url: `${base}/?payment=cancel`,
       });
-
       res.json({ url: session.url });
     } catch (error: any) {
-      console.error("Stripe Error:", error);
-      res.status(500).json({ error: error.message });
+      respondToError(error, res, "Donation checkout");
     }
   });
 
-  // Starts (or restarts) a subscription for an org's chosen plan. The
-  // caller must be an admin of that org — verified server-side, since a
-  // client can't be trusted to only ever pass their own orgId.
+  // Starts a subscription for an org that does NOT have one. The caller must be an admin of that org, verified
+  // server-side. An org that already has a live subscription is refused (use /api/change-plan), so an organization
+  // can never end up with two.
   app.post("/api/create-subscription-checkout", async (req, res) => {
     try {
       const { orgId, plan } = req.body as { orgId?: string; plan?: string };
-      if (!orgId || !plan || !["starter", "growth", "pro"].includes(plan)) {
-        res.status(400).json({ error: "orgId and a valid plan (starter/growth/pro) are required" });
+      if (!orgId || !plan) {
+        res.status(400).json({ error: "orgId and a plan (starter, growth or pro) are required." });
         return;
       }
-      await requireOrgAdmin(req.headers.authorization, orgId);
-
-      const priceId = priceIdForPlan(plan);
-      if (!priceId) {
-        res.status(500).json({ error: `No Stripe price is configured for the "${plan}" plan yet.` });
-        return;
-      }
-
-      const stripeInstance = getStripe();
-      const session = await stripeInstance.checkout.sessions.create({
-        mode: "subscription",
-        line_items: [{ price: priceId, quantity: 1 }],
-        client_reference_id: orgId,
-        // Metadata on the subscription (not just this session) so every
-        // later webhook event for it still carries the orgId.
-        subscription_data: { metadata: { orgId, plan } },
-        success_url: `${req.headers.origin}/?checkout=success`,
-        cancel_url: `${req.headers.origin}/?checkout=cancel`,
-      });
-
-      res.json({ url: session.url });
+      await deps.requireOrgAdmin(req.headers.authorization, orgId);
+      res.json(await createCheckout({ stripe: deps.stripe(), store: deps.store(), env: deps.env }, { orgId, plan, origin: req.headers.origin as string | undefined }));
     } catch (error: any) {
-      if (respondToAuthError(error, res)) return;
-      console.error("Create subscription checkout error:", error);
-      res.status(500).json({ error: error.message });
+      respondToError(error, res, "Create subscription checkout");
     }
   });
 
-  // Opens Stripe's hosted Billing Portal for an org's existing subscription
-  // — cancellation, payment-method updates, and invoice history all happen
-  // there, so none of it needs to be built here.
+  // Moves an org's EXISTING subscription to another plan (upgrade or downgrade), with proration.
+  app.post("/api/change-plan", async (req, res) => {
+    try {
+      const { orgId, plan } = req.body as { orgId?: string; plan?: string };
+      if (!orgId || !plan) {
+        res.status(400).json({ error: "orgId and a plan (starter, growth or pro) are required." });
+        return;
+      }
+      await deps.requireOrgAdmin(req.headers.authorization, orgId);
+      res.json(await changePlan({ stripe: deps.stripe(), store: deps.store(), env: deps.env }, { orgId, plan }));
+    } catch (error: any) {
+      respondToError(error, res, "Change plan");
+    }
+  });
+
+  // Opens Stripe's hosted Billing Portal for an org's existing customer: cancellation, payment-method updates
+  // and invoice history all happen there.
   app.post("/api/create-portal-session", async (req, res) => {
     try {
       const { orgId } = req.body as { orgId?: string };
@@ -101,27 +129,49 @@ export function createApiApp(): express.Express {
         res.status(400).json({ error: "orgId is required" });
         return;
       }
-      await requireOrgAdmin(req.headers.authorization, orgId);
-
-      const { db } = getAdmin();
-      const billingSnap = await db.doc(`organizations/${orgId}/billing/subscription`).get();
-      const customerId = billingSnap.data()?.stripeCustomerId as string | undefined;
+      await deps.requireOrgAdmin(req.headers.authorization, orgId);
+      assertBillingAllowed(deps.env);
+      const customerId = (await deps.store().getBilling(orgId))?.stripeCustomerId;
       if (!customerId) {
         res.status(400).json({ error: "This organization doesn't have a billing account yet." });
         return;
       }
-
-      const stripeInstance = getStripe();
-      const portalSession = await stripeInstance.billingPortal.sessions.create({
-        customer: customerId,
-        return_url: `${req.headers.origin}/`,
-      });
-
-      res.json({ url: portalSession.url });
+      const base = resolveReturnBase(req.headers.origin as string | undefined, deps.env);
+      const portal = await (getStripe() as any).billingPortal.sessions.create({ customer: customerId, return_url: `${base}/` });
+      res.json({ url: portal.url });
     } catch (error: any) {
-      if (respondToAuthError(error, res)) return;
-      console.error("Create portal session error:", error);
-      res.status(500).json({ error: error.message });
+      respondToError(error, res, "Create portal session");
+    }
+  });
+
+  // Removes a member and sets the member counter to the true count in one transaction. Browsers cannot do this
+  // themselves (the database rules refuse it), which is what keeps the counter honest.
+  app.post("/api/remove-member", async (req, res) => {
+    try {
+      const { orgId, userId } = req.body as { orgId?: string; userId?: string };
+      if (!orgId || !userId) {
+        res.status(400).json({ error: "orgId and userId are required." });
+        return;
+      }
+      const requesterUid = await deps.requireOrgAdmin(req.headers.authorization, orgId);
+      res.json(await deps.removeMember({ orgId, userId, requesterUid }));
+    } catch (error: any) {
+      respondToError(error, res, "Remove member");
+    }
+  });
+
+  // Puts the member counter right if it was ever wrong. Admin only; safe to call at any time.
+  app.post("/api/reconcile-members", async (req, res) => {
+    try {
+      const { orgId } = req.body as { orgId?: string };
+      if (!orgId) {
+        res.status(400).json({ error: "orgId is required." });
+        return;
+      }
+      await deps.requireOrgAdmin(req.headers.authorization, orgId);
+      res.json(await deps.reconcileMembers(orgId));
+    } catch (error: any) {
+      respondToError(error, res, "Reconcile members");
     }
   });
 
