@@ -7,6 +7,7 @@ import {
   type BillingStore, type Env, type StripeEvent, type StripeLike,
 } from "./billing";
 import { createFirestoreBillingStore } from "./firestoreStores";
+import firebaseConfig from "../../firebase-applet-config.json";
 
 // Plan names, seat limits and the billing-status policy live in types.ts and src/lib/plans.ts, and the
 // subscription rules in ./billing.ts. This file only connects them to the real Stripe and Firebase clients.
@@ -26,7 +27,7 @@ export const getAdmin = () => {
     if (getApps().length === 0) initializeApp({ credential: cert(JSON.parse(raw)) });
     adminReady = true;
   }
-  return { auth: getAdminAuth(), db: getAdminFirestore() };
+  return { auth: getAdminAuth(), db: getAdminFirestore((firebaseConfig as any).firestoreDatabaseId) };
 };
 
 export const getBillingStore = (): BillingStore => createFirestoreBillingStore(getAdmin().db);

@@ -14,6 +14,8 @@ import Stripe from 'stripe';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+import { readFileSync } from 'node:fs';
+const DB_ID = JSON.parse(readFileSync(new URL('../firebase-applet-config.json', import.meta.url), 'utf8')).firestoreDatabaseId;
 
 const need = ['STRIPE_SECRET_KEY', 'STRIPE_PRICE_STARTER', 'STRIPE_PRICE_GROWTH', 'STRIPE_PRICE_PRO', 'APP_URL', 'FIREBASE_SERVICE_ACCOUNT', 'FIREBASE_API_KEY'];
 const checkOnly = process.argv.includes('--check');
@@ -28,7 +30,7 @@ if (checkOnly) { console.log('Settings look right: test key, all prices, app add
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const fb = initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)) }, 'verify');
-const db = getFirestore(fb);
+const db = getFirestore(fb, DB_ID);
 const auth = getAuth(fb);
 
 const RUN = Date.now();

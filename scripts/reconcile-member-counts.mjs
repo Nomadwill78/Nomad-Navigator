@@ -9,10 +9,12 @@
  */
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { readFileSync } from 'node:fs';
+const DB_ID = JSON.parse(readFileSync(new URL('../firebase-applet-config.json', import.meta.url), 'utf8')).firestoreDatabaseId;
 
 if (!process.env.FIREBASE_SERVICE_ACCOUNT) { console.error('Set FIREBASE_SERVICE_ACCOUNT first.'); process.exit(2); }
 const fix = process.argv.includes('--fix');
-const db = getFirestore(initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)) }));
+const db = getFirestore(initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)) }), DB_ID);
 
 let wrong = 0;
 const orgs = await db.collection('organizations').get();
