@@ -19,50 +19,7 @@ import {
 import { DashboardStats, ProgramMetric, ROLE_PERMISSIONS } from '../types';
 import { useAuth } from '../src/contexts/AuthContext';
 import { exportToCSV, exportToJSON } from '../src/lib/exportUtils';
-
-// Robust client-side CSV parser that correctly handles quoted values, escaped quotes, and newlines.
-function parseCSV(text: string): string[][] {
-  const lines: string[][] = [];
-  let row: string[] = [];
-  let inQuotes = false;
-  let currentVal = '';
-
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    const nextChar = text[i + 1];
-
-    if (char === '"') {
-      if (inQuotes && nextChar === '"') {
-        currentVal += '"';
-        i++; // skip next quote
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (char === ',' && !inQuotes) {
-      row.push(currentVal.trim());
-      currentVal = '';
-    } else if ((char === '\r' || char === '\n') && !inQuotes) {
-      if (char === '\r' && nextChar === '\n') {
-        i++;
-      }
-      row.push(currentVal.trim());
-      if (row.length > 1 || row[0] !== '') {
-        lines.push(row);
-      }
-      row = [];
-      currentVal = '';
-    } else {
-      currentVal += char;
-    }
-  }
-  if (row.length > 0 || currentVal !== '') {
-    row.push(currentVal.trim());
-    if (row.length > 1 || row[0] !== '') {
-      lines.push(row);
-    }
-  }
-  return lines;
-}
+import { parseCSV } from '../src/lib/csvUtils';
 
 /** Returns a copy of `obj` with `path` set to `value`, without mutating `obj`. */
 function setIn(obj: any, path: string[], value: any): any {
