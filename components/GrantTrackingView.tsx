@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Grant, GrantKPI, Program, Subgrantee, SubgranteeKPI, ROLE_PERMISSIONS } from '../types';
 import { GrantTermsPanel } from './GrantTermsPanel';
+import { GrantCsvImport } from './GrantCsvImport';
 import { SharedKpiControl } from './SharedKpiControl';
 import { ReportingCalendarPanel } from './ReportingCalendarPanel';
 import { KpiDetailsPanel } from './KpiDetailsPanel';
@@ -378,6 +379,10 @@ export const GrantTrackingView: React.FC<GrantTrackingViewProps> = ({ grants, pr
           )}
         </div>
       </div>
+
+      {permissions?.canEditGrants && (
+        <GrantCsvImport grants={grants} programs={programs ?? []} onCreateGrant={onCreateGrant} />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Grant List */}
