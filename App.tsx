@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Users, 
   DollarSign, 
@@ -19,7 +19,8 @@ import {
   Download,
   CheckCircle2,
   Circle,
-  CreditCard
+  CreditCard,
+  Layers
 } from 'lucide-react';
 import { exportDashboardPDF } from './src/lib/exportUtils';
 import { 
@@ -57,8 +58,15 @@ import { BrandLogo } from './components/BrandLogo';
 import { KpiSidebar } from './components/KpiSidebar';
 import { useAuth } from './src/contexts/AuthContext';
 import { useOrgData } from './src/hooks/useOrgData';
+import { computeGrantTotals, computeFundingDiversity, rollUpKpis } from './src/lib/overview';
+import { filterGrants, availableYears, isFilterActive, NO_FILTER, GrantFilter } from './src/lib/programs';
+import { fiscalYearLabel } from './src/lib/fiscalYear';
+import { ProgramsView } from './components/ProgramsView';
+import { DueSoonCard } from './components/DueSoonCard';
+import { aggregateBreakdown } from './src/lib/kpiHistory';
+import { formatMoney } from './src/lib/money';
 import { generateImpactReport } from './services/geminiService';
-import { DashboardStats, ProgramMetric, Grant, Opportunity, ROLE_PERMISSIONS } from './types';
+import { DashboardStats, ProgramMetric, Grant, Opportunity, Program, ROLE_PERMISSIONS } from './types';
 import { Analytics } from '@vercel/analytics/react';
 
 // --- Chart ramps ---
@@ -140,6 +148,7 @@ const SAMPLE_PROGRAMS: ProgramMetric[] = [
 const DEMO_GRANTS: Grant[] = [
   {
     id: 'dg1',
+    programId: 'dp1',
     name: 'National Solar Expansion',
     funder: 'UNDP',
     amount: 1500000,
@@ -166,6 +175,7 @@ const DEMO_GRANTS: Grant[] = [
   },
   {
     id: 'dg2',
+    programId: 'dp1',
     name: 'West African Water Initiative',
     funder: 'USAID',
     amount: 500000,
@@ -178,6 +188,17 @@ const DEMO_GRANTS: Grant[] = [
     ],
     subgrantees: []
   }
+];
+
+const DEMO_PROGRAMS: Program[] = [
+  {
+    id: 'dp1',
+    name: 'Sample: Energy and Water Access',
+    description: 'Sample program for demo mode only.',
+    populationServed: 'Sample communities',
+    startDate: '2025-01-01',
+    endDate: '2026-12-31',
+  },
 ];
 
 // Sample deadlines are computed relative to today rather than hardcoded, so the
@@ -375,14 +396,6 @@ const DEMO_STATS: DashboardStats = {
   ]
 };
 
-// Transform data for sparklines
-const SPARK_FINANCIALS_SPENDING = [
-  { value: 45000 }, { value: 52000 }, { value: 48000 }, { value: 61000 }, { value: 55000 }, { value: 67000 }
-];
-const SPARK_FINANCIALS_SOURCES = [
-  { value: 38000 }, { value: 42000 }, { value: 55000 }, { value: 51000 }, { value: 59000 }, { value: 63000 }
-];
-
 const App: React.FC = () => {
   const {
     user, profile, organization, role, loading, invitation,
@@ -397,7 +410,7 @@ const App: React.FC = () => {
       setIsSidebarOpen(false);
     }
   }, []);
-  const [activeView, setActiveView] = useState<'dashboard' | 'data' | 'grants' | 'analysis' | 'discovery' | 'team' | 'billing' | 'settings'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'data' | 'grants' | 'programs' | 'analysis' | 'discovery' | 'team' | 'billing' | 'settings'>('dashboard');
   // True while the user has a CSV loaded into the Manage Data importer but hasn't
   // confirmed it yet. Used to warn before navigating away, so the mapped data isn't
   // silently thrown away.
@@ -422,15 +435,39 @@ const App: React.FC = () => {
 
   // Grants and metrics live in Firestore under this organization, so every member
   // of the org sees the same numbers. Demo mode is served from memory and never written.
-  const { stats, grants, setStats, createGrant, updateGrant, deleteGrant, syncStatus, syncError, hasUnsavedChanges, retrySync } = useOrgData(
+  const { stats, grants, programs, settings, updateSettings, createProgram, updateProgram, deleteProgram, setStats, createGrant, updateGrant, deleteGrant, syncStatus, syncError, hasUnsavedChanges, retrySync } = useOrgData(
     organization?.id ?? null,
     isDemoMode,
     DEMO_STATS,
-    DEMO_GRANTS
+    DEMO_GRANTS,
+    DEMO_PROGRAMS
   );
 
   const sparkImpact = (stats.programs || []).map(p => ({ value: p.peopleServed }));
   const sparkRoi = (stats.programs || []).map(p => ({ value: p.costPerPerson }));
+
+  // Every Overview figure below is computed from the grants the user entered.
+  // Nothing here is a default, an estimate, or a placeholder number.
+  const [filter, setFilter] = useState<GrantFilter>(NO_FILTER);
+  const fyStart = settings.fiscalYearStartMonth;
+  const filtered = useMemo(() => filterGrants(grants, filter, fyStart), [grants, filter, fyStart]);
+  const filterOn = isFilterActive(filter);
+  const years = useMemo(() => availableYears(grants, fyStart), [grants, fyStart]);
+  const totals = useMemo(() => computeGrantTotals(filtered), [filtered]);
+  const diversity = useMemo(() => computeFundingDiversity(filtered), [filtered]);
+  const kpiRollup = useMemo(() => rollUpKpis(filtered), [filtered]);
+  // People served is entered for the whole organization, so a per-program or per-year
+  // spend divided by it would be a made-up ratio. It is only shown when nothing is filtered.
+  const costPerPerson = !filterOn && stats.totalPeopleServed > 0 && totals.totalSpent > 0 ? totals.totalSpent / stats.totalPeopleServed : null;
+  // Who was served: counts entered on KPIs win. Manage Data's whole-organization percents
+  // are only a fallback, and are not shown while a filter is on because they cannot be filtered.
+  const kpiAge = useMemo(() => aggregateBreakdown(filtered, 'age'), [filtered]);
+  const kpiRace = useMemo(() => aggregateBreakdown(filtered, 'ethnicity'), [filtered]);
+  const demoFromKpis = kpiAge.length > 0 || kpiRace.length > 0;
+  const ageSlices = kpiAge.length > 0 ? kpiAge : demoFromKpis || filterOn ? [] : stats.demographics.age;
+  const raceSlices = kpiRace.length > 0 ? kpiRace : demoFromKpis || filterOn ? [] : stats.demographics.race;
+  const ageTotal = kpiAge.reduce((a, r) => a + r.count, 0);
+  const urbanShare = stats.geographic.urbanRural.find(u => /urban/i.test(u.name))?.value;
   const hasNoData = !isDemoMode && stats.totalPeopleServed === 0 && (stats.programs || []).length === 0;
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -619,6 +656,14 @@ const App: React.FC = () => {
               onClick={() => navigateTo('grants')}
             />
           )}
+
+          <NavItem
+            icon={<Layers size={20} />}
+            label="Programs"
+            active={activeView === 'programs'}
+            isOpen={isSidebarOpen}
+            onClick={() => navigateTo('programs')}
+          />
 
           <NavItem 
             icon={<Sparkles size={20} />} 
@@ -839,7 +884,23 @@ const App: React.FC = () => {
           {activeView === 'data' ? (
             <DataManagementView stats={stats} onUpdate={setStats} onPendingImportChange={setHasPendingImport} />
           ) : activeView === 'grants' ? (
-            <GrantTrackingView grants={grants} onCreateGrant={createGrant} onUpdateGrant={updateGrant} onDeleteGrant={deleteGrant} />
+            <GrantTrackingView grants={grants} programs={programs} onCreateGrant={createGrant} onUpdateGrant={updateGrant} onDeleteGrant={deleteGrant} />
+          ) : activeView === 'programs' ? (
+            <ProgramsView
+              programs={programs}
+              grants={grants}
+              canEdit={!!permissions?.canEditGrants}
+              canDelete={!!permissions?.canDeleteGrants}
+              orgName={organization?.name ?? 'Your organization'}
+              onCreate={createProgram}
+              onUpdate={updateProgram}
+              onDelete={(programId) => {
+                // Grants must not keep pointing at a program that no longer exists.
+                grants.filter((g) => g.programId === programId).forEach((g) => updateGrant(g.id, { programId: undefined }));
+                deleteProgram(programId);
+              }}
+              onOpenGrants={() => navigateTo('grants')}
+            />
           ) : activeView === 'analysis' ? (
             <AnalysisView stats={stats} grants={grants} />
           ) : activeView === 'discovery' ? (
@@ -849,7 +910,11 @@ const App: React.FC = () => {
           ) : activeView === 'billing' ? (
             <BillingView />
           ) : activeView === 'settings' ? (
-            <SettingsView />
+            <SettingsView
+              fiscalYearStartMonth={settings.fiscalYearStartMonth}
+              canChangeFiscalYear={role === 'admin'}
+              onFiscalYearChange={(m) => updateSettings({ ...settings, fiscalYearStartMonth: m })}
+            />
           ) : (
             <>
               {/* Dashboard Header */}
@@ -858,7 +923,7 @@ const App: React.FC = () => {
                   <p className="font-mono2 text-[0.62rem] tracking-[0.28em] uppercase text-brass mb-1.5">Bearing · Program Impact</p>
                   <h1 className="font-display text-4xl font-semibold text-ivory tracking-tight">Program Impact</h1>
                   <p className="text-inkmute mt-1.5 flex items-center gap-2 text-sm font-mono2">
-                    FY 2025 · Q1–Q2 <span className="w-1 h-1 rounded-full bg-inkfaint"></span>{' '}
+                    {filter.year === 'all' ? 'All years' : fiscalYearLabel(filter.year, fyStart)} <span className="w-1 h-1 rounded-full bg-inkfaint"></span>{' '}
                     {isDemoMode
                       ? 'Demo data'
                       : stats.dataQuality.lastUpdated && stats.dataQuality.lastUpdated !== '—'
@@ -899,6 +964,49 @@ const App: React.FC = () => {
                   )}
                 </div>
               </div>
+
+              {/* Filters: every grant-based figure below follows these two choices. */}
+              {grants.length > 0 && (
+                <div className="flex flex-wrap items-center gap-3 bg-surface border border-hairline rounded-xl px-4 py-3">
+                  <label className="flex items-center gap-2 text-xs text-inkfaint">
+                    Program
+                    <select
+                      value={filter.programId}
+                      onChange={(e) => setFilter({ ...filter, programId: e.target.value })}
+                      className="bg-ink/70 border border-hairline rounded-lg px-2 py-1.5 text-sm text-parchment outline-none max-w-[16rem]"
+                    >
+                      <option value="all">All programs</option>
+                      {programs.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                      <option value="none">Not assigned to a program</option>
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-inkfaint">
+                    Fiscal year
+                    <select
+                      value={String(filter.year)}
+                      onChange={(e) => setFilter({ ...filter, year: e.target.value === 'all' ? 'all' : Number(e.target.value) })}
+                      className="bg-ink/70 border border-hairline rounded-lg px-2 py-1.5 text-sm text-parchment outline-none"
+                    >
+                      <option value="all">All years</option>
+                      {years.map((y) => (
+                        <option key={y} value={y}>{fiscalYearLabel(y, fyStart)}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {filterOn && (
+                    <>
+                      <button onClick={() => setFilter(NO_FILTER)} className="text-xs text-brassbright font-semibold underline">Clear filters</button>
+                      <p className="text-xs text-inkmute basis-full">
+                        Showing {filtered.length} of {grants.length} {grants.length === 1 ? 'grant' : 'grants'}. Funding, funders and key indicators follow the filter.
+                        {filter.year !== 'all' && ' A grant is included if it is active at any point in the fiscal year, so a grant that spans two fiscal years appears in both.'}
+                        People served, demographics and service areas are entered for the whole organization, so they are not filtered.
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* First-run guided path: a new organization starts empty, so tell it
                   what to do first rather than presenting a full dashboard with nothing
@@ -960,7 +1068,7 @@ const App: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center relative z-10">
                         <div className="flex flex-col group">
                             <span className="text-[0.6rem] text-inkfaint font-mono2 mb-1.5 uppercase tracking-[0.16em]">Input</span>
-                            <span className="font-display text-xl font-semibold text-parchment group-hover:text-brassbright transition-colors">${(stats.totalBudgetSpent / 1000).toFixed(1)}k Invested</span>
+                            <span className="font-display text-xl font-semibold text-parchment group-hover:text-brassbright transition-colors">{totals.totalSpent > 0 ? `${formatMoney(totals.totalSpent)} spent` : 'No spending entered'}</span>
                         </div>
                         <div className="hidden md:flex justify-center text-inkfaint"><ArrowRight size={18} /></div>
                         <div className="flex flex-col group">
@@ -984,39 +1092,44 @@ const App: React.FC = () => {
               {/* Core Metric Cards with Gradients */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-5 duration-700 delay-200">
                 
-                <StatCard 
-                  title="Program Outcomes"
-                  value={stats.outcomesDetails.householdsWaterAccess.toLocaleString()}
-                  subValue="households"
-                  trend="+12.5% vs target"
-                  trendDirection="up"
-                  description="Sustained clean water access"
+                <StatCard
+                  title="Funding"
+                  value={totals.grantCount > 0 ? `${formatMoney(totals.totalAwarded)}` : '—'}
+                  subValue={totals.grantCount > 0 ? 'awarded' : undefined}
+                  description={
+                    totals.grantCount > 0
+                      ? `${formatMoney(totals.totalSpent)} spent across ${totals.funderCount} ${totals.funderCount === 1 ? 'funder' : 'funders'}${totals.activeFunders !== totals.funderCount ? ` (${totals.activeFunders} active)` : ''}`
+                      : filterOn ? 'No grants match these filters' : 'Add a grant to see funding totals'
+                  }
+                  footnote={
+                    totals.pendingCount > 0
+                      ? `Not counted: ${formatMoney(totals.pendingAmount)} on ${totals.pendingCount} pending ${totals.pendingCount === 1 ? 'grant' : 'grants'}. Totals cover active and completed grants.`
+                      : totals.grantCount > 0 ? 'Totals cover active and completed grants.' : undefined
+                  }
                   icon={<Target />}
                   accent="impact"
-                  sparklineData={sparkImpact}
                 />
 
-                <StatCard 
+                <StatCard
                   title="Cost Effectiveness"
-                  value={`$${stats.avgCostPerPerson.toFixed(2)}`}
-                  subValue="per person"
-                  trend="32% below avg"
-                  trendDirection="up"
-                  description={`SROI: $${stats.sroi} social value per $1`}
+                  value={costPerPerson !== null ? `$${costPerPerson.toFixed(2)}` : '—'}
+                  subValue={costPerPerson !== null ? 'per person' : undefined}
+                  description={
+                    costPerPerson !== null
+                      ? `Grant spending divided by ${stats.totalPeopleServed.toLocaleString()} people served${stats.sroi > 0 ? ` · SROI you entered: $${stats.sroi} per $1` : ''}`
+                      : 'Needs spending on a grant and people served under Manage Data'
+                  }
                   icon={<Scale />}
                   accent="impact"
-                  sparklineData={sparkRoi}
+                  sparklineData={sparkRoi.length > 1 ? sparkRoi : undefined}
                 />
 
-                <StatCard 
+                <StatCard
                   title="Data Quality"
                   value={stats.dataQuality.level}
-                  trend="Verified"
-                  trendDirection="neutral"
-                  description={`${stats.dataQuality.method} methodology`}
+                  description={stats.dataQuality.method !== 'Not set' ? `Self-reported: ${stats.dataQuality.method}` : 'Set under Manage Data'}
                   icon={<ShieldCheck />}
                   accent="funding"
-                  // No sparkline for quality
                 />
               </div>
 
@@ -1032,8 +1145,17 @@ const App: React.FC = () => {
                       <div>
                         <h3 className="font-display font-semibold text-ivory text-lg flex items-center gap-2">Demographic Reach</h3>
                         <p className="text-sm text-inkmute">Beneficiaries by Age and Ethnicity</p>
+                        <p className="text-[11px] text-inkfaint mt-1">
+                          {demoFromKpis
+                            ? 'Counted from the age and ethnicity entered on your KPIs. Shared KPIs count once.'
+                            : filterOn && ageSlices.length === 0 && raceSlices.length === 0
+                              ? 'No age or ethnicity counts entered on the KPIs of these grants.'
+                              : ageSlices.length === 0 && raceSlices.length === 0
+                                ? 'Enter who was served under a KPI on a grant, or use Manage Data.'
+                                : 'From Manage Data (organization-wide). Enter counts on a KPI to replace this.'}
+                        </p>
                       </div>
-                      <button className="text-inkfaint hover:text-parchment"><Settings size={16} /></button>
+                      
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -1044,7 +1166,7 @@ const App: React.FC = () => {
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Pie 
-                                data={stats.demographics.age} 
+                                data={ageSlices} 
                                 dataKey="value" 
                                 nameKey="name" 
                                 cx="50%" 
@@ -1054,7 +1176,7 @@ const App: React.FC = () => {
                                 paddingAngle={5}
                                 label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                               >
-                                {stats.demographics.age.map((entry, index) => (
+                                {ageSlices.map((entry, index) => (
                                   <Cell key={`cell-${index}`} fill={COLORS.impact[index % COLORS.impact.length]} stroke="none" />
                                 ))}
                               </Pie>
@@ -1067,16 +1189,16 @@ const App: React.FC = () => {
                           
                           {/* Center Text */}
                           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-                              <span className="font-display text-3xl font-semibold text-ivory">{stats.totalPeopleServed.toLocaleString()}</span>
+                              <span className="font-display text-3xl font-semibold text-ivory">{(demoFromKpis ? ageTotal : stats.totalPeopleServed).toLocaleString()}</span>
                               <p className="text-[0.6rem] text-inkfaint font-mono2 uppercase tracking-tighter">Served</p>
                           </div>
                       </div>
 
                       {/* Legend */}
                       <div className="flex justify-center gap-4 flex-wrap">
-                          {stats.demographics.age.map((item, i) => (
+                          {ageSlices.map((item, i) => (
                               <div key={i} className="flex items-center gap-1.5">
-                                  <div className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS.impact[i]}}></div>
+                                  <div className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS.impact[i % COLORS.impact.length]}}></div>
                                   <span className="text-[10px] text-inkmute font-mono2 uppercase tracking-wide">{item.name}</span>
                               </div>
                           ))}
@@ -1090,7 +1212,7 @@ const App: React.FC = () => {
                           <ResponsiveContainer width="100%" height="100%">
                               <BarChart 
                                 layout="vertical" 
-                                data={stats.demographics.race} 
+                                data={raceSlices} 
                                 margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
                               >
                                   <XAxis type="number" hide />
@@ -1107,7 +1229,7 @@ const App: React.FC = () => {
                                     contentStyle={{ background: '#0b1c33', borderRadius: '10px', border: '1px solid #24405f', boxShadow: '0 18px 40px -18px rgba(0, 0, 0, 0.7)' }}
                                   />
                                   <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24}>
-                                      {stats.demographics.race.map((entry, index) => (
+                                      {raceSlices.map((entry, index) => (
                                           <Cell key={`cell-${index}`} fill={COLORS.neutral[index % COLORS.neutral.length]} />
                                       ))}
                                       <LabelList dataKey="value" position="right" style={{ fontSize: 10, fill: '#93a6c2', fontWeight: 700 }} />
@@ -1124,7 +1246,7 @@ const App: React.FC = () => {
 
                 {/* Historical Impact Chart */}
                 <div className="bg-surface p-8 rounded-xl border border-hairline hover:border-brass/30 transition-colors duration-300">
-                  <div className="flex items-center justify-between mb-8">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
                     <div>
                       <h3 className="font-display font-semibold text-ivory text-lg">Impact Trajectory</h3>
                       <p className="text-sm text-inkmute">Outcomes achieved over time</p>
@@ -1207,9 +1329,11 @@ const App: React.FC = () => {
                       </h3>
                       <p className="text-sm text-inkmute">Resource Allocation & Funding Diversity</p>
                     </div>
-                    <div className="flex items-center gap-2 px-3 py-1 bg-teal/10 text-teal text-[10px] font-mono2 uppercase tracking-wider rounded-full border border-teal/25">
-                      Reserve: {stats.financials.operatingReserveMonths} mo.
-                    </div>
+                    {stats.financials.operatingReserveMonths > 0 && (
+                      <div className="flex items-center gap-2 px-3 py-1 bg-teal/10 text-teal text-[10px] font-mono2 uppercase tracking-wider rounded-full border border-teal/25">
+                        Reserve: {stats.financials.operatingReserveMonths} {stats.financials.operatingReserveMonths === 1 ? 'month' : 'months'}
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1242,33 +1366,21 @@ const App: React.FC = () => {
                            <span className="font-display text-lg font-semibold text-ivory">{stats.financials.spending[0]?.value ?? 0}%</span>
                         </div>
                       </div>
-                      
-                      {/* Historical Sparkline */}
-                      <div className="h-10 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={SPARK_FINANCIALS_SPENDING}>
-                            <Area 
-                              type="monotone" 
-                              dataKey="value" 
-                              stroke="#4fc4d3" 
-                              fill="#4fc4d3" 
-                              fillOpacity={0.1}
-                              strokeWidth={2}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                        <p className="text-[9px] text-inkfaint font-mono2 uppercase tracking-tight text-center mt-1">Total Spending Trend</p>
-                      </div>
                     </div>
 
                     {/* Funding Sources */}
                     <div className="space-y-4">
                       <h4 className="text-[0.6rem] font-mono2 text-inkfaint uppercase tracking-[0.18em]">Funding Diversity</h4>
+                      <p className="text-[11px] text-inkmute -mt-2">
+                        {diversity.length > 0
+                          ? `Share of awards by funder. Largest: ${diversity[0].name}`
+                          : 'Add grants to see each funder\'s share'}
+                      </p>
                       <div className="h-40 relative">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie 
-                              data={stats.financials.sources} 
+                              data={diversity} 
                               dataKey="value" 
                               nameKey="name" 
                               cx="50%" 
@@ -1277,7 +1389,7 @@ const App: React.FC = () => {
                               outerRadius={65}
                               paddingAngle={5}
                             >
-                              {stats.financials.sources.map((entry, index) => (
+                              {diversity.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={COLORS.funding[index % COLORS.funding.length]} stroke="none" />
                               ))}
                             </Pie>
@@ -1287,25 +1399,8 @@ const App: React.FC = () => {
                           </PieChart>
                         </ResponsiveContainer>
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                           <span className="font-display text-lg font-semibold text-ivory">{stats.financials.sources[0]?.value ?? 0}%</span>
+                           <span className="font-display text-lg font-semibold text-ivory">{diversity.length > 0 ? `${diversity[0].value}%` : '—'}</span>
                         </div>
-                      </div>
-
-                      {/* Historical Sparkline */}
-                      <div className="h-10 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={SPARK_FINANCIALS_SOURCES}>
-                            <Area 
-                              type="monotone" 
-                              dataKey="value" 
-                              stroke="#cba85c" 
-                              fill="#cba85c" 
-                              fillOpacity={0.1}
-                              strokeWidth={2}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                        <p className="text-[9px] text-inkfaint font-mono2 uppercase tracking-tight text-center mt-1">New Funding Trend</p>
                       </div>
                     </div>
                   </div>
@@ -1321,7 +1416,7 @@ const App: React.FC = () => {
                             </h3>
                             <p className="text-sm text-inkmute">Regional Outreach Breakdown</p>
                         </div>
-                        <div className="text-xs text-inkmute font-mono2">89% Urban Focus</div>
+                        {urbanShare !== undefined && <div className="text-xs text-inkmute font-mono2">{urbanShare}% urban</div>}
                     </div>
                     <div className="space-y-6">
                         {stats.geographic.neighborhoods.map((area, i) => (
@@ -1344,7 +1439,10 @@ const App: React.FC = () => {
 
                 {/* KPI Sidebar Column (Spans 1 column on desktop) */}
                 <div className="lg:col-span-1 lg:sticky lg:top-24">
-                  <KpiSidebar kpis={stats.saasKpis || []} />
+                  <div className="space-y-8">
+                    <KpiSidebar rollup={kpiRollup} />
+                    <DueSoonCard grants={filtered} onOpenGrants={() => navigateTo('grants')} />
+                  </div>
                 </div>
 
               </div> {/* Closes outer dashboard grid */}

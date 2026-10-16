@@ -13,6 +13,10 @@ vi.mock('../src/lib/orgData', async (orig) => ({
   readCachedGrants: () => [],
   subscribeToStats: (_o: string, cb: (s: any) => void) => ((h.statsListener = cb), () => {}),
   subscribeToGrants: () => () => {},
+  readCachedPrograms: () => [],
+  subscribeToPrograms: () => () => {},
+  readCachedSettings: () => ({ fiscalYearStartMonth: 1 }),
+  subscribeToSettings: () => () => {},
   persistStats: h.persistStats,
 }));
 vi.mock('../src/lib/firebase', () => ({ db: {}, auth: {} }));

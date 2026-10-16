@@ -10,6 +10,7 @@ import {
   FlaskConical
 } from 'lucide-react';
 import { Opportunity } from '../types';
+import { formatYmd } from '../src/lib/overview';
 
 interface GrantDiscoveryViewProps {
   opportunities: Opportunity[];
@@ -47,6 +48,7 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
                   </div>
                   <div>
                     <h3 className="font-bold text-ivory text-lg group-hover:text-teal transition-colors">{opp.name}</h3>
+                    <span className="inline-block mb-1 px-2 py-0.5 bg-brass/15 text-brassbright border border-brass/30 rounded-md text-[10px] font-mono2 font-bold uppercase tracking-wider">Sample data, not a real opportunity</span>
                     <p className="text-sm font-medium text-inkmute flex items-center gap-1.5 uppercase tracking-wider">
                       <DollarSign size={14} className="text-inkfaint" /> {opp.funder}
                     </p>
@@ -54,7 +56,7 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
                 </div>
                 <div className="text-right">
                   <div className="flex items-center gap-1.5 justify-end mb-1">
-                    <span className="text-xs font-bold text-inkfaint uppercase tracking-widest">Match Score</span>
+                    <span className="text-xs font-bold text-inkfaint uppercase tracking-widest">Sample Score</span>
                     <span className="px-2 py-0.5 bg-teal/10 text-teal rounded-full text-[10px] font-black">{opp.matchScore}%</span>
                   </div>
                   <div className="h-1.5 w-24 bg-abyss border border-hairline/50 rounded-full overflow-hidden ml-auto">
@@ -72,7 +74,7 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
 
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="bg-ink/50 rounded-2xl p-4 border border-hairline/60">
-                   <p className="text-[10px] font-bold text-inkfaint uppercase tracking-widest mb-1.5">Nomad AI Rationale</p>
+                   <p className="text-[10px] font-bold text-inkfaint uppercase tracking-widest mb-1.5">Sample Rationale</p>
                    <p className="text-xs text-parchment font-medium leading-relaxed italic">
                      "{opp.whyMatch}"
                    </p>
@@ -84,7 +86,7 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
                   </div>
                   <div className="flex items-center gap-2 text-sm text-inkmute font-medium">
                     <Calendar size={16} className="text-teal" />
-                    <span>Deadline: <span className="text-ivory font-bold">{new Date(opp.deadline).toLocaleDateString()}</span></span>
+                    <span>Deadline: <span className="text-ivory font-bold">{formatYmd(opp.deadline)}</span></span>
                   </div>
                 </div>
               </div>
@@ -111,6 +113,7 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
               <div className="bg-surface2 w-fit p-3 rounded-2xl mb-4 backdrop-blur-sm">
                 <TrendingUp size={24} className="text-teal" />
               </div>
+              <span className="inline-block mb-2 px-2 py-0.5 bg-brass/15 text-brassbright border border-brass/30 rounded-md text-[10px] font-mono2 font-bold uppercase tracking-wider">Sample content</span>
               <h4 className="text-xl font-bold mb-2 tracking-tight">Strategy Intelligence</h4>
               <p className="text-inkfaint text-sm leading-relaxed mb-6">
                 Based on your <strong className="font-bold text-parchment">92% success rate</strong> in WASH projects, Nomad AI predicts a high likelihood of approval for community-led infrastructure grants this quarter.
@@ -131,7 +134,7 @@ export const GrantDiscoveryView: React.FC<GrantDiscoveryViewProps> = ({ opportun
 
           <div className="bg-surface border border-hairline rounded-3xl p-6">
             <h4 className="font-bold text-ivory mb-4 flex items-center gap-2">
-              <CheckCircle2 size={18} className="text-teal" /> Submission Readiness
+              <CheckCircle2 size={18} className="text-teal" /> Submission Readiness <span className="px-2 py-0.5 bg-brass/15 text-brassbright border border-brass/30 rounded-md text-[10px] font-mono2 font-bold uppercase tracking-wider">Sample</span>
             </h4>
             <div className="space-y-4">
               <div className="flex items-start gap-3">

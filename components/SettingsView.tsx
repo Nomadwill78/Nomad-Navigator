@@ -3,8 +3,16 @@ import { User, Mail, Shield, KeyRound, LogOut, AlertCircle, CheckCircle2 } from 
 import { useAuth } from '../src/contexts/AuthContext';
 import { ROLE_DESCRIPTIONS } from '../types';
 import { describeAuthError } from '../src/lib/authErrors';
+import { MONTH_NAMES, fiscalYearLabel, fiscalYearOf, DEFAULT_FISCAL_START_MONTH } from '../src/lib/fiscalYear';
+import { todayYmd } from '../src/lib/overview';
 
-export const SettingsView: React.FC = () => {
+interface SettingsViewProps {
+  fiscalYearStartMonth?: number;
+  canChangeFiscalYear?: boolean;
+  onFiscalYearChange?: (month: number) => Promise<void>;
+}
+
+export const SettingsView: React.FC<SettingsViewProps> = ({ fiscalYearStartMonth = DEFAULT_FISCAL_START_MONTH, canChangeFiscalYear = false, onFiscalYearChange }) => {
   const { user, profile, organization, role, logout, updateDisplayName, changePassword } = useAuth();
 
   const [name, setName] = useState(profile?.displayName || '');
@@ -16,6 +24,23 @@ export const SettingsView: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordStatus, setPasswordStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  const [fyStatus, setFyStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [fyError, setFyError] = useState<string | null>(null);
+  const currentFy = fiscalYearOf(todayYmd(), fiscalYearStartMonth) ?? new Date().getFullYear();
+
+  const handleFiscalYear = async (month: number) => {
+    if (!onFiscalYearChange) return;
+    setFyStatus('saving');
+    setFyError(null);
+    try {
+      await onFiscalYearChange(month);
+      setFyStatus('saved');
+    } catch (error) {
+      setFyStatus('error');
+      setFyError(error instanceof Error ? error.message : 'Could not save. Please try again.');
+    }
+  };
 
   const nameChanged = name.trim() !== '' && name.trim() !== profile?.displayName;
 
@@ -134,6 +159,39 @@ export const SettingsView: React.FC = () => {
           )}
         </form>
       </div>
+
+      {/* --- Fiscal year (organization-wide) --- */}
+      {organization && (
+        <div className="bg-surface rounded-3xl border border-hairline shadow-sm p-6 space-y-4">
+          <div className="flex items-center gap-2 text-xs font-bold text-inkfaint uppercase tracking-widest">
+            <Shield size={14} /> Fiscal year
+          </div>
+          <p className="text-sm text-inkmute leading-relaxed">
+            The Overview's year filter and board numbers follow your fiscal year. A fiscal year is named for the year it ends in:
+            with a July start, July 2026 to June 2027 is FY2027.
+          </p>
+          <div>
+            <label htmlFor="fy-start" className="block text-[10px] font-bold text-inkfaint uppercase tracking-widest mb-1.5">
+              Fiscal year starts in
+            </label>
+            <select
+              id="fy-start"
+              value={fiscalYearStartMonth}
+              disabled={!canChangeFiscalYear || fyStatus === 'saving'}
+              onChange={(e) => handleFiscalYear(Number(e.target.value))}
+              className="px-4 py-2.5 bg-ink/50 border border-hairline rounded-xl focus:outline-none focus:ring-2 focus:ring-teal/40 text-sm font-medium disabled:opacity-60"
+            >
+              {MONTH_NAMES.map((name, i) => (
+                <option key={name} value={i + 1}>{name}</option>
+              ))}
+            </select>
+            <p className="text-xs text-inkfaint mt-2">Today falls in {fiscalYearLabel(currentFy, fiscalYearStartMonth)}.</p>
+            {!canChangeFiscalYear && <p className="text-xs text-inkfaint mt-1">Only an admin can change this.</p>}
+            {fyStatus === 'saved' && <p className="text-xs text-teal mt-1">Saved.</p>}
+            {fyError && <p role="alert" className="text-xs text-alert mt-1">{fyError}</p>}
+          </div>
+        </div>
+      )}
 
       {/* --- Change password --- */}
       <div className="bg-surface rounded-3xl border border-hairline shadow-sm p-6 space-y-5">

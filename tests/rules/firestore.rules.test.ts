@@ -46,3 +46,101 @@ describe('grants writes match canEditGrants', () => {
     it(`${r} ${allowed ? 'can' : 'cannot'} write a grant`, () => (allowed ? assertSucceeds(grant(dbAs(r))) : assertFails(grant(dbAs(r)))));
   }
 });
+
+const program = (db: any, over: Record<string, unknown> = {}) =>
+  setDoc(doc(db, `organizations/${ORG}/programs/p1`), {
+    id: 'p1', name: 'Youth Workforce and Family Stability', description: '', populationServed: 'Youth 16-24',
+    startDate: '2026-01-01', endDate: '2026-12-31', ...over,
+  });
+
+describe('programs writes match canEditGrants; every member can read', () => {
+  for (const r of roles) {
+    const allowed = ['admin', 'grant_coordinator'].includes(r);
+    it(`${r} ${allowed ? 'can' : 'cannot'} write a program`, () => (allowed ? assertSucceeds(program(dbAs(r))) : assertFails(program(dbAs(r)))));
+  }
+  it('a viewer can read programs', async () => {
+    await assertSucceeds(program(dbAs('admin')));
+    await assertSucceeds(getDoc(doc(dbAs('viewer'), `organizations/${ORG}/programs/p1`)));
+  });
+  it('a non-member cannot read programs', () => assertFails(getDoc(doc(dbAs('stranger'), `organizations/${ORG}/programs/p1`))));
+  it('rejects an empty name, a bad date and a negative cost', async () => {
+    await assertFails(program(dbAs('admin'), { name: '' }));
+    await assertFails(program(dbAs('admin'), { startDate: '01/01/2026' }));
+    await assertFails(program(dbAs('admin'), { budgetNeed: -5 }));
+  });
+  it('only an admin can delete a program', async () => {
+    const { deleteDoc } = await import('firebase/firestore');
+    await assertSucceeds(program(dbAs('admin')));
+    await assertFails(deleteDoc(doc(dbAs('grant_coordinator'), `organizations/${ORG}/programs/p1`)));
+    await assertSucceeds(deleteDoc(doc(dbAs('admin'), `organizations/${ORG}/programs/p1`)));
+  });
+  it('a grant with the new Phase 2 fields still saves', () =>
+    assertSucceeds(
+      setDoc(doc(dbAs('admin'), `organizations/${ORG}/grants/g2`), {
+        id: 'g2', name: 'G', funder: 'F', amount: 1000, startDate: '2026-01-01', endDate: '2026-12-31', status: 'active', kpis: [],
+        programId: 'p1', restriction: 'restricted', matchRequired: 500, matchSecured: 100, reportFrequency: 'quarterly', budgetLines: [],
+      })
+    ));
+});
+
+describe('clearing an optional grant field', () => {
+  it('a grant coordinator can unassign a program with deleteField', async () => {
+    const { updateDoc, deleteField } = await import('firebase/firestore');
+    const ref = doc(dbAs('grant_coordinator'), `organizations/${ORG}/grants/g3`);
+    await assertSucceeds(
+      setDoc(ref, { id: 'g3', name: 'G', funder: 'F', amount: 1000, startDate: '2026-01-01', endDate: '2026-12-31', status: 'active', kpis: [], programId: 'p1', restriction: 'restricted' })
+    );
+    await assertSucceeds(updateDoc(ref, { programId: deleteField(), restriction: deleteField() }));
+    const after = (await getDoc(ref)).data()!;
+    if ('programId' in after || 'restriction' in after) throw new Error('field was not cleared');
+  });
+});
+
+describe('Phase 3 data', () => {
+  it('a grant with reports, KPI details and breakdowns still saves', () =>
+    assertSucceeds(
+      setDoc(doc(dbAs('admin'), `organizations/${ORG}/grants/g4`), {
+        id: 'g4', name: 'G', funder: 'F', amount: 1000, startDate: '2026-01-01', endDate: '2026-12-31', status: 'active',
+        reports: [{ id: 'r', title: 'Q3', dueDate: '2026-10-20', owner: 'Dana' }],
+        kpis: [{ id: 'k', name: 'K', target: 5, current: 2, unit: 'x', baseline: 1, history: [{ id: 'h', date: '2026-03-31', value: 2 }], ageBreakdown: [{ id: 'a', label: '16-24', count: 2 }] }],
+      })
+    ));
+  it('no client can write the reminder log, not even an admin (only the server job can)', () =>
+    assertFails(setDoc(doc(dbAs('admin'), `organizations/${ORG}/reminderLog/x`), { sentAt: 'now' })));
+  it('no client can read the reminder log either', () =>
+    assertFails(getDoc(doc(dbAs('admin'), `organizations/${ORG}/reminderLog/x`))));
+});
+
+describe('organization settings (fiscal year)', () => {
+  const save = (uid: string, data: Record<string, unknown>) => setDoc(doc(dbAs(uid), `organizations/${ORG}/settings/general`), data);
+  for (const r of roles) {
+    const allowed = r === 'admin';
+    it(`${r} ${allowed ? 'can' : 'cannot'} change the fiscal year`, () =>
+      allowed ? assertSucceeds(save(r, { fiscalYearStartMonth: 7 })) : assertFails(save(r, { fiscalYearStartMonth: 7 })));
+  }
+  it('every member can read it', async () => {
+    await assertSucceeds(save('admin', { fiscalYearStartMonth: 7 }));
+    await assertSucceeds(getDoc(doc(dbAs('viewer'), `organizations/${ORG}/settings/general`)));
+  });
+  it('rejects a bad month, extra fields and the wrong document name', async () => {
+    await assertFails(save('admin', { fiscalYearStartMonth: 13 }));
+    await assertFails(save('admin', { fiscalYearStartMonth: 0 }));
+    await assertFails(save('admin', { fiscalYearStartMonth: 6.5 }));
+    await assertFails(save('admin', { fiscalYearStartMonth: 7, extra: 'x' }));
+    await assertFails(setDoc(doc(dbAs('admin'), `organizations/${ORG}/settings/other`), { fiscalYearStartMonth: 7 }));
+  });
+});
+
+describe('money limits', () => {
+  const g = (over: Record<string, unknown>) => setDoc(doc(dbAs('admin'), `organizations/${ORG}/grants/gm`), {
+    id: 'gm', name: 'G', funder: 'F', amount: 1000, startDate: '2026-01-01', endDate: '2026-12-31', status: 'active', kpis: [], ...over,
+  });
+  it('accepts cents and the one billion limit', async () => {
+    await assertSucceeds(g({ amount: 47000.25, spentAmount: 1234.5 }));
+    await assertSucceeds(g({ amount: 1000000000 }));
+  });
+  it('rejects amounts above one billion', async () => {
+    await assertFails(g({ amount: 99000000000 }));
+    await assertFails(g({ spentAmount: 99000000000 }));
+  });
+});

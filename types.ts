@@ -3,7 +3,7 @@ export interface ProgramMetric {
   name: string;
   peopleServed: number;
   totalCost: number;
-  costPerPerson: number; // ROI metric
+  costPerPerson: number;
   month: string;
 }
 
@@ -55,42 +55,29 @@ export interface SaasKPI {
 }
 
 export interface DashboardStats {
-  totalPeopleServed: number; 
+  totalPeopleServed: number;
   totalBudgetSpent: number;
   avgCostPerPerson: number;
   programs: ProgramMetric[];
-  
-  // New Enhanced Fields
   demographics: Demographics;
   geographic: GeographicImpact;
   outcomesDetails: Outcomes;
   theoryOfChange: TheoryOfChange;
   financials: FinancialBreakdown;
   dataQuality: DataQuality;
-  sroi: number; 
+  sroi: number;
   benchmarkComparison: string;
   saasKpis: SaasKPI[];
 }
 
 export interface GeneratedReport {
   title: string;
-  content: string; 
+  content: string;
   generatedAt: string;
 }
 
 export type ReportFrequency = 'weekly' | 'monthly' | 'quarterly' | 'annual';
 
-/**
- * THE AUTHORITATIVE ROLE MODEL.
- *
- * These six roles are the single source of truth for authorization. `firestore.rules`
- * and `security_spec.md` both follow this list — if you change it here, change it in
- * both of those files in the same commit, or the UI and the database will disagree
- * about who can do what.
- *
- * (An older four-role model — admin/editor/viewer/uploader — existed in the security
- * spec and is now retired. It never matched the app.)
- */
 export type UserRole =
   | 'admin'
   | 'grant_coordinator'
@@ -108,7 +95,6 @@ export const USER_ROLES: UserRole[] = [
   'viewer',
 ];
 
-/** One line per role, shown in the invite picker and the members table. */
 export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   admin: 'Full system administration',
   grant_coordinator: 'Manage grant lifecycle',
@@ -127,48 +113,12 @@ export interface RolePermission {
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, RolePermission> = {
-  admin: {
-    canManageTeam: true,
-    canEditGrants: true,
-    canEditMetrics: true,
-    canDeleteGrants: true,
-    canExportData: true,
-  },
-  grant_coordinator: {
-    canManageTeam: false,
-    canEditGrants: true,
-    canEditMetrics: false,
-    canDeleteGrants: false,
-    canExportData: true,
-  },
-  impact_analyst: {
-    canManageTeam: false,
-    canEditGrants: false,
-    canEditMetrics: true,
-    canDeleteGrants: false,
-    canExportData: true,
-  },
-  compliance_officer: {
-    canManageTeam: false,
-    canEditGrants: false,
-    canEditMetrics: false,
-    canDeleteGrants: false,
-    canExportData: true,
-  },
-  data_entry: {
-    canManageTeam: false,
-    canEditGrants: false,
-    canEditMetrics: true,
-    canDeleteGrants: false,
-    canExportData: false,
-  },
-  viewer: {
-    canManageTeam: false,
-    canEditGrants: false,
-    canEditMetrics: false,
-    canDeleteGrants: false,
-    canExportData: false,
-  },
+  admin: { canManageTeam: true, canEditGrants: true, canEditMetrics: true, canDeleteGrants: true, canExportData: true },
+  grant_coordinator: { canManageTeam: false, canEditGrants: true, canEditMetrics: false, canDeleteGrants: false, canExportData: true },
+  impact_analyst: { canManageTeam: false, canEditGrants: false, canEditMetrics: true, canDeleteGrants: false, canExportData: true },
+  compliance_officer: { canManageTeam: false, canEditGrants: false, canEditMetrics: false, canDeleteGrants: false, canExportData: true },
+  data_entry: { canManageTeam: false, canEditGrants: false, canEditMetrics: true, canDeleteGrants: false, canExportData: false },
+  viewer: { canManageTeam: false, canEditGrants: false, canEditMetrics: false, canDeleteGrants: false, canExportData: false },
 };
 
 export interface OrgMember {
@@ -176,19 +126,10 @@ export interface OrgMember {
   email: string;
   role: UserRole;
   joinedAt: string;
-  /** Firestore document id. Always the member's auth uid. */
   docId?: string;
 }
 
-/**
- * A pending invitation lives at `invitations/{lowercased-email}` — a top-level
- * collection, because the invitee is not yet a member of the org and therefore
- * cannot read anything underneath it. One pending invitation per email address.
- *
- * The document is deleted the moment it is accepted; a member doc replaces it.
- */
 export interface Invitation {
-  /** Document id — the invitee's email, lowercased and trimmed. */
   id: string;
   email: string;
   orgId: string;
@@ -209,17 +150,25 @@ export interface Organization {
 }
 
 /**
- * THE AUTHORITATIVE PLAN MODEL. Matches the tiers on the /pricing page.
- * `firestore.rules` and `server.ts` both follow this list — if you change a
- * seat limit here, change it in both of those places in the same commit.
+ * THE AUTHORITATIVE PLAN MODEL.
+ * Seat limits live in PLAN_SEAT_LIMITS below.
  */
 export type PlanId = 'trial' | 'starter' | 'growth' | 'pro';
+export type BillingStatus = 'trialing' | 'active' | 'past_due' | 'canceled';
 
-export const PLAN_SEAT_LIMITS: Record<PlanId, number> = {
+/**
+ * Team seats per plan. THE ONE PLACE this is decided. The server, the app and the database rules
+ * (firestore.rules, checked against this table by a test) all follow it. `null` means unlimited.
+ *
+ * Each step up never has fewer seats than the one below it:
+ *   Trial 8, Starter 3, Growth unlimited, Pro unlimited.
+ * Pro is set apart by AI report volume and onboarding, not by a smaller team cap.
+ */
+export const PLAN_SEAT_LIMITS: Record<PlanId, number | null> = {
   trial: 8,
   starter: 3,
-  growth: 8,
-  pro: 20,
+  growth: null,
+  pro: null,
 };
 
 export const PLAN_LABELS: Record<PlanId, string> = {
@@ -229,19 +178,19 @@ export const PLAN_LABELS: Record<PlanId, string> = {
   pro: 'Compass Pro',
 };
 
-/**
- * Lives at `organizations/{orgId}/billing/subscription`. Written once
- * client-side (the trial default, at org creation) and after that only by
- * the server's Stripe webhook via firebase-admin — there is no client path
- * to change your own plan. See firestore.rules.
- */
 export interface OrgBilling {
   plan: PlanId;
-  status: 'trialing' | 'active' | 'past_due' | 'canceled';
-  seatLimit: number;
+  status: BillingStatus;
+  /**
+   * For display only. Entitlements are always worked out from `plan` (see src/lib/plans.ts),
+   * never from this stored copy, so it can never drift out of step. Null means unlimited.
+   */
+  seatLimit: number | null;
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
   currentPeriodEnd?: string;
+  /** True when the subscription is set to end at the end of the paid period. */
+  cancelAtPeriodEnd?: boolean;
   updatedAt: string;
 }
 
@@ -250,63 +199,88 @@ export interface UserProfile {
   email: string;
   displayName: string;
   currentOrgId?: string;
-  /** True once this account has dismissed the one-time welcome step. */
   hasSeenWelcome?: boolean;
 }
 
+/** One measurement of a KPI for a reporting period. `date` is the last day of the period (YYYY-MM-DD). */
+export interface KpiEntry { id: string; date: string; value: number; }
+/** A count of people in one group, such as "Ages 16-24". */
+export interface BreakdownRow { id: string; label: string; count: number; }
+export type KpiReportingPeriod = 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'cumulative';
 export interface GrantKPI {
-  id: string;
-  name: string;
-  target: number;
-  current: number;
-  unit: string;
+  id: string; name: string; target: number; current: number; unit: string;
+  /** KPIs sharing this id are the same outcome reported to different funders (counted once, each with its own target). */
+  sharedKpiId?: string;
+  /** Where the number started, so progress can be shown as change from baseline. */
+  baseline?: number;
+  reportingPeriod?: KpiReportingPeriod;
+  dataSource?: string;
+  definition?: string;
+  /** Which funder requires this KPI. */
+  requiredBy?: string;
+  /** A value per period. The latest entry is also saved as `current`. */
+  history?: KpiEntry[];
+  /** Who was served, counted by age and by ethnicity. */
+  ageBreakdown?: BreakdownRow[];
+  ethnicityBreakdown?: BreakdownRow[];
 }
-
-export interface SubgranteeKPI {
-  id: string;
-  name: string;
-  target: number;
-  current: number;
-  unit: string;
-}
-
+export interface SubgranteeKPI { id: string; name: string; target: number; current: number; unit: string; }
+export type PartnerReportingStatus = 'current' | 'late' | 'not_started';
 export interface Subgrantee {
-  id: string;
-  name: string;
-  allocatedAmount: number;
-  status: 'active' | 'pending' | 'completed';
-  kpis: SubgranteeKPI[];
+  id: string; name: string; allocatedAmount: number; status: 'active' | 'pending' | 'completed'; kpis: SubgranteeKPI[];
+  /** Money the partner has drawn down so far against allocatedAmount. */
+  drawnAmount?: number;
+  reportingStatus?: PartnerReportingStatus;
 }
+export interface Opportunity { id: string; funder: string; name: string; amount: number; matchScore: number; deadline: string; description: string; whyMatch: string; }
 
-export interface Opportunity {
+export type BudgetCategory = 'personnel' | 'supplies' | 'partner_pass_through' | 'other';
+export interface BudgetLine { id: string; category: BudgetCategory; budgeted: number; spent: number; }
+export type ReportStatus = 'upcoming' | 'submitted' | 'late';
+/** A report a funder expects. Status is worked out from the dates, never stored. */
+export interface ReportDue {
   id: string;
-  funder: string;
-  name: string;
-  amount: number;
-  matchScore: number; // 0-100
-  deadline: string;
-  description: string;
-  whyMatch: string;
+  title: string;
+  /** YYYY-MM-DD */
+  dueDate: string;
+  /** Who is responsible. */
+  owner: string;
+  /** Where reminders go. When empty, reminders go to the organization's admins. */
+  ownerEmail?: string;
+  /** YYYY-MM-DD once the report has been sent to the funder. */
+  submittedDate?: string;
 }
+export type GrantReportFrequency = 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'none';
 
 export interface Grant {
-  id: string;
-  name: string;
-  funder: string;
-  amount: number;
-  startDate: string;
-  endDate: string;
-  status: 'active' | 'pending' | 'completed';
-  kpis: GrantKPI[];
-  subgrantees?: Subgrantee[];
-  spentAmount?: number;
+  id: string; name: string; funder: string; amount: number; startDate: string; endDate: string;
+  status: 'active' | 'pending' | 'completed'; kpis: GrantKPI[]; subgrantees?: Subgrantee[]; spentAmount?: number;
+  /** The program this grant funds. Unset means the grant is not assigned to a program yet. */
+  programId?: string;
+  restriction?: 'restricted' | 'unrestricted';
+  allowedUses?: string;
+  matchRequired?: number;
+  matchSecured?: number;
+  reportFrequency?: GrantReportFrequency;
+  budgetLines?: BudgetLine[];
+  reports?: ReportDue[];
 }
 
-// New Types for AI Analysis
-export interface AIAnalysisData {
-  keyFindings: string[];
-  recommendations: string[];
-  risks: string[];
-  trendAnalysis: string;
-  readinessScore: number;
+/** Organization-wide settings. Only an admin can change them. */
+export interface OrgSettings {
+  /** The month the fiscal year starts: 1 = January, 7 = July. */
+  fiscalYearStartMonth: number;
 }
+
+/** A program is what the organization runs; several grants from different funders can pay for it. */
+export interface Program {
+  id: string;
+  name: string;
+  description: string;
+  populationServed: string;
+  startDate: string;
+  endDate: string;
+  /** What it costs to run the program. Used only to work out the funding gap; left unset if unknown. */
+  budgetNeed?: number;
+}
+export interface AIAnalysisData { keyFindings: string[]; recommendations: string[]; risks: string[]; trendAnalysis: string; readinessScore: number; }

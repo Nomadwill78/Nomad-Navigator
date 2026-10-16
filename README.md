@@ -1,3 +1,7 @@
+> ## Nomad Compass v2 (new)
+>
+> **[`compass-v2/`](compass-v2/README.md)** is the next version of Nomad Compass: the grants and impact tracking from this app, plus donors, volunteers, donor cultivation and AI insights, built as an app on the open-source Twenty CRM. It is an early preview. This v1 app below is unchanged and keeps working.
+
 <div align="center">
 <img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
 </div>
