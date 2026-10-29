@@ -263,7 +263,7 @@ describe('upgrades and downgrades update the existing subscription', () => {
     const err = await changePlan(deps(), { orgId: 'org1', plan: 'starter' }).catch((e) => e);
     expect(err).toBeInstanceOf(BillingError);
     expect(err.code).toBe('TOO_MANY_MEMBERS');
-    expect(err.message).toMatch(/5 team members.*allows 3.*Remove 2 members/);
+    expect(err.message).toMatch(/5 occupied seats.*allows 3.*Remove 2 members or revoke invitations/);
     expect(stripe.count('update')).toBe(0);
   });
   it('exactly 3 members can downgrade to Starter; 4 cannot', async () => {
