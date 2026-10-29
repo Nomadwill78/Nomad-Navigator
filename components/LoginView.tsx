@@ -93,9 +93,9 @@ const CompassRose: React.FC = () => {
   );
 };
 
-export const LoginView: React.FC = () => {
+export const LoginView: React.FC<{ defaultView?: 'login' | 'register' }> = ({ defaultView = 'login' }) => {
   const { loginWithEmail, registerWithEmail, resetPassword } = useAuth();
-  const [view, setView] = useState<'login' | 'register' | 'reset'>('login');
+  const [view, setView] = useState<'login' | 'register' | 'reset'>(defaultView);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
