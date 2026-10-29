@@ -243,7 +243,7 @@ export const SalesPageView: React.FC = () => {
           Stop chasing spreadsheets, rebuilding reports, and trying to remember which numbers belong to which
           grant. Track the work. Understand the impact. Know where you're headed.
         </p>
-        <PrimaryCta>Request Your 30-Day Free Trial</PrimaryCta>
+        <PrimaryCta>Start Your 30-Day Free Trial</PrimaryCta>
         <p className="font-mono2 text-[0.6rem] tracking-[0.14em] uppercase text-inkfaint mt-4">
           No credit card required · First 10 nonprofits · 30 days free
         </p>
