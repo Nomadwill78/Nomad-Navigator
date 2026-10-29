@@ -73,36 +73,23 @@ const readCount = async (orgId: string) => {
 describe('seat limits are exact for every plan (driven by PLAN_SEAT_LIMITS)', () => {
   for (const plan of Object.keys(PLAN_SEAT_LIMITS) as PlanId[]) {
     const limit = PLAN_SEAT_LIMITS[plan];
-    if (limit !== null) {
-      it(`${plan}: the ${limit}th member can join, the ${limit + 1}th cannot`, async () => {
-        const full = await seedOrg({ plan, members: limit });
-        await seedInvite(full, 'late@x.org');
-        await assertFails(join(full, 'late', limit, 'late@x.org')); // already at the limit
+    if (limit === null) throw new Error(`${plan} must have a finite seat limit`);
+    it(`${plan}: the ${limit}th member can join, the ${limit + 1}th cannot`, async () => {
+      const full = await seedOrg({ plan, members: limit });
+      await seedInvite(full, 'late@x.org');
+      await assertFails(join(full, 'late', limit, 'late@x.org')); // already at the limit
 
-        const oneLeft = await seedOrg({ plan, members: limit - 1 });
-        await seedInvite(oneLeft, 'last@x.org');
-        await assertSucceeds(join(oneLeft, 'last', limit - 1, 'last@x.org')); // fills the last seat exactly
-        expect(await readCount(oneLeft)).toBe(limit);
-      });
-      it(`${plan}: an admin can send an invitation while a seat is free, and not once the plan is full`, async () => {
-        const oneLeft = await seedOrg({ plan, members: limit - 1 });
-        await assertSucceeds(sendInvite(oneLeft, 'new@x.org'));
-        const full = await seedOrg({ plan, members: limit });
-        await assertFails(sendInvite(full, 'new@x.org'));
-      });
-    } else {
-      it(`${plan}: unlimited. A 25th, 100th and 500th member can all join`, async () => {
-        for (const already of [24, 99, 499]) {
-          const org = await seedOrg({ plan, members: already });
-          await seedInvite(org, 'more@x.org');
-          await assertSucceeds(join(org, 'more', already, 'more@x.org'));
-          expect(await readCount(org)).toBe(already + 1);
-        }
-      });
-      it(`${plan}: an admin can keep sending invitations at any size`, async () => {
-        await assertSucceeds(sendInvite(await seedOrg({ plan, members: 300 }), 'new@x.org'));
-      });
-    }
+      const oneLeft = await seedOrg({ plan, members: limit - 1 });
+      await seedInvite(oneLeft, 'last@x.org');
+      await assertSucceeds(join(oneLeft, 'last', limit - 1, 'last@x.org')); // fills the last seat exactly
+      expect(await readCount(oneLeft)).toBe(limit);
+    });
+    it(`${plan}: an admin can send an invitation while a seat is free, and not once the plan is full`, async () => {
+      const oneLeft = await seedOrg({ plan, members: limit - 1 });
+      await assertSucceeds(sendInvite(oneLeft, 'new@x.org'));
+      const full = await seedOrg({ plan, members: limit });
+      await assertFails(sendInvite(full, 'new@x.org'));
+    });
   }
 
   it('the limit comes from the plan name, not the stored seatLimit number (which these tests set wrongly to 0)', async () => {
