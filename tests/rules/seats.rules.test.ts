@@ -25,7 +25,7 @@ async function seedOrg(opts: { plan?: string; status?: string; members: number; 
   const orgId = `org${++orgCounter}`;
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
-    await setDoc(doc(db, `organizations/${orgId}`), { name: 'Test', creatorId: OWNER, createdAt: Timestamp.now(), memberCount: opts.members });
+    await setDoc(doc(db, `organizations/${orgId}`), { name: 'Test', creatorId: OWNER, createdAt: Timestamp.now(), memberCount: opts.members, pendingInviteCount: 0 });
     for (let i = 0; i < Math.min(opts.members, 30); i++) {
       const uid = i === 0 ? OWNER : `m${i}`;
       await setDoc(doc(db, `organizations/${orgId}/members/${uid}`), { userId: uid, email: `${uid}@x.org`, role: i === 0 ? 'admin' : 'viewer', joinedAt: 'x' });
@@ -42,6 +42,9 @@ async function seedOrg(opts: { plan?: string; status?: string; members: number; 
 async function seedInvite(orgId: string, email: string, role = 'viewer') {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
+    const orgRef = doc(db, `organizations/${orgId}`);
+    const orgSnap = await getDoc(orgRef);
+    await updateDoc(orgRef, { pendingInviteCount: (orgSnap.data()?.pendingInviteCount ?? 0) + 1 });
     await setDoc(doc(db, `invitations/${email}`), {
       email, orgId, orgName: 'Test', role, invitedBy: OWNER, invitedByEmail: 'owner@x.org', status: 'pending', createdAt: 'x',
     });
@@ -50,19 +53,24 @@ async function seedInvite(orgId: string, email: string, role = 'viewer') {
 }
 
 /** The three writes a join makes, in one commit, as the real app does. */
-const join = (orgId: string, uid: string, countBefore: number, email = `${uid}@x.org`, role = 'viewer') => {
+const join = (orgId: string, uid: string, countBefore: number, email = `${uid}@x.org`, role = 'viewer', pendingBefore = 1) => {
   const db = as(uid, email);
   const batch = writeBatch(db);
   batch.set(doc(db, `organizations/${orgId}/members/${uid}`), { userId: uid, email, role, joinedAt: 'x' });
-  batch.update(doc(db, `organizations/${orgId}`), { memberCount: countBefore + 1 });
+  batch.update(doc(db, `organizations/${orgId}`), { memberCount: countBefore + 1, pendingInviteCount: pendingBefore - 1 });
   batch.delete(doc(db, `invitations/${email}`));
   return batch.commit();
 };
 
-const sendInvite = (orgId: string, email: string) =>
-  setDoc(doc(as(OWNER), `invitations/${email}`), {
+const sendInvite = (orgId: string, email: string) => {
+  const db = as(OWNER);
+  const batch = writeBatch(db);
+  batch.update(doc(db, `organizations/${orgId}`), { pendingInviteCount: 1 });
+  batch.set(doc(db, `invitations/${email}`), {
     email, orgId, orgName: 'Test', role: 'viewer', invitedBy: OWNER, invitedByEmail: 'owner@x.org', status: 'pending', createdAt: 'x',
   });
+  return batch.commit();
+};
 
 const readCount = async (orgId: string) => {
   let n = -1;
@@ -73,36 +81,23 @@ const readCount = async (orgId: string) => {
 describe('seat limits are exact for every plan (driven by PLAN_SEAT_LIMITS)', () => {
   for (const plan of Object.keys(PLAN_SEAT_LIMITS) as PlanId[]) {
     const limit = PLAN_SEAT_LIMITS[plan];
-    if (limit !== null) {
-      it(`${plan}: the ${limit}th member can join, the ${limit + 1}th cannot`, async () => {
-        const full = await seedOrg({ plan, members: limit });
-        await seedInvite(full, 'late@x.org');
-        await assertFails(join(full, 'late', limit, 'late@x.org')); // already at the limit
+    if (limit === null) throw new Error(`${plan} must have a finite seat limit`);
+    it(`${plan}: the ${limit}th member can join, the ${limit + 1}th cannot`, async () => {
+      const full = await seedOrg({ plan, members: limit });
+      await seedInvite(full, 'late@x.org');
+      await assertFails(join(full, 'late', limit, 'late@x.org')); // already at the limit
 
-        const oneLeft = await seedOrg({ plan, members: limit - 1 });
-        await seedInvite(oneLeft, 'last@x.org');
-        await assertSucceeds(join(oneLeft, 'last', limit - 1, 'last@x.org')); // fills the last seat exactly
-        expect(await readCount(oneLeft)).toBe(limit);
-      });
-      it(`${plan}: an admin can send an invitation while a seat is free, and not once the plan is full`, async () => {
-        const oneLeft = await seedOrg({ plan, members: limit - 1 });
-        await assertSucceeds(sendInvite(oneLeft, 'new@x.org'));
-        const full = await seedOrg({ plan, members: limit });
-        await assertFails(sendInvite(full, 'new@x.org'));
-      });
-    } else {
-      it(`${plan}: unlimited. A 25th, 100th and 500th member can all join`, async () => {
-        for (const already of [24, 99, 499]) {
-          const org = await seedOrg({ plan, members: already });
-          await seedInvite(org, 'more@x.org');
-          await assertSucceeds(join(org, 'more', already, 'more@x.org'));
-          expect(await readCount(org)).toBe(already + 1);
-        }
-      });
-      it(`${plan}: an admin can keep sending invitations at any size`, async () => {
-        await assertSucceeds(sendInvite(await seedOrg({ plan, members: 300 }), 'new@x.org'));
-      });
-    }
+      const oneLeft = await seedOrg({ plan, members: limit - 1 });
+      await seedInvite(oneLeft, 'last@x.org');
+      await assertSucceeds(join(oneLeft, 'last', limit - 1, 'last@x.org')); // fills the last seat exactly
+      expect(await readCount(oneLeft)).toBe(limit);
+    });
+    it(`${plan}: an admin can send an invitation while a seat is free, and not once the plan is full`, async () => {
+      const oneLeft = await seedOrg({ plan, members: limit - 1 });
+      await assertSucceeds(sendInvite(oneLeft, 'new@x.org'));
+      const full = await seedOrg({ plan, members: limit });
+      await assertFails(sendInvite(full, 'new@x.org'));
+    });
   }
 
   it('the limit comes from the plan name, not the stored seatLimit number (which these tests set wrongly to 0)', async () => {
@@ -110,13 +105,13 @@ describe('seat limits are exact for every plan (driven by PLAN_SEAT_LIMITS)', ()
     await seedInvite(org, 'a@x.org');
     await assertSucceeds(join(org, 'a', 5, 'a@x.org'));
   });
-  it('an organization with no billing document yet is on the 8 seat trial', async () => {
-    const seven = await seedOrg({ members: 7, billing: false });
-    await seedInvite(seven, 'a@x.org');
-    await assertSucceeds(join(seven, 'a', 7, 'a@x.org'));
-    const eight = await seedOrg({ members: 8, billing: false });
-    await seedInvite(eight, 'b@x.org');
-    await assertFails(join(eight, 'b', 8, 'b@x.org'));
+  it('an organization with no billing document yet is on the 5 seat trial', async () => {
+    const four = await seedOrg({ members: 4, billing: false });
+    await seedInvite(four, 'a@x.org');
+    await assertSucceeds(join(four, 'a', 4, 'a@x.org'));
+    const five = await seedOrg({ members: 5, billing: false });
+    await seedInvite(five, 'b@x.org');
+    await assertFails(join(five, 'b', 5, 'b@x.org'));
   });
   it('an unknown plan name never gets unlimited seats', async () => {
     const org = await seedOrg({ plan: 'enterprise-typo', members: 2 });
@@ -256,7 +251,7 @@ describe('concurrent invitations cannot exceed capacity', () => {
     await seedInvite(org, 'a@x.org');
     await seedInvite(org, 'b@x.org');
     // Both read memberCount = 2 and both try to write 3 at the same moment (raw writes, no client-side retry logic).
-    const results = await Promise.allSettled([join(org, 'a', 2, 'a@x.org'), join(org, 'b', 2, 'b@x.org')]);
+    const results = await Promise.allSettled([join(org, 'a', 2, 'a@x.org'), join(org, 'b', 2, 'b@x.org', 'viewer', 2)]);
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
     expect(await readCount(org)).toBe(3);
   });
@@ -284,11 +279,11 @@ describe('concurrent invitations cannot exceed capacity', () => {
     const org = await seedOrg({ plan: 'trial', members: 6 });
     const people = ['a', 'b', 'c', 'd'];
     for (const p of people) await seedInvite(org, `${p}@x.org`);
-    await Promise.allSettled(people.map((p) => join(org, p, 6, `${p}@x.org`)));
+    await Promise.allSettled(people.map((p) => join(org, p, 4, `${p}@x.org`, 'viewer', 4)));
     let real = 0;
     await env.withSecurityRulesDisabled(async (ctx) => { real = (await getDocs(collection(ctx.firestore(), `organizations/${org}/members`))).size; });
     expect(await readCount(org)).toBe(real);
-    expect(real).toBeLessThanOrEqual(8);
+    expect(real).toBeLessThanOrEqual(5);
   });
 });
 
@@ -307,9 +302,10 @@ describe('the rules table matches PLAN_SEAT_LIMITS in types.ts', () => {
   it('lists the same limit for every plan', () => {
     const rules = readFileSync('firestore.rules', 'utf8');
     const fn = /function seatLimitOf\(plan\) \{([\s\S]*?)\n    \}/.exec(rules)![1];
-    expect(fn).toContain("plan == 'trial' ? 8");
+    expect(fn).toContain("plan == 'trial' ? 5");
     expect(fn).toContain("plan == 'starter' ? 3");
-    expect(fn).toMatch(/\(plan == 'growth' \|\| plan == 'pro'\) \? null/);
-    expect(PLAN_SEAT_LIMITS).toEqual({ trial: 8, starter: 3, growth: null, pro: null });
+    expect(fn).toContain("plan == 'growth' ? 10");
+    expect(fn).toContain("plan == 'pro' ? 25");
+    expect(PLAN_SEAT_LIMITS).toEqual({ trial: 5, starter: 3, growth: 10, pro: 25 });
   });
 });

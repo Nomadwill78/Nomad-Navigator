@@ -71,6 +71,10 @@ export function createFirestoreBillingStore(db: Firestore, now: () => number = D
     async countMembers(orgId) {
       return (await db.collection(`organizations/${orgId}/members`).select().get()).size;
     },
+
+    async countPendingInvitations(orgId) {
+      return (await db.collection('invitations').where('orgId', '==', orgId).where('status', '==', 'pending').select().get()).size;
+    },
   };
 }
 

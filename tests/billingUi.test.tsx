@@ -44,45 +44,47 @@ beforeEach(() => {
   vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
 
-describe('Growth is unlimited everywhere', () => {
-  it('Billing shows Unlimited seats for a Growth org even when the stored seatLimit is null or wrong', () => {
-    for (const seatLimit of [null, 8, 20, undefined]) {
+describe('plan seat limits are consistent everywhere', () => {
+  it('Billing derives Growth seat limit from the plan even when stored seatLimit is wrong', () => {
+    for (const seatLimit of [null, 5, 25, undefined]) {
       setAuth({ plan: 'growth', status: 'active', seatLimit });
       const { unmount } = render(<BillingView />);
-      expect(screen.getByText(/Unlimited seats/)).toBeTruthy();
-      expect(screen.queryByText(/Up to 8 seats/)).toBeNull();
+      expect(screen.getByText(/Up to 10 seats/)).toBeTruthy();
+      expect(screen.queryByText(/Up to 5 seats/)).toBeNull();
       unmount();
     }
   });
-  it('the plan cards say Starter 3, Growth and Pro unlimited, and never "8" or "20"', () => {
+  it('the plan cards show Starter 3, Growth 10 and Pro 25', () => {
     setAuth({ plan: 'starter', status: 'active', seatLimit: 3 });
     render(<BillingView />);
     expect(screen.getByText('3 team members')).toBeTruthy();
-    expect(screen.getAllByText('Unlimited team members')).toHaveLength(2);
-    expect(screen.queryByText(/20 team members/)).toBeNull();
-    expect(screen.queryByText(/\b8 team members/)).toBeNull();
+    expect(screen.getByText('10 team members')).toBeTruthy();
+    expect(screen.getByText('25 team members')).toBeTruthy();
+    
+    
   });
   it('the public pricing page agrees', () => {
     render(<SalesPageView onGetStarted={() => {}} onLogin={() => {}} onSignUp={() => {}} {...({} as any)} />);
     expect(screen.getByText('3 team members')).toBeTruthy();
-    expect(screen.getAllByText('Unlimited team members').length).toBe(2);
-    expect(screen.queryByText('8 team members')).toBeNull();
-    expect(screen.queryByText('20 team members')).toBeNull();
+    expect(screen.getByText('10 team members')).toBeTruthy();
+    expect(screen.getByText('25 team members')).toBeTruthy();
+    
+    
   });
-  it('Team screen: a Growth org with 25 members shows 25 / ∞ and can still invite', () => {
-    setAuth({ plan: 'growth', status: 'active', seatLimit: null }, {}, 25);
-    h.members = makeMembers(25);
+  it('Team screen: a Growth org with 10 members reaches its cap', () => {
+    setAuth({ plan: 'growth', status: 'active', seatLimit: 10 }, {}, 10);
+    h.members = makeMembers(10);
     render(<TeamManagementView />);
-    expect(screen.getByText(/∞/)).toBeTruthy();
-    expect(screen.getByText(/Unlimited seats/)).toBeTruthy();
-    expect(screen.getByText('Invite Colleague')).toBeTruthy();
+    expect(screen.getByText(/10/)).toBeTruthy();
+    expect(screen.getByText(/Up to 10 seats/)).toBeTruthy();
+    expect(screen.queryByText('Invite Colleague')).toBeNull();
   });
-  it('Team screen: the old bug (null seatLimit turning into 8) cannot come back', () => {
-    setAuth({ plan: 'growth', status: 'active', seatLimit: null }, {}, 9);
+  it('Team screen uses the Growth plan limit instead of a stale stored seatLimit', () => {
+    setAuth({ plan: 'growth', status: 'active', seatLimit: 5 }, {}, 9);
     h.members = makeMembers(9);
     render(<TeamManagementView />);
-    expect(screen.getByText('Invite Colleague')).toBeTruthy(); // 9 members, above the old wrong limit of 8
-    expect(screen.queryByText(/All 8 seats/)).toBeNull();
+    expect(screen.getByText('Invite Colleague')).toBeTruthy(); // stored limit 5 is ignored; actual Growth limit is 10
+    expect(screen.queryByText(/All 5 seats/)).toBeNull();
   });
 });
 
@@ -106,13 +108,13 @@ describe('exact limits in the Team screen', () => {
     expect(screen.queryByText('Invite Colleague')).toBeNull();
     expect(screen.getByText(/2 joined · 1 pending/)).toBeTruthy();
   });
-  it('Trial allows 8', () => {
-    setAuth({ plan: 'trial', status: 'trialing', seatLimit: 8 });
-    h.members = makeMembers(7);
+  it('Trial allows 5', () => {
+    setAuth({ plan: 'trial', status: 'trialing', seatLimit: 5 });
+    h.members = makeMembers(4);
     const first = render(<TeamManagementView />);
     expect(screen.getByText('Invite Colleague')).toBeTruthy();
     first.unmount();
-    h.members = makeMembers(8);
+    h.members = makeMembers(5);
     render(<TeamManagementView />);
     expect(screen.queryByText('Invite Colleague')).toBeNull();
   });
