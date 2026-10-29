@@ -110,13 +110,13 @@ describe('seat limits are exact for every plan (driven by PLAN_SEAT_LIMITS)', ()
     await seedInvite(org, 'a@x.org');
     await assertSucceeds(join(org, 'a', 5, 'a@x.org'));
   });
-  it('an organization with no billing document yet is on the 8 seat trial', async () => {
-    const seven = await seedOrg({ members: 7, billing: false });
+  it('an organization with no billing document yet is on the 5 seat trial', async () => {
+    const four = await seedOrg({ members: 4, billing: false });
     await seedInvite(seven, 'a@x.org');
-    await assertSucceeds(join(seven, 'a', 7, 'a@x.org'));
-    const eight = await seedOrg({ members: 8, billing: false });
+    await assertSucceeds(join(four, 'a', 4, 'a@x.org'));
+    const five = await seedOrg({ members: 5, billing: false });
     await seedInvite(eight, 'b@x.org');
-    await assertFails(join(eight, 'b', 8, 'b@x.org'));
+    await assertFails(join(five, 'b', 5, 'b@x.org'));
   });
   it('an unknown plan name never gets unlimited seats', async () => {
     const org = await seedOrg({ plan: 'enterprise-typo', members: 2 });
@@ -284,11 +284,11 @@ describe('concurrent invitations cannot exceed capacity', () => {
     const org = await seedOrg({ plan: 'trial', members: 6 });
     const people = ['a', 'b', 'c', 'd'];
     for (const p of people) await seedInvite(org, `${p}@x.org`);
-    await Promise.allSettled(people.map((p) => join(org, p, 6, `${p}@x.org`)));
+    await Promise.allSettled(people.map((p) => join(org, p, 4, `${p}@x.org`)));
     let real = 0;
     await env.withSecurityRulesDisabled(async (ctx) => { real = (await getDocs(collection(ctx.firestore(), `organizations/${org}/members`))).size; });
     expect(await readCount(org)).toBe(real);
-    expect(real).toBeLessThanOrEqual(8);
+    expect(real).toBeLessThanOrEqual(5);
   });
 });
 
@@ -307,9 +307,10 @@ describe('the rules table matches PLAN_SEAT_LIMITS in types.ts', () => {
   it('lists the same limit for every plan', () => {
     const rules = readFileSync('firestore.rules', 'utf8');
     const fn = /function seatLimitOf\(plan\) \{([\s\S]*?)\n    \}/.exec(rules)![1];
-    expect(fn).toContain("plan == 'trial' ? 8");
+    expect(fn).toContain("plan == 'trial' ? 5");
     expect(fn).toContain("plan == 'starter' ? 3");
-    expect(fn).toMatch(/\(plan == 'growth' \|\| plan == 'pro'\) \? null/);
-    expect(PLAN_SEAT_LIMITS).toEqual({ trial: 8, starter: 3, growth: null, pro: null });
+    expect(fn).toContain("plan == 'growth' ? 10");
+    expect(fn).toContain("plan == 'pro' ? 25");
+    expect(PLAN_SEAT_LIMITS).toEqual({ trial: 5, starter: 3, growth: 10, pro: 25 });
   });
 });
