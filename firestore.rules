@@ -110,10 +110,12 @@ service cloud.firestore {
         (hasRole(orgId, ['admin'])) &&
          incoming().diff(existing()).affectedKeys().hasOnly(['pendingInviteCount']) &&
          pendingInviteCount(incoming()) == pendingInviteCount(existing()) + 1 &&
-         existsAfter(/databases/$(database)/documents/invitations/$(request.resource.data.get('reservationEmail', ''))) &&
          canHold(orgId, existing().memberCount + pendingInviteCount(incoming())))
         ||
         // Accepting an already-reserved invitation transfers one pending seat to one active member.
+        (hasRole(orgId, ['admin']) && incoming().diff(existing()).affectedKeys().hasOnly(['pendingInviteCount']) &&
+         pendingInviteCount(incoming()) == pendingInviteCount(existing()) - 1)
+        ||
         (hasPendingInvite(orgId) && incoming().diff(existing()).affectedKeys().hasOnly(['memberCount', 'pendingInviteCount']) &&
          incoming().memberCount == existing().memberCount + 1 &&
          pendingInviteCount(incoming()) == pendingInviteCount(existing()) - 1 &&
