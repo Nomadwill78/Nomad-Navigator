@@ -99,10 +99,10 @@ describe('seat limits are exact for every plan (driven by PLAN_SEAT_LIMITS)', ()
   });
   it('an organization with no billing document yet is on the 5 seat trial', async () => {
     const four = await seedOrg({ members: 4, billing: false });
-    await seedInvite(seven, 'a@x.org');
+    await seedInvite(four, 'a@x.org');
     await assertSucceeds(join(four, 'a', 4, 'a@x.org'));
     const five = await seedOrg({ members: 5, billing: false });
-    await seedInvite(eight, 'b@x.org');
+    await seedInvite(five, 'b@x.org');
     await assertFails(join(five, 'b', 5, 'b@x.org'));
   });
   it('an unknown plan name never gets unlimited seats', async () => {
