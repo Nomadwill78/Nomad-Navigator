@@ -147,6 +147,8 @@ export interface Organization {
   creatorId: string;
   createdAt: string;
   memberCount: number;
+  /** Number of pending invitations reserving seats. */
+  pendingInviteCount?: number;
 }
 
 /**
