@@ -39,10 +39,14 @@ service cloud.firestore {
       return statusAllowsNewSeats(orgStatus(orgId)) && (limit == null || newCount <= limit);
     }
 
+    function pendingInviteCount(data) { return data.get('pendingInviteCount', 0); }
+
     function isValidOrganization(data) {
       return data.keys().hasAll(['name', 'creatorId', 'createdAt', 'memberCount']) &&
-             data.keys().size() == 4 && data.name is string && data.name.size() > 0 && data.name.size() < 256 &&
-             (data.memberCount is int || data.memberCount is number) && data.memberCount >= 0;
+             (data.keys().size() == 4 || (data.keys().size() == 5 && 'pendingInviteCount' in data)) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 256 &&
+             (data.memberCount is int || data.memberCount is number) && data.memberCount >= 0 &&
+             pendingInviteCount(data) is int && pendingInviteCount(data) >= 0;
     }
 
     function isValidBilling(data) {
@@ -90,21 +94,32 @@ service cloud.firestore {
       allow get: if isOrgMember(orgId) || hasPendingInvite(orgId);
       // A new organization starts with exactly one member, its creator, added in the same commit.
       allow create: if isSignedIn() && isValidOrganization(incoming()) && incoming().creatorId == request.auth.uid && isValidId(orgId) &&
-        incoming().memberCount == 1 &&
+        incoming().memberCount == 1 && pendingInviteCount(incoming()) == 0 &&
         existsAfter(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
       // memberCount is a counter that only moves with a real membership change:
       //  - an admin can edit the organization but can NEVER set memberCount (it must stay as it is);
       //  - an invitee can add exactly 1, and only in the same commit that creates their own membership;
       //  - removals go through the server (which recounts the members), so no client can lower it.
       allow update: if
+        // Ordinary admin edits cannot manipulate either seat counter.
         (hasRole(orgId, ['admin']) && isValidOrganization(incoming()) && incoming().creatorId == existing().creatorId &&
-         incoming().memberCount == existing().memberCount)
+         incoming().memberCount == existing().memberCount &&
+         pendingInviteCount(incoming()) == pendingInviteCount(existing()))
         ||
-        (hasPendingInvite(orgId) && incoming().diff(existing()).affectedKeys().hasOnly(['memberCount']) &&
+        // Creating an invitation reserves one seat in the same atomic commit.
+        (hasRole(orgId, ['admin'])) &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['pendingInviteCount']) &&
+         pendingInviteCount(incoming()) == pendingInviteCount(existing()) + 1 &&
+         existsAfter(/databases/$(database)/documents/invitations/$(request.resource.data.get('reservationEmail', ''))) &&
+         canHold(orgId, existing().memberCount + pendingInviteCount(incoming())))
+        ||
+        // Accepting an already-reserved invitation transfers one pending seat to one active member.
+        (hasPendingInvite(orgId) && incoming().diff(existing()).affectedKeys().hasOnly(['memberCount', 'pendingInviteCount']) &&
          incoming().memberCount == existing().memberCount + 1 &&
+         pendingInviteCount(incoming()) == pendingInviteCount(existing()) - 1 &&
          !exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
          existsAfter(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
-         canHold(orgId, incoming().memberCount));
+         !existsAfter(inviteRef()));
 
       match /members/{userId} {
         allow read: if isOrgMember(orgId);
@@ -122,7 +137,9 @@ service cloud.firestore {
             (hasPendingInvite(orgId) && incoming().role == get(inviteRef()).data.role && incoming().email.lower() == authEmail() &&
              getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.memberCount ==
                get(/databases/$(database)/documents/organizations/$(orgId)).data.memberCount + 1 &&
-             canHold(orgId, getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.memberCount))
+             pendingInviteCount(getAfter(/databases/$(database)/documents/organizations/$(orgId)).data) ==
+               pendingInviteCount(get(/databases/$(database)/documents/organizations/$(orgId)).data) - 1 &&
+             !existsAfter(inviteRef()))
           );
         // Roles can change, but not your own, and not the owner's: an organization always keeps its owner as an admin.
         allow update: if hasRole(orgId, ['admin']) && isValidOrgMember(incoming()) && incoming().userId == existing().userId &&
@@ -175,10 +192,27 @@ service cloud.firestore {
     match /invitations/{inviteEmail} {
       allow get: if isSignedIn() && (inviteEmail == authEmail() || hasRole(resource.data.orgId, ['admin']));
       allow list: if isSignedIn() && hasRole(resource.data.orgId, ['admin']);
-      allow create: if isValidInvitation(incoming()) && inviteEmail == incoming().email && hasRole(incoming().orgId, ['admin']) &&
-                       canHold(incoming().orgId, get(/databases/$(database)/documents/organizations/$(incoming().orgId)).data.memberCount + 1);
+      allow create: if !exists(/databases/$(database)/documents/invitations/$(inviteEmail)) &&
+                       isValidInvitation(incoming()) && inviteEmail == incoming().email &&
+                       hasRole(incoming().orgId, ['admin']) &&
+                       pendingInviteCount(getAfter(/databases/$(database)/documents/organizations/$(incoming().orgId)).data) ==
+                         pendingInviteCount(get(/databases/$(database)/documents/organizations/$(incoming().orgId)).data) + 1 &&
+                       canHold(incoming().orgId,
+                         get(/databases/$(database)/documents/organizations/$(incoming().orgId)).data.memberCount +
+                         pendingInviteCount(getAfter(/databases/$(database)/documents/organizations/$(incoming().orgId)).data));
       allow update: if false;
-      allow delete: if isSignedIn() && (inviteEmail == authEmail() || hasRole(resource.data.orgId, ['admin']));
+      // Admin revocation releases one reserved seat; invite acceptance transfers the reservation to membership.
+      allow delete: if
+        (hasRole(resource.data.orgId, ['admin']) &&
+         pendingInviteCount(getAfter(/databases/$(database)/documents/organizations/$(resource.data.orgId)).data) ==
+           pendingInviteCount(get(/databases/$(database)/documents/organizations/$(resource.data.orgId)).data) - 1)
+        ||
+        (hasVerifiedEmail() && inviteEmail == authEmail() &&
+         existsAfter(/databases/$(database)/documents/organizations/$(resource.data.orgId)/members/$(request.auth.uid)) &&
+         getAfter(/databases/$(database)/documents/organizations/$(resource.data.orgId)).data.memberCount ==
+           get(/databases/$(database)/documents/organizations/$(resource.data.orgId)).data.memberCount + 1 &&
+         pendingInviteCount(getAfter(/databases/$(database)/documents/organizations/$(resource.data.orgId)).data) ==
+           pendingInviteCount(get(/databases/$(database)/documents/organizations/$(resource.data.orgId)).data) - 1);
     }
 
     match /trial_signups/{signupId} {
