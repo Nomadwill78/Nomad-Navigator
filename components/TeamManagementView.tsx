@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Mail, Trash2, UserPlus, CheckCircle2, Clock, X } from 'lucide-react';
 import { useAuth, inviteId } from '../src/contexts/AuthContext';
 import { db } from '../src/lib/firebase';
-import { collection, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, query, where, runTransaction } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, query, where, runTransaction } from 'firebase/firestore';
 import { OrgMember, UserRole, Invitation, USER_ROLES, PLAN_LABELS } from '../types';
 import { evaluateSeats, describeSeatLimit } from '../src/lib/plans';
 
@@ -91,7 +91,7 @@ export const TeamManagementView: React.FC = () => {
       setIsInviteModalOpen(false);
     } catch (error) {
       console.error('Invite failed:', error);
-      setInviteError('Could not create that invitation. Check that you still have admin access.');
+      setInviteError(error instanceof Error ? error.message : 'Could not create that invitation. Check that you still have admin access.');
     } finally { setIsSending(false); }
   };
 
