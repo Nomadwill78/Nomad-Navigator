@@ -160,15 +160,14 @@ export type BillingStatus = 'trialing' | 'active' | 'past_due' | 'canceled';
  * Team seats per plan. THE ONE PLACE this is decided. The server, the app and the database rules
  * (firestore.rules, checked against this table by a test) all follow it. `null` means unlimited.
  *
- * Each step up never has fewer seats than the one below it:
- *   Trial 8, Starter 3, Growth unlimited, Pro unlimited.
- * Pro is set apart by AI report volume and onboarding, not by a smaller team cap.
+ * Seat progression: Trial 5, Starter 3, Growth 10, Pro 25.
+ * Trial is a short evaluation tier; paid plans scale with organizational complexity.
  */
 export const PLAN_SEAT_LIMITS: Record<PlanId, number | null> = {
-  trial: 8,
+  trial: 5,
   starter: 3,
-  growth: null,
-  pro: null,
+  growth: 10,
+  pro: 25,
 };
 
 export const PLAN_LABELS: Record<PlanId, string> = {
