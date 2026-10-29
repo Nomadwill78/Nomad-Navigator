@@ -48,7 +48,6 @@ import { GrantDiscoveryView } from './components/GrantDiscoveryView';
 import { TeamManagementView } from './components/TeamManagementView';
 import { BillingView } from './components/BillingView';
 import { LoginView } from './components/LoginView';
-import { TrialSignupView } from './components/TrialSignupView';
 import { SalesPageView } from './components/SalesPageView';
 import { OnboardingView } from './components/OnboardingView';
 import { SettingsView } from './components/SettingsView';
@@ -522,12 +521,14 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Public free-trial signup page — no login required
-  if (typeof window !== 'undefined' &&
+  // The /free-trial link is the pilot entry point: it serves the standard
+  // signup flow, defaulting to the register tab. Creating an organization
+  // through onboarding automatically starts the trial (see
+  // createOrganizationTxn in src/lib/membership.ts), so there is no separate
+  // request/approval step — signup IS trial access.
+  const isTrialPath = typeof window !== 'undefined' &&
       (window.location.pathname.replace(/\/+$/, '') === '/free-trial' ||
-       new URLSearchParams(window.location.search).has('trial'))) {
-    return <TrialSignupView />;
-  }
+       new URLSearchParams(window.location.search).has('trial'));
 
   // Public pricing / sales page — no login required
   if (typeof window !== 'undefined' &&
@@ -544,7 +545,7 @@ const App: React.FC = () => {
   }
 
   if (!user) {
-    return <LoginView />;
+    return <LoginView defaultView={isTrialPath ? 'register' : 'login'} />;
   }
 
   if (!organization) {
