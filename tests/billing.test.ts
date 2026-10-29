@@ -274,6 +274,18 @@ describe('upgrades and downgrades update the existing subscription', () => {
     store.memberCounts.set('org1', 3);
     await expect(changePlan(deps(), { orgId: 'org1', plan: 'starter' })).resolves.toBeTruthy();
   });
+
+  it('a downgrade counts pending invitations as reserved seats', async () => {
+    store.billing.set('org1', { plan: 'growth', status: 'active', stripeSubscriptionId: 'sub_1' });
+    stripe.subs.get('sub_1')!.items.data[0].price = { id: 'price_growth' };
+    store.memberCounts.set('org1', 2);
+    store.pendingInviteCounts.set('org1', 2);
+    const err = await changePlan(deps(), { orgId: 'org1', plan: 'starter' }).catch((e) => e);
+    expect(err).toBeInstanceOf(BillingError);
+    expect(err.code).toBe('TOO_MANY_MEMBERS');
+    expect(err.message).toMatch(/4 occupied seats.*pending invitations.*allows 3/);
+    expect(stripe.count('update')).toBe(0);
+  });
   it('a refused change leaves everything as it was', async () => {
     store.billing.set('org1', { plan: 'growth', status: 'active', stripeSubscriptionId: 'sub_1' });
     stripe.subs.get('sub_1')!.items.data[0].price = { id: 'price_growth' };
