@@ -41,6 +41,16 @@ service cloud.firestore {
 
     function pendingInviteCount(data) { return data.get('pendingInviteCount', 0); }
 
+    // Accepting an invitation moves one seat from pending to active. Normally the counter
+    // decrements by exactly 1. Organizations created before pendingInviteCount existed have
+    // no field yet; the first acceptance initializes it to 0 (the client's own invitation
+    // was the one pending seat). A data migration backfills the true count for all
+    // pre-existing organizations (see scripts/migrate-pending-invite-counts.mjs).
+    function isValidPendingDecrement(oldData, newData) {
+      return pendingInviteCount(newData) == pendingInviteCount(oldData) - 1 ||
+             (!('pendingInviteCount' in oldData) && pendingInviteCount(newData) == 0);
+    }
+
     function isValidOrganization(data) {
       return data.keys().hasAll(['name', 'creatorId', 'createdAt', 'memberCount']) &&
              (data.keys().size() == 4 || (data.keys().size() == 5 && 'pendingInviteCount' in data)) &&
@@ -112,13 +122,12 @@ service cloud.firestore {
          pendingInviteCount(incoming()) == pendingInviteCount(existing()) + 1 &&
          canHold(orgId, existing().memberCount + pendingInviteCount(incoming())))
         ||
-        // Accepting an already-reserved invitation transfers one pending seat to one active member.
-        (hasRole(orgId, ['admin']) && incoming().diff(existing()).affectedKeys().hasOnly(['pendingInviteCount']) &&
-         pendingInviteCount(incoming()) == pendingInviteCount(existing()) - 1)
-        ||
+        // Invitee acceptance transfers one pending seat to one active member.
+        // (Admin revocation goes through the server API, which bypasses rules;
+        // there is intentionally no client-side standalone decrement branch.)
         (hasPendingInvite(orgId) && incoming().diff(existing()).affectedKeys().hasOnly(['memberCount', 'pendingInviteCount']) &&
          incoming().memberCount == existing().memberCount + 1 &&
-         pendingInviteCount(incoming()) == pendingInviteCount(existing()) - 1 &&
+         isValidPendingDecrement(existing(), incoming()) &&
          !exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
          existsAfter(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
          !existsAfter(inviteRef()));
@@ -139,8 +148,9 @@ service cloud.firestore {
             (hasPendingInvite(orgId) && incoming().role == get(inviteRef()).data.role && incoming().email.lower() == authEmail() &&
              getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.memberCount ==
                get(/databases/$(database)/documents/organizations/$(orgId)).data.memberCount + 1 &&
-             pendingInviteCount(getAfter(/databases/$(database)/documents/organizations/$(orgId)).data) ==
-               pendingInviteCount(get(/databases/$(database)/documents/organizations/$(orgId)).data) - 1 &&
+             isValidPendingDecrement(
+               get(/databases/$(database)/documents/organizations/$(orgId)).data,
+               getAfter(/databases/$(database)/documents/organizations/$(orgId)).data) &&
              !existsAfter(inviteRef()))
           );
         // Roles can change, but not your own, and not the owner's: an organization always keeps its owner as an admin.
@@ -203,7 +213,9 @@ service cloud.firestore {
                          get(/databases/$(database)/documents/organizations/$(incoming().orgId)).data.memberCount +
                          pendingInviteCount(getAfter(/databases/$(database)/documents/organizations/$(incoming().orgId)).data));
       allow update: if false;
-      // Admin revocation releases one reserved seat; invite acceptance transfers the reservation to membership.
+      // Invitation deletion: invitees delete their own invitation on acceptance (transferring the
+      // reserved seat to membership). Admin revocation goes through the server API
+      // (POST /api/revoke-invitation), which bypasses rules; there is no client-side admin delete path.
       allow delete: if
         (hasRole(resource.data.orgId, ['admin']) &&
          pendingInviteCount(getAfter(/databases/$(database)/documents/organizations/$(resource.data.orgId)).data) ==
@@ -213,8 +225,9 @@ service cloud.firestore {
          existsAfter(/databases/$(database)/documents/organizations/$(resource.data.orgId)/members/$(request.auth.uid)) &&
          getAfter(/databases/$(database)/documents/organizations/$(resource.data.orgId)).data.memberCount ==
            get(/databases/$(database)/documents/organizations/$(resource.data.orgId)).data.memberCount + 1 &&
-         pendingInviteCount(getAfter(/databases/$(database)/documents/organizations/$(resource.data.orgId)).data) ==
-           pendingInviteCount(get(/databases/$(database)/documents/organizations/$(resource.data.orgId)).data) - 1);
+         isValidPendingDecrement(
+           get(/databases/$(database)/documents/organizations/$(resource.data.orgId)).data,
+           getAfter(/databases/$(database)/documents/organizations/$(resource.data.orgId)).data));
     }
 
     match /trial_signups/{signupId} {

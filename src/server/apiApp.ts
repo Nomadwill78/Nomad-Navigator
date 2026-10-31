@@ -6,7 +6,7 @@ import {
   BillingError, changePlan, createCheckout, resolveReturnBase, assertBillingAllowed,
   type BillingStore, type Env, type StripeLike,
 } from "./billing";
-import { MemberError, reconcileMemberCount, removeMemberAndRecount } from "./firestoreStores";
+import { MemberError, reconcileMemberCount, removeMemberAndRecount, revokeInvitationAndRecount } from "./firestoreStores";
 
 /** Everything the routes need from the outside world. Real by default; tests pass fakes. */
 export interface ApiDeps {
@@ -16,6 +16,7 @@ export interface ApiDeps {
   requireOrgAdmin: (authHeader: string | string[] | undefined, orgId: string) => Promise<string>;
   removeMember: (args: { orgId: string; userId: string; requesterUid: string }) => Promise<{ memberCount: number }>;
   reconcileMembers: (orgId: string) => Promise<{ before: number | undefined; after: number }>;
+  revokeInvitation: (args: { orgId: string; inviteEmail: string; requesterUid: string }) => Promise<{ pendingInviteCount: number }>;
 }
 
 const realDeps = (): ApiDeps => ({
@@ -25,6 +26,7 @@ const realDeps = (): ApiDeps => ({
   requireOrgAdmin,
   removeMember: (args) => removeMemberAndRecount(getAdmin().db, args),
   reconcileMembers: (orgId) => reconcileMemberCount(getAdmin().db, orgId),
+  revokeInvitation: (args) => revokeInvitationAndRecount(getAdmin().db, args),
 });
 
 /** One place that turns a failure into the right HTTP answer with a plain-language message. */
@@ -172,6 +174,23 @@ export function createApiApp(overrides: Partial<ApiDeps> = {}): express.Express 
       res.json(await deps.reconcileMembers(orgId));
     } catch (error: any) {
       respondToError(error, res, "Reconcile members");
+    }
+  });
+
+  // Revokes a pending invitation and recounts the pending seats, atomically on the server.
+  // Admin only. Clients must use this endpoint; firestore.rules intentionally has no
+  // client-side path that decrements pendingInviteCount without deleting an invitation.
+  app.post("/api/revoke-invitation", async (req, res) => {
+    try {
+      const { orgId, inviteEmail } = req.body as { orgId?: string; inviteEmail?: string };
+      if (!orgId || !inviteEmail) {
+        res.status(400).json({ error: "orgId and inviteEmail are required." });
+        return;
+      }
+      const requesterUid = await deps.requireOrgAdmin(req.headers.authorization, orgId);
+      res.json(await deps.revokeInvitation({ orgId, inviteEmail, requesterUid }));
+    } catch (error: any) {
+      respondToError(error, res, "Revoke invitation");
     }
   });
 

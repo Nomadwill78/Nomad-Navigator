@@ -113,7 +113,7 @@ async function main() {
   const up = await api('/api/change-plan', { orgId: ORG, plan: 'growth' }, token);
   check('upgrade to Growth succeeds', up.status === 200, `status ${up.status} ${JSON.stringify(up.json)}`);
   const afterUp = await waitFor('growth', async () => { const b = await billing(); return b.plan === 'growth' ? b : null; });
-  check('organization is Growth with unlimited seats (seatLimit null)', afterUp && afterUp.seatLimit === null, JSON.stringify(afterUp));
+  check('organization is Growth with 10 seats (seatLimit 10)', afterUp && afterUp.seatLimit === 10, JSON.stringify(afterUp));
   const live = (await stripe.subscriptions.list({ customer: customerId, status: 'active' })).data;
   check('still exactly one active subscription in Stripe', live.length === 1 && live[0].id === sub1.id, `${live.length} active`);
   for (let i = 1; i <= 4; i++) await db.doc(`organizations/${ORG}/members/extra${i}`).set({ userId: `extra${i}`, email: `e${i}@example.test`, role: 'viewer', joinedAt: 'x' });
@@ -144,7 +144,7 @@ async function main() {
   created.customers.push(failCustomer.id);
   const good = await stripe.paymentMethods.attach((await stripe.paymentMethods.create({ type: 'card', card: { token: 'tok_visa' } })).id, { customer: failCustomer.id });
   await stripe.customers.update(failCustomer.id, { invoice_settings: { default_payment_method: good.id } });
-  await db.doc(`organizations/${ORG}/billing/subscription`).set({ plan: 'trial', status: 'trialing', seatLimit: 8, stripeCustomerId: failCustomer.id, stripeSubscriptionId: null, updatedAt: new Date().toISOString() });
+  await db.doc(`organizations/${ORG}/billing/subscription`).set({ plan: 'trial', status: 'trialing', seatLimit: 5, stripeCustomerId: failCustomer.id, stripeSubscriptionId: null, updatedAt: new Date().toISOString() });
   const failSub = await stripe.subscriptions.create({ customer: failCustomer.id, items: [{ price: process.env.STRIPE_PRICE_GROWTH }], metadata: { orgId: ORG, plan: 'growth' } });
   created.subs.push(failSub.id);
   await waitFor('growth active', async () => ((await billing()).status === 'active' ? true : null));

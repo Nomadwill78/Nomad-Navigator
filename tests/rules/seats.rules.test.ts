@@ -309,3 +309,75 @@ describe('the rules table matches PLAN_SEAT_LIMITS in types.ts', () => {
     expect(PLAN_SEAT_LIMITS).toEqual({ trial: 5, starter: 3, growth: 10, pro: 25 });
   });
 });
+
+describe('legacy organizations without pendingInviteCount (pre-rollout)', () => {
+  /** An organization as created before the seat-reservation rollout: no pendingInviteCount field. */
+  async function seedLegacyOrg(members: number) {
+    const orgId = `org${++orgCounter}`;
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, `organizations/${orgId}`), { name: 'Test', creatorId: OWNER, createdAt: Timestamp.now(), memberCount: members });
+      for (let i = 0; i < Math.min(members, 30); i++) {
+        const uid = i === 0 ? OWNER : `m${i}`;
+        await setDoc(doc(db, `organizations/${orgId}/members/${uid}`), { userId: uid, email: `${uid}@x.org`, role: i === 0 ? 'admin' : 'viewer', joinedAt: 'x' });
+      }
+      await setDoc(doc(db, `organizations/${orgId}/billing/subscription`), {
+        plan: 'trial', status: 'active', seatLimit: 0, updatedAt: 'x',
+      });
+    });
+    return orgId;
+  }
+
+  /** An invitation created before the rollout: the org counter is untouched. */
+  async function seedLegacyInvite(orgId: string, email: string) {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, `invitations/${email}`), {
+        email, orgId, orgName: 'Test', role: 'viewer', invitedBy: OWNER, invitedByEmail: 'owner@x.org', status: 'pending', createdAt: 'x',
+      });
+      await setDoc(doc(db, `users/${email.split('@')[0]}`), { uid: email.split('@')[0], email, displayName: email });
+    });
+  }
+
+  it('an invitee with a pre-rollout invitation can accept; the counter initializes to 0', async () => {
+    const org = await seedLegacyOrg(2);
+    await seedLegacyInvite(org, 'legacy@x.org');
+    // The app writes pendingInviteCount: 0 for a legacy org (its own invitation was the pending seat).
+    await assertSucceeds(join(org, 'legacy', 2, 'legacy@x.org', 'viewer', 1));
+    expect(await readCount(org)).toBe(3);
+  });
+
+  it('a legacy org still enforces the seat limit on acceptance', async () => {
+    const org = await seedLegacyOrg(5); // trial limit is 5, already full
+    await seedLegacyInvite(org, 'late@x.org');
+    await assertFails(join(org, 'late', 5, 'late@x.org', 'viewer', 1));
+  });
+});
+
+describe('pendingInviteCount cannot be manipulated without a real invitation change', () => {
+  it('an admin cannot decrement pendingInviteCount standalone (no invitation deleted)', async () => {
+    const org = await seedOrg({ plan: 'growth', members: 2 });
+    await seedInvite(org, 'a@x.org');
+    const db = as(OWNER);
+    // Direct decrement with no invitation deletion: must fail (revocation goes through the server API).
+    await assertFails(updateDoc(doc(db, `organizations/${org}`), { pendingInviteCount: 0 }));
+  });
+
+  it('an admin cannot set pendingInviteCount negative', async () => {
+    const org = await seedOrg({ plan: 'growth', members: 2 });
+    const db = as(OWNER);
+    await assertFails(updateDoc(doc(db, `organizations/${org}`), { pendingInviteCount: -1 }));
+  });
+
+  it('an admin cannot delete an invitation directly without the server', async () => {
+    const org = await seedOrg({ plan: 'growth', members: 2 });
+    await seedInvite(org, 'a@x.org');
+    const db = as(OWNER);
+    // Client-side delete requires the org counter update, which has no allowing branch,
+    // so the whole transaction is refused. Revocation must go through POST /api/revoke-invitation.
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'invitations/a@x.org'));
+    batch.update(doc(db, `organizations/${org}`), { pendingInviteCount: 0 });
+    await assertFails(batch.commit());
+  });
+});

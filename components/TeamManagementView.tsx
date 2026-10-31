@@ -98,19 +98,17 @@ export const TeamManagementView: React.FC = () => {
   const revokeInvitation = async (id: string) => {
     if (!isAdmin || !confirm('Revoke this invitation?')) return;
     try {
-      if (!organization) return;
-      const orgRef = doc(db, 'organizations', organization.id);
-      const inviteRef = doc(db, 'invitations', id);
-      await runTransaction(db, async (transaction) => {
-        const [orgSnap, inviteSnap, pendingSnap] = await Promise.all([
-          transaction.get(orgRef),
-          transaction.get(inviteRef),
-          transaction.get(query(collection(db, 'invitations'), where('orgId', '==', organization.id))),
-        ]);
-        if (!orgSnap.exists() || !inviteSnap.exists() || inviteSnap.data().orgId !== organization.id) return;
-        transaction.update(orgRef, { pendingInviteCount: Math.max(0, pendingSnap.size - 1) });
-        transaction.delete(inviteRef);
+      if (!organization || !user) return;
+      // The server revokes the invitation and recounts the pending seats in one step; the browser
+      // cannot (the rules forbid decrementing the counter without the server), which keeps the
+      // seat counter from being manipulated.
+      const idToken = await user.getIdToken();
+      const res = await fetch('/api/revoke-invitation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ orgId: organization.id, inviteEmail: id }),
       });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Could not revoke that invitation.');
     } catch (error) { console.error('Could not revoke invitation:', error); }
   };
 
