@@ -73,14 +73,15 @@ export const TeamManagementView: React.FC = () => {
       await runTransaction(db, async (transaction) => {
         const orgSnap = await transaction.get(orgRef);
         const existing = await transaction.get(inviteRef);
-        const pendingSnap = await transaction.get(query(collection(db, 'invitations'), where('orgId', '==', organization.id)));
         if (!orgSnap.exists()) throw new Error('This organization could not be found.');
         if (existing.exists()) {
           throw new Error(existing.data().orgId === organization.id
             ? 'That person already has a pending invitation.'
             : 'That email already has a pending invitation to another organization.');
         }
-        const pendingCount = pendingSnap.size;
+        // The stored counter is the source of truth; the rules require exactly +1,
+        // and server-side revocation keeps it accurate via recounting.
+        const pendingCount = Number(orgSnap.data().pendingInviteCount ?? 0);
         const memberCount = Number(orgSnap.data().memberCount ?? members.length);
         const currentSeats = evaluateSeats({ plan, status: billing?.status ?? 'trialing', members: memberCount, pendingInvites: pendingCount });
         if (!currentSeats.canAdd) throw new Error(currentSeats.message);
