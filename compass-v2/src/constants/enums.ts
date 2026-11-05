@@ -63,6 +63,22 @@ export const SUBGRANTEE_STATUS_SEEDS = [
   { value: 'COMPLETED', label: 'Completed', color: 'turquoise' },
 ] as const satisfies readonly OptionSeed<string>[];
 
+// ------------------------------------------------------------- financials
+
+export const FISCAL_YEAR_SEEDS = [
+  { value: '2025', label: '2025', color: 'gray' },
+  { value: '2026', label: '2026', color: 'blue' },
+  { value: '2027', label: '2027', color: 'green' },
+] as const satisfies readonly OptionSeed<string>[];
+
+export const EXPENSE_CATEGORY_SEEDS = [
+  { value: 'PAYROLL', label: 'Payroll', color: 'blue' },
+  { value: 'SUPPLIES', label: 'Supplies', color: 'amber' },
+  { value: 'DIRECT_ASSISTANCE', label: 'Direct assistance', color: 'green' },
+  { value: 'OVERHEAD', label: 'Overhead', color: 'gray' },
+  { value: 'CONTRACTOR', label: 'Contractor', color: 'purple' },
+] as const satisfies readonly OptionSeed<string>[];
+
 // -------------------------------------------------------------- donations
 
 export const DONATION_STATUS_SEEDS = [

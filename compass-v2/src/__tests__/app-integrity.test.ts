@@ -70,8 +70,8 @@ describe('every definition', () => {
       commands: commands.length, frontComponents: frontComponents.length, logicFunctions: logicFunctions.length,
       agents: agents.length, skills: skills.length, roles: roles.length,
     }).toEqual({
-      objects: 8, views: 14, navigation: 26, pageLayouts: 1,
-      commands: 4, frontComponents: 4, logicFunctions: 15,
+      objects: 11, views: 14, navigation: 29, pageLayouts: 1,
+      commands: 4, frontComponents: 4, logicFunctions: 16,
       agents: 2, skills: 5, roles: 6,
     });
   });

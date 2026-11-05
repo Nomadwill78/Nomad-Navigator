@@ -64,7 +64,16 @@ Progress is **rounded down**: 99.96% shows as 99.9% and is never called "Met".
 
 Pace is only judged for **active** grants that have dates and at least one KPI with a target. Otherwise it says "Not enough data". It is a prompt to look closer, not a verdict.
 
-**Percent spent** is spent so far divided by the award. **Payments received** adds up donations linked to the grant that are Received.
+**Percent spent** uses the expense ledger total when one has been calculated, and otherwise uses the existing Spent so far amount, divided by the award. **Payments received** adds up donations linked to the grant that are Received.
+
+## Budgets and expense transactions
+
+- Each expense transaction belongs to one budget and may be linked to a restricted grant. Removing or moving an expense recalculates totals for both its previous and current budget and grant.
+- A budget's **Total spent** is the sum of linked expenses in the budget's currency. Expenses recorded in another currency are not converted or added.
+- **Remaining balance** is the total budget amount minus total spent. An overdrawn budget shows a negative balance. It stays empty until a total budget amount is entered.
+- A grant's **Expense ledger total** is the sum of linked expense transactions in the grant award currency. If no award currency is set, Compass uses the reporting currency. This calculated value takes precedence over the older Spent so far amount for Percent spent.
+- **Grant allocations** record planned amounts assigned from budgets to grants. Allocations are not included in expense totals until expenses are recorded.
+- Compass v2 does not currently define a separate Program object. The Budget's Program field is a text label, not a linked record.
 
 **Next report due** moves forward when you set **Last report submitted on**. Early, on time or very late, it moves to the next cycle after both the report just sent and the day you sent it, so it never lands on a date in the past.
 

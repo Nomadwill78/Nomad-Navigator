@@ -27,6 +27,9 @@ export const COLLECTION = {
   fundraisingCampaign: { plural: 'fundraisingCampaigns', mutationName: 'FundraisingCampaign' },
   cultivationPlan: { plural: 'cultivationPlans', mutationName: 'CultivationPlan' },
   volunteerLog: { plural: 'volunteerLogs', mutationName: 'VolunteerLog' },
+  budget: { plural: 'budgets', mutationName: 'Budget' },
+  grantAllocation: { plural: 'grantAllocations', mutationName: 'GrantAllocation' },
+  expenseTransaction: { plural: 'expenseTransactions', mutationName: 'ExpenseTransaction' },
 } as const satisfies Record<string, Collection>;
 
 // Twenty returns at most 60 records per page.

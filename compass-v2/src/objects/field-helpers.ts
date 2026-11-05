@@ -13,6 +13,8 @@ type CommonOptions = {
   system?: boolean;
 };
 
+type RequiredFieldOptions = CommonOptions & { required?: boolean };
+
 const common = ({ description, icon, system }: CommonOptions) => ({
   ...(description ? { description } : {}),
   ...(icon ? { icon } : {}),
@@ -54,13 +56,15 @@ export const dateField = (
   universalIdentifier: string,
   name: string,
   label: string,
-  options: CommonOptions = {},
+  options: RequiredFieldOptions = {},
 ): ObjectField => ({
   universalIdentifier,
   type: FieldType.DATE,
   name,
   label,
-  isNullable: true,
+  ...(options.required
+    ? { defaultValue: 'now', isNullable: false } as const
+    : { isNullable: true } as const),
   icon: 'IconCalendar',
   ...common(options),
 });
@@ -84,13 +88,15 @@ export const currencyField = (
   universalIdentifier: string,
   name: string,
   label: string,
-  options: CommonOptions = {},
+  options: RequiredFieldOptions = {},
 ): ObjectField => ({
   universalIdentifier,
   type: FieldType.CURRENCY,
   name,
   label,
-  isNullable: true,
+  ...(options.required
+    ? { defaultValue: { amountMicros: "'0'", currencyCode: "'USD'" }, isNullable: false } as const
+    : { isNullable: true } as const),
   icon: 'IconCurrencyDollar',
   ...common(options),
 });

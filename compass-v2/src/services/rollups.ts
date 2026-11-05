@@ -224,6 +224,7 @@ const GRANT_SELECTION = {
   funderId: true,
   awardAmount: MONEY,
   spentAmount: MONEY,
+  totalExpended: MONEY,
   receivedAmount: MONEY,
   startDate: true,
   endDate: true,
@@ -251,7 +252,7 @@ export const recomputeGrant = async (deps: RollupDeps, grantId: string): Promise
     kpiResult.records.map((kpi) => ({ current: kpi.current, target: kpi.target })),
   );
   const awardUnits = unitsOf(grant.awardAmount);
-  const spentUnits = unitsOf(grant.spentAmount);
+  const spentUnits = unitsOf(grant.totalExpended) ?? unitsOf(grant.spentAmount);
   const elapsed = timeElapsedPercent(grant.startDate, grant.endDate, deps.asOf);
   const funding = summarizeFunding(donationResult.records.map(toDonationRow), deps.currency);
 
