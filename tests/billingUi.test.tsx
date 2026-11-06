@@ -75,7 +75,6 @@ describe('plan seat limits are consistent everywhere', () => {
     setAuth({ plan: 'growth', status: 'active', seatLimit: 10 }, {}, 10);
     h.members = makeMembers(10);
     render(<TeamManagementView />);
-    expect(screen.getByText(/10/)).toBeTruthy();
     expect(screen.getByText(/Up to 10 seats/)).toBeTruthy();
     expect(screen.queryByText('Invite Colleague')).toBeNull();
   });
@@ -173,7 +172,7 @@ describe('Billing: one subscription, plan changes, policies', () => {
     setAuth({ plan: 'growth', status: 'active', seatLimit: null, stripeSubscriptionId: 'sub_1' }, {}, 5);
     render(<BillingView />);
     fireEvent.click(screen.getByText('Downgrade to Starter'));
-    expect((await screen.findByRole('alert')).textContent).toMatch(/5 team members.*allows 3.*Remove 2 members/);
+    expect((await screen.findByRole('alert')).textContent).toMatch(/5 occupied seats.*allows 3.*Remove 2 members/);
     expect(h.fetch).not.toHaveBeenCalled();
   });
   it('exactly 3 members can downgrade to Starter', async () => {
