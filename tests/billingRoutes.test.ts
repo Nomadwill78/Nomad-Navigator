@@ -184,7 +184,7 @@ describe('API routes: billing flows', () => {
     store.memberCounts.set('org1', 6);
     const r = await call('/api/change-plan', { orgId: 'org1', plan: 'starter' }, { authorization: ADMIN });
     expect(r.status).toBe(409);
-    expect(r.json.error).toMatch(/6 team members.*allows 3/);
+    expect(r.json.error).toMatch(/6 occupied seats.*allows 3/);
   });
   it('bad input is a 400, and server errors never leak internals', async () => {
     expect((await call('/api/change-plan', { orgId: 'org1' }, { authorization: ADMIN })).status).toBe(400);
