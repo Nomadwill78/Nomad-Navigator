@@ -54,6 +54,29 @@ export const recomputeBudgetLedger = async (deps: RollupDeps, budgetId: string):
   );
 };
 
+export type BudgetEventSummary = {
+  budgetsSeen: number;
+  budgetsRecomputed: number;
+};
+
+// Re-read the ledger on every Budget event. The calculated-field updates can
+// trigger this again, but updateIfChanged makes the second pass a no-op.
+export const handleBudgetEvents = async (
+  deps: RollupDeps,
+  events: readonly RecordEvent[],
+): Promise<BudgetEventSummary> => {
+  const budgetIds = new Set(
+    events.map((event) => event.recordId).filter((id): id is string => typeof id === 'string' && Boolean(id)),
+  );
+  let budgetsRecomputed = 0;
+
+  for (const budgetId of budgetIds) {
+    if (await recomputeBudgetLedger(deps, budgetId)) budgetsRecomputed += 1;
+  }
+
+  return { budgetsSeen: budgetIds.size, budgetsRecomputed };
+};
+
 export const recomputeGrantLedger = async (deps: RollupDeps, grantId: string): Promise<boolean> => {
   const grant = await fetchOne(deps.client, COLLECTION.grant, grantId, {
     awardAmount: MONEY,

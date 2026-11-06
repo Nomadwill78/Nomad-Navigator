@@ -141,6 +141,7 @@ export const LOGIC_FUNCTION_ID = {
   onPlanChanged: stableUuid('logic-function:on-plan-changed'),
   onProgramMetricChanged: stableUuid('logic-function:on-program-metric-changed'),
   onExpenseTransactionChanged: stableUuid('logic-function:on-expense-transaction-changed'),
+  onBudgetChanged: stableUuid('logic-function:on-budget-changed'),
   nightlySweep: stableUuid('logic-function:nightly-sweep'),
   weeklyAiInsights: stableUuid('logic-function:weekly-ai-insights'),
   generateDonorInsight: stableUuid('logic-function:generate-donor-insight'),

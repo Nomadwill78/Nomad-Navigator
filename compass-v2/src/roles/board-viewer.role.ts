@@ -7,7 +7,7 @@ export default defineRole({
   universalIdentifier: ROLE_ID.boardViewer,
   label: 'Compass: Board viewer',
   description:
-    'Read-only view of grants, KPIs, program results, campaigns and funders. Cannot see individual donors, gifts or volunteers, and cannot change or export anything.',
+    'Read-only view of grants, budgets, allocations, expense transactions, KPIs, program results, campaigns and funders. Cannot see individual donors, gifts or volunteers, and cannot change or export anything.',
   icon: 'IconEye',
   canReadAllObjectRecords: false,
   canUpdateAllObjectRecords: false,
@@ -22,6 +22,9 @@ export default defineRole({
     read(OBJECT.grantKpi),
     read(OBJECT.subgrantee),
     read(OBJECT.programMetric),
+    read(OBJECT.budget),
+    read(OBJECT.grantAllocation),
+    read(OBJECT.expenseTransaction),
     read(OBJECT.fundraisingCampaign),
     read(OBJECT.company),
     read(OBJECT.workspaceMember),

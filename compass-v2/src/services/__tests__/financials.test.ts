@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { handleFinancialEvents, type FinancialEventSummary } from 'src/services/financials';
+import { handleBudgetEvents, handleFinancialEvents, recomputeGrantLedger, type FinancialEventSummary } from 'src/services/financials';
 import { createFakeClient, eur } from 'src/services/__tests__/fake-client';
-import { type RollupDeps } from 'src/services/rollups';
+import { recomputeGrant, type RollupDeps } from 'src/services/rollups';
 
 const ASOF = '2026-10-06';
 const deps = (client: RollupDeps['client']): RollupDeps => ({ client, asOf: ASOF, currency: 'USD' });
@@ -26,6 +26,52 @@ const eventSummary = (overrides: Partial<FinancialEventSummary> = {}) => ({
   budgetsRecomputed: 0,
   grantsRecomputed: 0,
   ...overrides,
+});
+
+describe('handleBudgetEvents', () => {
+  it('calculates spending and remaining balance when a Budget is created', async () => {
+    const fake = createFakeClient({
+      budgets: [{ id: 'b1', totalBudgetAmount: eur(100), totalSpentAmount: eur(0), remainingBalance: eur(100) }],
+      expenseTransactions: [
+        { id: 'e1', amount: eur(35), budgetId: 'b1' },
+        { id: 'e2', amount: eur(90, 'EUR'), budgetId: 'b1' },
+      ],
+    });
+
+    const result = await handleBudgetEvents(deps(fake.client), [
+      { recordId: 'b1', properties: { after: { totalBudgetAmount: eur(100) } } },
+    ]);
+
+    expect(result).toEqual({ budgetsSeen: 1, budgetsRecomputed: 1 });
+    expect(fake.row('budgets', 'b1')).toMatchObject({
+      totalSpentAmount: eur(35),
+      remainingBalance: eur(65),
+    });
+  });
+
+  it('recalculates ledger totals after budget currency and amount changes', async () => {
+    const fake = createFakeClient({
+      budgets: [{ id: 'b1', totalBudgetAmount: eur(100), totalSpentAmount: eur(20), remainingBalance: eur(80) }],
+      expenseTransactions: [
+        { id: 'e1', amount: eur(20), budgetId: 'b1' },
+        { id: 'e2', amount: eur(15, 'EUR'), budgetId: 'b1' },
+      ],
+    });
+
+    fake.row('budgets', 'b1')!.totalBudgetAmount = eur(70, 'EUR');
+    const currencyChange = await handleBudgetEvents(deps(fake.client), [{ recordId: 'b1' }]);
+
+    expect(currencyChange.budgetsRecomputed).toBe(1);
+    expect(fake.row('budgets', 'b1')).toMatchObject({
+      totalSpentAmount: eur(15, 'EUR'),
+      remainingBalance: eur(55, 'EUR'),
+    });
+
+    fake.row('budgets', 'b1')!.totalBudgetAmount = eur(40, 'EUR');
+    await handleBudgetEvents(deps(fake.client), [{ recordId: 'b1' }]);
+
+    expect(fake.row('budgets', 'b1')!.remainingBalance).toEqual(eur(25, 'EUR'));
+  });
 });
 
 describe('handleFinancialEvents', () => {
@@ -96,5 +142,22 @@ describe('handleFinancialEvents', () => {
     expect(result).toEqual(eventSummary({ budgetsRecomputed: 1, grantsRecomputed: 1 }));
     expect(fake.row('budgets', 'b1')).toMatchObject({ totalSpentAmount: eur(0), remainingBalance: eur(100) });
     expect(fake.row('grants', 'g1')!.totalExpended).toEqual(eur(0));
+  });
+
+  it('recalculates a Grant ledger in its current award currency before spending metrics use it', async () => {
+    const fake = createFakeClient({
+      grants: [grant('g1', { awardAmount: eur(1200, 'EUR'), totalExpended: eur(500, 'USD') })],
+      expenseTransactions: [
+        { id: 'eUSD', amount: eur(200, 'USD'), grantId: 'g1' },
+        { id: 'eEUR', amount: eur(150, 'EUR'), grantId: 'g1' },
+      ],
+    });
+
+    await recomputeGrantLedger(deps(fake.client), 'g1');
+    await recomputeGrant(deps(fake.client), 'g1');
+    const grantRecord = fake.row('grants', 'g1')!;
+
+    expect(grantRecord.totalExpended).toEqual(eur(150, 'EUR'));
+    expect(grantRecord.percentSpent).toBe(12.5);
   });
 });

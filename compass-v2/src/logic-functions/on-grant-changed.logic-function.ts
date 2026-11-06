@@ -4,6 +4,7 @@ import { type DatabaseEventBatchPayload } from 'twenty-sdk/logic-function';
 import { LOGIC_FUNCTION_ID } from 'src/constants/universal-identifiers';
 import { nextDueAfterSubmission } from 'src/lib/grant';
 import { dateOnly } from 'src/services/mappers';
+import { recomputeGrantLedger } from 'src/services/financials';
 import { type RecordEvent } from 'src/services/donation-events';
 import { liveClient, liveRollupDeps } from 'src/services/runtime';
 import { COLLECTION, fetchOne, updateRecord } from 'src/services/repo';
@@ -49,7 +50,11 @@ const handler = async (batch: DatabaseEventBatchPayload) => {
     }
   }
 
-  for (const grantId of grantIds) await recomputeGrant(deps, grantId);
+  for (const grantId of grantIds) {
+    // Re-read expenses in the current award currency before using the ledger total.
+    await recomputeGrantLedger(deps, grantId);
+    await recomputeGrant(deps, grantId);
+  }
   for (const funderId of funderIds) await recomputeCompanyRollup(deps, funderId);
 
   return { grantsRecomputed: grantIds.size, fundersRecomputed: funderIds.size };
