@@ -125,15 +125,15 @@ export function evaluateSeats(input: SeatInput): SeatStatus {
 
 /**
  * Whether an organization may move to `target`. Moving to a plan with fewer seats than there are
- * members is refused, because it would leave the organization over its limit.
+ * occupied seats (members plus pending invitations) is refused, because it would leave the organization over its limit.
  */
-export function checkPlanChange(target: unknown, members: number): { ok: true } | { ok: false; reason: string } {
+export function checkPlanChange(target: unknown, occupiedSeats: number): { ok: true } | { ok: false; reason: string } {
   if (!isPaidPlan(target)) return { ok: false, reason: 'Choose Starter, Growth or Pro.' };
   const limit = seatLimitForPlan(target);
-  if (limit !== null && members > limit) {
+  if (limit !== null && occupiedSeats > limit) {
     return {
       ok: false,
-      reason: `You have ${members} team members, but ${target[0].toUpperCase()}${target.slice(1)} allows ${limit}. Remove ${members - limit} ${members - limit === 1 ? 'member' : 'members'} first, then switch.`,
+      reason: `You have ${occupiedSeats} occupied seats (including pending invitations), but ${target[0].toUpperCase()}${target.slice(1)} allows ${limit}. Remove ${occupiedSeats - limit} members or revoke invitations first, then switch.`,
     };
   }
   return { ok: true };

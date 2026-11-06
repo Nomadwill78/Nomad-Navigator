@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Mail, Trash2, UserPlus, CheckCircle2, Clock, X } from 'lucide-react';
 import { useAuth, inviteId } from '../src/contexts/AuthContext';
 import { db } from '../src/lib/firebase';
-import { collection, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, query, where, runTransaction } from 'firebase/firestore';
 import { OrgMember, UserRole, Invitation, USER_ROLES, PLAN_LABELS } from '../types';
 import { evaluateSeats, describeSeatLimit } from '../src/lib/plans';
 
@@ -64,27 +64,53 @@ export const TeamManagementView: React.FC = () => {
     }
     setIsSending(true);
     try {
-      const existing = await getDoc(doc(db, 'invitations', email));
-      if (existing.exists() && existing.data().orgId !== organization.id) {
-        setInviteError('That email already has a pending invitation to another organization.');
-        return;
-      }
+      const orgRef = doc(db, 'organizations', organization.id);
+      const inviteRef = doc(db, 'invitations', email);
       const invitation: Omit<Invitation, 'id'> = {
         email, orgId: organization.id, orgName: organization.name, role: inviteRole,
         invitedBy: user.uid, invitedByEmail: user.email || '', status: 'pending', createdAt: new Date().toISOString()
       };
-      await setDoc(doc(db, 'invitations', email), invitation);
+      await runTransaction(db, async (transaction) => {
+        const orgSnap = await transaction.get(orgRef);
+        const existing = await transaction.get(inviteRef);
+        if (!orgSnap.exists()) throw new Error('This organization could not be found.');
+        if (existing.exists()) {
+          throw new Error(existing.data().orgId === organization.id
+            ? 'That person already has a pending invitation.'
+            : 'That email already has a pending invitation to another organization.');
+        }
+        // The stored counter is the source of truth; the rules require exactly +1,
+        // and server-side revocation keeps it accurate via recounting.
+        const pendingCount = Number(orgSnap.data().pendingInviteCount ?? 0);
+        const memberCount = Number(orgSnap.data().memberCount ?? members.length);
+        const currentSeats = evaluateSeats({ plan, status: billing?.status ?? 'trialing', members: memberCount, pendingInvites: pendingCount });
+        if (!currentSeats.canAdd) throw new Error(currentSeats.message);
+        transaction.update(orgRef, { pendingInviteCount: pendingCount + 1 });
+        transaction.set(inviteRef, invitation);
+      });
       setInviteEmail('');
       setIsInviteModalOpen(false);
     } catch (error) {
       console.error('Invite failed:', error);
-      setInviteError('Could not create that invitation. Check that you still have admin access.');
+      setInviteError(error instanceof Error ? error.message : 'Could not create that invitation. Check that you still have admin access.');
     } finally { setIsSending(false); }
   };
 
   const revokeInvitation = async (id: string) => {
     if (!isAdmin || !confirm('Revoke this invitation?')) return;
-    try { await deleteDoc(doc(db, 'invitations', id)); } catch (error) { console.error('Could not revoke invitation:', error); }
+    try {
+      if (!organization || !user) return;
+      // The server revokes the invitation and recounts the pending seats in one step; the browser
+      // cannot (the rules forbid decrementing the counter without the server), which keeps the
+      // seat counter from being manipulated.
+      const idToken = await user.getIdToken();
+      const res = await fetch('/api/revoke-invitation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ orgId: organization.id, inviteEmail: id }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Could not revoke that invitation.');
+    } catch (error) { console.error('Could not revoke invitation:', error); }
   };
 
   const updateMemberRole = async (docId: string, newRole: UserRole) => {

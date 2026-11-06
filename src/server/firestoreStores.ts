@@ -71,6 +71,10 @@ export function createFirestoreBillingStore(db: Firestore, now: () => number = D
     async countMembers(orgId) {
       return (await db.collection(`organizations/${orgId}/members`).select().get()).size;
     },
+
+    async countPendingInvitations(orgId) {
+      return (await db.collection('invitations').where('orgId', '==', orgId).where('status', '==', 'pending').select().get()).size;
+    },
   };
 }
 
@@ -123,5 +127,42 @@ export async function reconcileMemberCount(db: Firestore, orgId: string): Promis
     const before = orgSnap.data()!.memberCount as number | undefined;
     if (before !== members.size) tx.update(orgRef, { memberCount: members.size });
     return { before, after: members.size };
+  });
+}
+
+/**
+ * Revokes a pending invitation and sets pendingInviteCount to the TRUE number of remaining
+ * pending invitations, in one transaction. Recounting (rather than subtracting 1) means a
+ * counter that was ever wrong is put right by the next revocation. Runs on the server via
+ * the Admin SDK, so clients never decrement the counter directly (see firestore.rules).
+ */
+export async function revokeInvitationAndRecount(
+  db: Firestore,
+  args: { orgId: string; inviteEmail: string; requesterUid: string }
+): Promise<{ pendingInviteCount: number }> {
+  const { orgId, inviteEmail, requesterUid } = args;
+  const normalizedEmail = inviteEmail.toLowerCase();
+  return db.runTransaction(async (tx) => {
+    const orgRef = db.doc(`organizations/${orgId}`);
+    const orgSnap = await tx.get(orgRef);
+    if (!orgSnap.exists) throw new MemberError('NOT_FOUND', 'That organization does not exist.', 404);
+    // Only an admin of this organization may revoke its invitations.
+    const requesterSnap = await tx.get(db.doc(`organizations/${orgId}/members/${requesterUid}`));
+    if (!requesterSnap.exists || requesterSnap.data()!.role !== 'admin') {
+      throw new MemberError('NOT_FOUND', 'You do not have permission to revoke invitations for this organization.', 403);
+    }
+    const inviteRef = db.doc(`invitations/${normalizedEmail}`);
+    const inviteSnap = await tx.get(inviteRef);
+    if (!inviteSnap.exists || inviteSnap.data()!.orgId !== orgId) {
+      throw new MemberError('NOT_FOUND', 'That invitation no longer exists.', 404);
+    }
+    const pendingSnap = await tx.get(
+      db.collection('invitations').where('orgId', '==', orgId).where('status', '==', 'pending')
+    );
+    // The invitation being revoked is still counted in pendingSnap, so subtract 1.
+    const remaining = Math.max(0, pendingSnap.size - 1);
+    tx.delete(inviteRef);
+    tx.update(orgRef, { pendingInviteCount: remaining });
+    return { pendingInviteCount: remaining };
   });
 }

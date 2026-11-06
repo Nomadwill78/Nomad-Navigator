@@ -23,7 +23,7 @@ export class SeatError extends Error {
 export async function createOrganizationTxn(db: Firestore, args: { orgId: string; name: string; uid: string; email: string }): Promise<void> {
   const { orgId, name, uid, email } = args;
   await runTransaction(db, async (transaction) => {
-    transaction.set(doc(db, 'organizations', orgId), { name, creatorId: uid, createdAt: serverTimestamp(), memberCount: 1 });
+    transaction.set(doc(db, 'organizations', orgId), { name, creatorId: uid, createdAt: serverTimestamp(), memberCount: 1, pendingInviteCount: 0 });
     transaction.set(doc(db, `organizations/${orgId}/members`, uid), { userId: uid, email, role: 'admin' as UserRole, joinedAt: serverTimestamp() });
     transaction.set(doc(db, `organizations/${orgId}/billing`, 'subscription'), {
       plan: 'trial', status: 'trialing', seatLimit: PLAN_SEAT_LIMITS.trial, updatedAt: new Date().toISOString(),
@@ -72,11 +72,14 @@ async function explainRefusal(db: Firestore, invitation: Invitation): Promise<Se
     if (!orgSnap.exists()) return null;
     const plan = billingSnap.exists() ? billingSnap.data().plan : 'trial';
     const status = billingSnap.exists() ? billingSnap.data().status : 'trialing';
-    const seats = evaluateSeats({ plan, status, members: (orgSnap.data().memberCount as number) ?? 0 });
-    if (seats.blockedBy === 'full') {
-      return new SeatError(`${invitation.orgName} just filled its last seat (limit ${seats.limit}). Ask an administrator to free one up or upgrade the plan.`);
+    const members = Number(orgSnap.data().memberCount ?? 0);
+    const pending = Number(orgSnap.data().pendingInviteCount ?? 1);
+    const limit = seatLimitForPlan(plan);
+    const statusCheck = evaluateSeats({ plan, status, members: 0, pendingInvites: 0 });
+    if (limit !== null && members + pending > limit) {
+      return new SeatError(`${invitation.orgName} has more occupied seats than its current plan allows. Ask an administrator to review the team or upgrade the plan.`);
     }
-    if (seats.blockedBy) return new SeatError(`${invitation.orgName} cannot add new members right now. ${seats.message}`);
+    if (statusCheck.blockedBy) return new SeatError(`${invitation.orgName} cannot add new members right now. ${statusCheck.message}`);
     return null;
   } catch {
     return null;
@@ -87,32 +90,38 @@ async function runAccept(db: Firestore, args: { uid: string; email: string; invi
   const { uid, email, invitation } = args;
   const orgRef = doc(db, 'organizations', invitation.orgId);
   const billingRef = doc(db, `organizations/${invitation.orgId}/billing`, 'subscription');
+  const invitationRef = doc(db, 'invitations', invitation.id);
 
   await runTransaction(db, async (transaction) => {
     const orgSnap = await transaction.get(orgRef);
     if (!orgSnap.exists()) throw new SeatError('That organization no longer exists. Ask your administrator to re-invite you.');
-    const billingSnap = await transaction.get(billingRef);
+    const [billingSnap, invitationSnap] = await Promise.all([transaction.get(billingRef), transaction.get(invitationRef)]);
+    if (!invitationSnap.exists() || invitationSnap.data().orgId !== invitation.orgId || invitationSnap.data().email?.toLowerCase() !== email.toLowerCase()) {
+      throw new SeatError('This invitation is no longer available. Ask an administrator to send a new invitation.');
+    }
     // An organization with no billing document yet is on the trial.
     const plan = billingSnap.exists() ? billingSnap.data().plan : 'trial';
     const status = billingSnap.exists() ? billingSnap.data().status : 'trialing';
-    const members = (orgSnap.data().memberCount as number) ?? 0;
+    const members = Number(orgSnap.data().memberCount ?? 0);
+    const pendingInviteCount = Number(orgSnap.data().pendingInviteCount ?? 1);
 
-    // Seats are judged on real members only here (the invitation being accepted is this person's own seat).
-    const seats = evaluateSeats({ plan, status, members, pendingInvites: 0 });
-    if (!seats.canAdd) {
-      const limit = seatLimitForPlan(plan);
+    // The invitation already holds a seat. Acceptance transfers it from pending to active without increasing occupancy.
+    const seats = evaluateSeats({ plan, status, members: 0, pendingInvites: 0 });
+    const limit = seatLimitForPlan(plan);
+    if (pendingInviteCount < 1 || (limit !== null && members + pendingInviteCount > limit) || seats.blockedBy) {
       throw new SeatError(
-        seats.blockedBy === 'full'
-          ? `${invitation.orgName} has no seats left (limit ${limit}). Ask an administrator to free one up or upgrade the plan.`
-          : `${invitation.orgName} cannot add new members right now. ${seats.message}`
+        seats.blockedBy
+          ? `${invitation.orgName} cannot add new members right now. ${seats.message}`
+          : `${invitation.orgName} has more occupied seats than its current plan allows. Ask an administrator to review the team or upgrade the plan.`
       );
     }
 
     transaction.set(doc(db, `organizations/${invitation.orgId}/members`, uid), {
       userId: uid, email, role: invitation.role, joinedAt: new Date().toISOString(),
     });
-    transaction.update(orgRef, { memberCount: members + 1 });
+    const pendingInviteCountAfter = pendingInviteCount - 1;
+    transaction.update(orgRef, { memberCount: members + 1, pendingInviteCount: pendingInviteCountAfter });
     transaction.update(doc(db, 'users', uid), { currentOrgId: invitation.orgId });
-    transaction.delete(doc(db, 'invitations', invitation.id));
+    transaction.delete(invitationRef);
   });
 }

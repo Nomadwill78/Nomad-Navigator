@@ -258,7 +258,7 @@ A pivot tool for cross-referencing your program data against your grant portfoli
 
 ### 10. Team Management *(admins only)*
 
-- **Seats Used** card: `N / limit` with a progress bar (Trial 8, Starter 3), or `N / ∞` for Growth and Pro, which have unlimited seats
+- **Seats Used** card: `N / limit` with a progress bar (Trial 5, Starter 3, Growth 10, Pro 25)
 - **Member table**: user (avatar + email, with "Active" or "Pending Invitation" beneath), role, status (green check "Verified" or a pulsing "Pending" dot), joined date, and a remove button
 - Admins can change any member's role inline from a dropdown — except the organization's creator, who is protected. Admins also can't remove themselves or the creator. Removal asks for confirmation and is done by the server, which also recounts the members.
 - **"Invite Colleague"** button (hidden once the plan's seats are full, or while a payment is failing or the subscription has ended) opens a modal: an email field plus a grid of six role cards, each with a one-line description of what that role can do. It writes the invitation into the organization's member list.
@@ -403,7 +403,7 @@ The only live commitment is the trial offer: **30 days free, first 10 nonprofits
 
 ### Still open
 1. Several dashboard figures remain hard-coded rather than derived: the stat-card trend chips ("+12.5% vs target," "32% below avg") and "89% Urban Focus" under Service Areas. Fixing these needs a target/baseline data model that doesn't exist yet — left alone this pass rather than faked with a different hard-coded number.
-2. ~~The 8-member cap.~~ **Resolved:** seat limits are Trial 8, Starter 3, Growth unlimited, Pro unlimited, defined once in `PLAN_SEAT_LIMITS` (`types.ts`) and used by the app, the server and the database rules.
+2. **Seat limits:** Trial 5, Starter 3, Growth 10, Pro 25, defined in `PLAN_SEAT_LIMITS` (`types.ts`) and enforced by the app, server, and database rules.
 
 ---
 

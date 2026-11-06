@@ -6,12 +6,12 @@ This is the one place that says what each plan allows and what happens when paym
 
 | Plan | Team members |
 |---|---|
-| Trial (free, every new organization) | 8 |
+| Trial (free, every new organization) | 5 |
 | Compass Starter ($49/mo) | 3 |
-| Compass Growth ($99/mo) | Unlimited |
-| Compass Pro ($199/mo) | Unlimited |
+| Compass Growth ($99/mo) | 10 |
+| Compass Pro ($199/mo) | 25 |
 
-A higher plan never has fewer seats than a lower one. Pro is set apart by unlimited AI reports and onboarding, not by a smaller team cap.
+Each plan has a defined capacity. Growth supports larger cross-functional teams; Pro supports up to 25 users and adds advanced reporting and onboarding.
 
 "Exactly 3" means exactly 3: the third member can join, the fourth cannot. Pending invitations count against the limit in the app, so an admin cannot over-invite. The database also refuses a join that would go over, so the limit holds even if two people accept at the same moment or someone modifies the app.
 

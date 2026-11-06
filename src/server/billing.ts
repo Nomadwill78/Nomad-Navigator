@@ -69,6 +69,8 @@ export interface BillingStore {
   failEvent(eventId: string, error: string): Promise<void>;
   /** The real number of members, counted from the members themselves (never the stored counter). */
   countMembers(orgId: string): Promise<number>;
+  /** Pending invitations also reserve capacity and must fit a downgrade. */
+  countPendingInvitations?(orgId: string): Promise<number>;
 }
 
 export class BillingError extends Error {
@@ -370,7 +372,8 @@ export async function changePlan(
 
   // Count real members, not the stored counter, so a damaged counter cannot let a downgrade through.
   const members = await store.countMembers(args.orgId);
-  const fit = checkPlanChange(target, members);
+  const pendingInvitations = await store.countPendingInvitations?.(args.orgId) ?? 0;
+  const fit = checkPlanChange(target, members + pendingInvitations);
   if ('reason' in fit) throw new BillingError('TOO_MANY_MEMBERS', fit.reason, 409);
 
   const updated = await stripe.subscriptions.update(
