@@ -24,7 +24,7 @@ export const GRANT_STATUS_SEEDS = [
   { value: 'PROSPECT', label: 'Prospect', color: 'gray' },
   { value: 'APPLYING', label: 'Applying', color: 'sky' },
   { value: 'SUBMITTED', label: 'Submitted', color: 'blue' },
-  { value: 'PENDING', label: 'Awarded, not started', color: 'amber' },
+  { value: 'PENDING', label: 'Awarded but not started', color: 'amber' },
   { value: 'ACTIVE', label: 'Active', color: 'green' },
   { value: 'COMPLETED', label: 'Completed', color: 'turquoise' },
   { value: 'DECLINED', label: 'Declined', color: 'red' },
@@ -66,9 +66,9 @@ export const SUBGRANTEE_STATUS_SEEDS = [
 // ------------------------------------------------------------- financials
 
 export const FISCAL_YEAR_SEEDS = [
-  { value: '2025', label: '2025', color: 'gray' },
-  { value: '2026', label: '2026', color: 'blue' },
-  { value: '2027', label: '2027', color: 'green' },
+  { value: 'FY_2025', label: '2025', color: 'gray' },
+  { value: 'FY_2026', label: '2026', color: 'blue' },
+  { value: 'FY_2027', label: '2027', color: 'green' },
 ] as const satisfies readonly OptionSeed<string>[];
 
 export const EXPENSE_CATEGORY_SEEDS = [
@@ -147,17 +147,17 @@ export type GivingStatus = (typeof GIVING_STATUS_SEEDS)[number]['value'];
 
 export const OUTREACH_PERMISSION_SEEDS = [
   { value: 'OK_TO_CONTACT', label: 'OK to contact', color: 'green' },
-  { value: 'NO_ASKS', label: 'Thank-yous only, no asks', color: 'amber' },
+  { value: 'NO_ASKS', label: 'Thank-yous only with no asks', color: 'amber' },
   { value: 'DO_NOT_CONTACT', label: 'Do not contact', color: 'red' },
 ] as const satisfies readonly OptionSeed<string>[];
 export type OutreachPermission =
   (typeof OUTREACH_PERMISSION_SEEDS)[number]['value'];
 
 export const CAPACITY_SEEDS = [
-  { value: 'UNDER_1K', label: 'Under $1,000', color: 'gray' },
-  { value: 'K1_TO_10K', label: '$1,000 to $10,000', color: 'sky' },
-  { value: 'K10_TO_100K', label: '$10,000 to $100,000', color: 'blue' },
-  { value: 'OVER_100K', label: 'Over $100,000', color: 'purple' },
+  { value: 'UNDER_1K', label: 'Under $1000', color: 'gray' },
+  { value: 'K1_TO_10K', label: '$1000 to $10000', color: 'sky' },
+  { value: 'K10_TO_100K', label: '$10000 to $100000', color: 'blue' },
+  { value: 'OVER_100K', label: 'Over $100000', color: 'purple' },
 ] as const satisfies readonly OptionSeed<string>[];
 
 export const RISK_SEEDS = [
@@ -182,7 +182,7 @@ export const VOLUNTEER_SKILL_SEEDS = [
   { value: 'ADMIN', label: 'Office or admin', color: 'gray' },
   { value: 'FUNDRAISING', label: 'Fundraising', color: 'purple' },
   { value: 'COMMUNICATIONS', label: 'Communications', color: 'blue' },
-  { value: 'PROFESSIONAL', label: 'Legal, finance or HR', color: 'iris' },
+  { value: 'PROFESSIONAL', label: 'Legal / finance / HR', color: 'iris' },
   { value: 'TECHNOLOGY', label: 'Technology', color: 'turquoise' },
   { value: 'TRANSPORT', label: 'Driving or transport', color: 'orange' },
 ] as const satisfies readonly OptionSeed<string>[];
@@ -195,7 +195,7 @@ export const BACKGROUND_CHECK_SEEDS = [
 ] as const satisfies readonly OptionSeed<string>[];
 
 export const VOLUNTEER_LOG_STATUS_SEEDS = [
-  { value: 'LOGGED', label: 'Logged, awaiting approval', color: 'amber' },
+  { value: 'LOGGED', label: 'Logged and awaiting approval', color: 'amber' },
   { value: 'APPROVED', label: 'Approved', color: 'green' },
 ] as const satisfies readonly OptionSeed<string>[];
 export type VolunteerLogStatus =
