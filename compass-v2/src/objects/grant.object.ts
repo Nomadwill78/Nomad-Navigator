@@ -43,6 +43,10 @@ export default defineObject({
       description: 'Total spent against this grant to date. Update it as you close each month.',
       icon: 'IconReceipt',
     }),
+    currencyField(GRANT_FIELD.totalExpended, 'totalExpended', 'Expense ledger total', {
+      description: 'Calculated from expense transactions linked to this grant. Amounts in other currencies are not added.',
+      system: true,
+    }),
     currencyField(GRANT_FIELD.receivedAmount, 'receivedAmount', 'Payments received', {
       description: 'Calculated from the donations you link to this grant that are marked Received.',
       icon: 'IconCashBanknote',

@@ -70,8 +70,8 @@ describe('every definition', () => {
       commands: commands.length, frontComponents: frontComponents.length, logicFunctions: logicFunctions.length,
       agents: agents.length, skills: skills.length, roles: roles.length,
     }).toEqual({
-      objects: 8, views: 14, navigation: 26, pageLayouts: 1,
-      commands: 4, frontComponents: 4, logicFunctions: 15,
+      objects: 11, views: 14, navigation: 29, pageLayouts: 1,
+      commands: 4, frontComponents: 4, logicFunctions: 17,
       agents: 2, skills: 5, roles: 6,
     });
   });
@@ -319,6 +319,50 @@ describe('roles and AI agents', () => {
 
     expect(role.objectPermissions.every((p: any) => p.canUpdateObjectRecords === false && p.canSoftDeleteObjectRecords === false)).toBe(true);
     expect(role.permissionFlagUniversalIdentifiers).toEqual([]);
+  });
+
+  it('lets grants managers manage financial records', () => {
+    const role = roles.find((entry) => entry.config.label === 'Compass: Grants manager')!.config;
+
+    for (const name of ['budget', 'grantAllocation', 'expenseTransaction']) {
+      const objectId = objects.find((object) => object.config.nameSingular === name)!.config.universalIdentifier;
+      const permission = role.objectPermissions.find((entry: any) => entry.objectUniversalIdentifier === objectId);
+
+      expect(permission, name).toMatchObject({
+        canReadObjectRecords: true,
+        canUpdateObjectRecords: true,
+        canSoftDeleteObjectRecords: true,
+        canDestroyObjectRecords: false,
+      });
+    }
+  });
+
+  it('lets board viewers read financial records without edit or delete access', () => {
+    const role = roles.find((entry) => entry.config.label === 'Compass: Board viewer')!.config;
+
+    for (const name of ['budget', 'grantAllocation', 'expenseTransaction']) {
+      const objectId = objects.find((object) => object.config.nameSingular === name)!.config.universalIdentifier;
+      const permission = role.objectPermissions.find((entry: any) => entry.objectUniversalIdentifier === objectId);
+
+      expect(permission, name).toMatchObject({
+        canReadObjectRecords: true,
+        canUpdateObjectRecords: false,
+        canSoftDeleteObjectRecords: false,
+        canDestroyObjectRecords: false,
+      });
+    }
+  });
+
+  it('does not expose financial records to Fundraisers or Volunteer Coordinators', () => {
+    for (const label of ['Compass: Fundraiser', 'Compass: Volunteer coordinator']) {
+      const role = roles.find((entry) => entry.config.label === label)!.config;
+
+      for (const name of ['budget', 'grantAllocation', 'expenseTransaction']) {
+        const objectId = objects.find((object) => object.config.nameSingular === name)!.config.universalIdentifier;
+
+        expect(role.objectPermissions.some((entry: any) => entry.objectUniversalIdentifier === objectId), `${label}: ${name}`).toBe(false);
+      }
+    }
   });
 
   it('binds every AI agent to a role that cannot read or change any record', () => {

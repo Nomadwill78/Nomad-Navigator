@@ -7,7 +7,7 @@ export default defineRole({
   universalIdentifier: ROLE_ID.grantsManager,
   label: 'Compass: Grants manager',
   description:
-    'Manages grants, KPIs, subgrantees and program results, and can draft funder reports. Sees funders and their contacts but not individual donors\' giving history.',
+    'Manages grants, budgets, allocations, expense transactions, KPIs, subgrantees and program results, and can draft funder reports. Sees funders and their contacts but not individual donors\' giving history.',
   icon: 'IconAward',
   canReadAllObjectRecords: false,
   canUpdateAllObjectRecords: false,
@@ -23,6 +23,9 @@ export default defineRole({
     remove(OBJECT.grantKpi),
     remove(OBJECT.subgrantee),
     remove(OBJECT.programMetric),
+    remove(OBJECT.budget),
+    remove(OBJECT.grantAllocation),
+    remove(OBJECT.expenseTransaction),
     edit(OBJECT.company),
     edit(OBJECT.person),
     read(OBJECT.fundraisingCampaign),

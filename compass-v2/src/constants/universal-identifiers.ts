@@ -19,6 +19,9 @@ export const OBJECT_ID = {
   fundraisingCampaign: stableUuid('object:fundraisingCampaign'),
   cultivationPlan: stableUuid('object:cultivationPlan'),
   volunteerLog: stableUuid('object:volunteerLog'),
+  budget: stableUuid('object:budget'),
+  grantAllocation: stableUuid('object:grantAllocation'),
+  expenseTransaction: stableUuid('object:expenseTransaction'),
 } as const;
 
 // Builds { fieldName: uuid } for one object. Because the names are a literal
@@ -32,14 +35,27 @@ const fieldIds = <const TNames extends readonly string[]>(
   ) as Record<TNames[number], string>;
 
 export const GRANT_FIELD = fieldIds('grant', [
-  'name', 'status', 'awardAmount', 'requestedAmount', 'spentAmount',
+  'name', 'status', 'awardAmount', 'requestedAmount', 'spentAmount', 'totalExpended',
   'receivedAmount', 'startDate', 'endDate', 'applicationDeadline',
   'reportFrequency', 'nextReportDue', 'lastReportSubmittedOn', 'purpose',
   'kpiProgressPercent', 'timeElapsedPercent', 'percentSpent', 'pace',
   'dataCheck', 'aiReportDraft', 'aiReportGeneratedAt',
   // relations
   'funder', 'owner', 'kpis', 'subgrantees', 'programMetrics', 'donations',
-  'volunteerLogs',
+  'volunteerLogs', 'allocations', 'expenseTransactions',
+] as const);
+
+export const BUDGET_FIELD = fieldIds('budget', [
+  'name', 'fiscalYear', 'programName', 'totalBudgetAmount', 'totalSpentAmount',
+  'remainingBalance', 'allocations', 'expenseTransactions',
+] as const);
+
+export const GRANT_ALLOCATION_FIELD = fieldIds('grantAllocation', [
+  'name', 'allocatedAmount', 'grant', 'budget',
+] as const);
+
+export const EXPENSE_TRANSACTION_FIELD = fieldIds('expenseTransaction', [
+  'name', 'transactionDate', 'amount', 'vendor', 'expenseCategory', 'budget', 'grant',
 ] as const);
 
 export const GRANT_KPI_FIELD = fieldIds('grantKpi', [
@@ -124,6 +140,8 @@ export const LOGIC_FUNCTION_ID = {
   onGrantChanged: stableUuid('logic-function:on-grant-changed'),
   onPlanChanged: stableUuid('logic-function:on-plan-changed'),
   onProgramMetricChanged: stableUuid('logic-function:on-program-metric-changed'),
+  onExpenseTransactionChanged: stableUuid('logic-function:on-expense-transaction-changed'),
+  onBudgetChanged: stableUuid('logic-function:on-budget-changed'),
   nightlySweep: stableUuid('logic-function:nightly-sweep'),
   weeklyAiInsights: stableUuid('logic-function:weekly-ai-insights'),
   generateDonorInsight: stableUuid('logic-function:generate-donor-insight'),

@@ -8,7 +8,7 @@ import {
   type InsightCandidate,
   type RecentGift,
 } from 'src/lib/evidence';
-import { findGrantDataIssues } from 'src/lib/grant';
+import { findGrantDataIssues, percentSpent } from 'src/lib/grant';
 import { toNumber } from 'src/lib/money';
 
 import { dateOnly, DONATION_SELECTION, money, toDonationRow, unitsOf } from 'src/services/mappers';
@@ -156,13 +156,13 @@ export const generateGrantReportDraft = async (deps: AiDeps, grantId: string): P
     funderId: true,
     awardAmount: MONEY,
     spentAmount: MONEY,
+    totalExpended: MONEY,
     startDate: true,
     endDate: true,
     reportFrequency: true,
     nextReportDue: true,
     kpiProgressPercent: true,
     timeElapsedPercent: true,
-    percentSpent: true,
     pace: true,
     purpose: true,
   });
@@ -180,7 +180,7 @@ export const generateGrantReportDraft = async (deps: AiDeps, grantId: string): P
 
   const subgranteeNames = new Map(subgrantees.records.map((sub) => [sub.id, sub.name as string]));
   const awardUnits = unitsOf(grant.awardAmount);
-  const spentUnits = unitsOf(grant.spentAmount);
+  const spentUnits = unitsOf(grant.totalExpended) ?? unitsOf(grant.spentAmount);
   const funding = summarizeFunding(payments.records.map(toDonationRow), deps.currency);
 
   const issues = findGrantDataIssues(
@@ -202,7 +202,7 @@ export const generateGrantReportDraft = async (deps: AiDeps, grantId: string): P
       awardAmount: awardUnits,
       spentAmount: spentUnits,
       receivedAmount: funding.giftCount > 0 ? funding.receivedAmount : null,
-      percentSpent: toNumber(grant.percentSpent),
+      percentSpent: percentSpent(spentUnits, awardUnits),
       startDate: dateOnly(grant.startDate),
       endDate: dateOnly(grant.endDate),
       timeElapsedPercent: toNumber(grant.timeElapsedPercent),

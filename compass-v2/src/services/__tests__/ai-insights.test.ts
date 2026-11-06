@@ -185,7 +185,7 @@ describe('generateDonorInsight', () => {
 });
 
 describe('generateGrantReportDraft', () => {
-  const fixture = () =>
+  const fixture = (grantOverrides: Record<string, unknown> = {}) =>
     createFakeClient({
       companies: [{ id: 'f1', name: 'Memphis Community Foundation' }],
       grants: [
@@ -195,6 +195,7 @@ describe('generateGrantReportDraft', () => {
           reportFrequency: 'QUARTERLY', nextReportDue: '2026-10-15',
           kpiProgressPercent: 51.2, timeElapsedPercent: 76.4, percentSpent: 40, pace: 'OFF_PACE',
           purpose: 'Install wells in three neighborhoods',
+          ...grantOverrides,
         },
       ],
       grantKpis: [
@@ -223,6 +224,16 @@ describe('generateGrantReportDraft', () => {
     expect(prompt).toContain('method: Sign-in sheets');
     expect(prompt).toContain('Pace: OFF_PACE');
     expect(prompt).not.toContain('Install wells in three neighborhoods');
+  });
+
+  it('uses the ledger total and recalculates report spending percent when cached fields are stale', async () => {
+    const fake = fixture({ totalExpended: eur(12000), percentSpent: 40 });
+    const agent = stubAgent({ draft: 'The grant is progressing.', dataGaps: '' });
+
+    await generateGrantReportDraft(depsFor(fake.client, agent.runAgent), 'g1');
+
+    expect(agent.calls[0].prompt).toContain('Spent so far: $12,000 (24% of the award).');
+    expect(agent.calls[0].prompt).not.toContain('Spent so far: $20,000');
   });
 
   it('lists figures in the draft that are not in the records', async () => {

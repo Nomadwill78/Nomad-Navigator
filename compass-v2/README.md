@@ -23,6 +23,7 @@ You do not need to know how Twenty works to use Compass. The [setup guide](SETUP
 
 **Grants and impact** (everything from v1, carried forward)
 - Track grants from prospect to completed, with funder, award, spending, reporting schedule and status.
+- Track fiscal-year budgets, grant allocations and expense transactions. Budget and grant ledger totals are recalculated from linked expenses.
 - Track **KPIs** with a target, the result so far, when it was measured and how. Subgrantee KPIs roll up under the parent grant.
 - See whether each grant is **on pace** by comparing KPI progress with the time that has passed.
 - A **data check** on every grant lists problems before a funder finds them.
@@ -58,7 +59,7 @@ Nonprofits sell trust. These are rules the code enforces, not just wishes in a p
 
 | Folder | What it holds |
 |---|---|
-| `src/objects`, `src/fields` | The data model: grants, KPIs, donations, campaigns, plans, volunteer hours, and the extra fields on People and Companies |
+| `src/objects`, `src/fields` | The data model: grants, budgets, allocations, expense transactions, KPIs, donations, campaigns, plans, volunteer hours, and the extra fields on People and Companies |
 | `src/lib` | The rules, written as small testable pieces: KPI status, giving status, grant pace, reminders, AI guardrails |
 | `src/services` | The automations that keep totals current and create reminders |
 | `src/logic-functions` | Connects those automations to Twenty (what triggers each one) |
