@@ -76,6 +76,20 @@ describe('every definition', () => {
     });
   });
 
+  it('uses Twenty-safe option values and labels for every dropdown', () => {
+    const dropdownFields = [
+      ...objects.flatMap((object) => object.config.fields ?? []),
+      ...standaloneFields.map((field) => field.config),
+    ].filter((field) => field.type === 'SELECT' || field.type === 'MULTI_SELECT');
+
+    for (const field of dropdownFields) {
+      for (const option of field.options ?? []) {
+        expect(option.value, `${field.name}: option value`).toMatch(/^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$/);
+        expect(option.label, `${field.name}: option label`).not.toContain(',');
+      }
+    }
+  });
+
   it('has a universal ID that is a UUID and unique across the whole app', () => {
     const ids = everyEntity.map((entity) => entity.config.universalIdentifier as string);
 
