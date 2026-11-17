@@ -48,7 +48,7 @@ function validateKpiDetails(kpi: GrantKPI): string | null {
     if (!Array.isArray(kpi.history) || kpi.history.length > 500) return `"${n}" has too many history entries.`;
     for (const e of kpi.history) {
       if (!isValidDate(e.date)) return `"${n}" has a history entry with an invalid date.`;
-      if (typeof e.value !== 'number' || !Number.isFinite(e.value)) return `"${n}" has an invalid history value.`;
+      if (typeof e.value !== 'number' || !Number.isFinite(e.value)) return `"${n}" has an invalid history entry.`;
     }
   }
   for (const rows of [kpi.ageBreakdown, kpi.ethnicityBreakdown]) {
