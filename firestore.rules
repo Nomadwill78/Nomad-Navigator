@@ -117,7 +117,7 @@ service cloud.firestore {
          pendingInviteCount(incoming()) == pendingInviteCount(existing()))
         ||
         // Creating an invitation reserves one seat in the same atomic commit.
-        (hasRole(orgId, ['admin'])) &&
+        (hasRole(orgId, ['admin']) &&
          incoming().diff(existing()).affectedKeys().hasOnly(['pendingInviteCount']) &&
          pendingInviteCount(incoming()) == pendingInviteCount(existing()) + 1 &&
          canHold(orgId, existing().memberCount + pendingInviteCount(incoming())))
