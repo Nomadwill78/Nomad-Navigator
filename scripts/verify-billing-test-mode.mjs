@@ -69,9 +69,9 @@ async function main() {
 
   // --- set up: a throwaway organization with one admin, on the trial ------------------------------------
   await auth.createUser({ uid: UID, email: `${UID}@example.test`, emailVerified: true });
-  await db.doc(`organizations/${ORG}`).set({ name: 'Stripe test org', creatorId: UID, createdAt: new Date(), memberCount: 1 });
+  await db.doc(`organizations/${ORG}`).set({ name: 'Stripe test org', creatorId: UID, createdAt: new Date(), memberCount: 1, pendingInviteCount: 0 });
   await db.doc(`organizations/${ORG}/members/${UID}`).set({ userId: UID, email: `${UID}@example.test`, role: 'admin', joinedAt: new Date().toISOString() });
-  await db.doc(`organizations/${ORG}/billing/subscription`).set({ plan: 'trial', status: 'trialing', seatLimit: 8, updatedAt: new Date().toISOString() });
+  await db.doc(`organizations/${ORG}/billing/subscription`).set({ plan: 'trial', status: 'trialing', seatLimit: 5, updatedAt: new Date().toISOString() });
   const token = await idToken();
 
   console.log('1. Webhook security');

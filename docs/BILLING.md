@@ -17,6 +17,8 @@ Each plan has a defined capacity. Growth supports larger cross-functional teams;
 
 **Where this lives:** `PLAN_SEAT_LIMITS` in `types.ts` is the single source. The app, the server, and `firestore.rules` all follow it, and a test fails if the rules table and `types.ts` ever disagree. To change a limit, change `types.ts` and `seatLimitOf()` in `firestore.rules` together.
 
+**Seat-reservation rollout for existing organizations.** Deploy the updated Firestore rules, then backfill with `node scripts/migrate-pending-invite-counts.mjs --fix` using the target project's `FIREBASE_SERVICE_ACCOUNT`. Run the script again without `--fix` to confirm that no organizations need repair. Legacy invitees can still accept within the plan limit while their organization's counter is absent. Sending new invitations resumes once its counter is backfilled.
+
 ## What happens when payment goes wrong
 
 | Situation | Plan | New members | Existing members and data |

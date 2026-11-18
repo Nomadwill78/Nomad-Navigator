@@ -1,3 +1,4 @@
+import { FirebaseError } from 'firebase/app';
 import React, { useState, useEffect } from 'react';
 import { Users, Mail, Trash2, UserPlus, CheckCircle2, Clock, X } from 'lucide-react';
 import { useAuth, inviteId } from '../src/contexts/AuthContext';
@@ -72,27 +73,25 @@ export const TeamManagementView: React.FC = () => {
       };
       await runTransaction(db, async (transaction) => {
         const orgSnap = await transaction.get(orgRef);
-        const existing = await transaction.get(inviteRef);
         if (!orgSnap.exists()) throw new Error('This organization could not be found.');
-        if (existing.exists()) {
-          throw new Error(existing.data().orgId === organization.id
-            ? 'That person already has a pending invitation.'
-            : 'That email already has a pending invitation to another organization.');
+        const pendingCount = orgSnap.data().pendingInviteCount as number | undefined;
+        if (pendingCount === undefined) {
+          throw new Error('Invitation counts are being updated. Please try again after the organization has been migrated.');
         }
-        // The stored counter is the source of truth; the rules require exactly +1,
-        // and server-side revocation keeps it accurate via recounting.
-        const pendingCount = Number(orgSnap.data().pendingInviteCount ?? 0);
         const memberCount = Number(orgSnap.data().memberCount ?? members.length);
         const currentSeats = evaluateSeats({ plan, status: billing?.status ?? 'trialing', members: memberCount, pendingInvites: pendingCount });
         if (!currentSeats.canAdd) throw new Error(currentSeats.message);
         transaction.update(orgRef, { pendingInviteCount: pendingCount + 1 });
+        // Rules allow creation only. An existing invitation causes the entire transaction to fail.
         transaction.set(inviteRef, invitation);
       });
       setInviteEmail('');
       setIsInviteModalOpen(false);
     } catch (error) {
       console.error('Invite failed:', error);
-      setInviteError(error instanceof Error ? error.message : 'Could not create that invitation. Check that you still have admin access.');
+      setInviteError(error instanceof FirebaseError && error.code === 'permission-denied'
+        ? 'Could not create that invitation. The address may already have a pending invitation, or your team access may have changed.'
+        : error instanceof Error ? error.message : 'Could not create that invitation.');
     } finally { setIsSending(false); }
   };
 

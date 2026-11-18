@@ -153,14 +153,14 @@ export async function revokeInvitationAndRecount(
     }
     const inviteRef = db.doc(`invitations/${normalizedEmail}`);
     const inviteSnap = await tx.get(inviteRef);
-    if (!inviteSnap.exists || inviteSnap.data()!.orgId !== orgId) {
+    if (!inviteSnap.exists || inviteSnap.data()!.orgId !== orgId || inviteSnap.data()!.status !== 'pending') {
       throw new MemberError('NOT_FOUND', 'That invitation no longer exists.', 404);
     }
     const pendingSnap = await tx.get(
       db.collection('invitations').where('orgId', '==', orgId).where('status', '==', 'pending')
     );
     // The invitation being revoked is still counted in pendingSnap, so subtract 1.
-    const remaining = Math.max(0, pendingSnap.size - 1);
+    const remaining = pendingSnap.size - 1;
     tx.delete(inviteRef);
     tx.update(orgRef, { pendingInviteCount: remaining });
     return { pendingInviteCount: remaining };

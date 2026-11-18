@@ -339,12 +339,30 @@ describe('legacy organizations without pendingInviteCount (pre-rollout)', () => 
     });
   }
 
-  it('an invitee with a pre-rollout invitation can accept; the counter initializes to 0', async () => {
+  it('multiple pre-rollout invitees can accept before the counter is backfilled', async () => {
     const org = await seedLegacyOrg(2);
-    await seedLegacyInvite(org, 'legacy@x.org');
-    // The app writes pendingInviteCount: 0 for a legacy org (its own invitation was the pending seat).
-    await assertSucceeds(join(org, 'legacy', 2, 'legacy@x.org', 'viewer', 1));
-    expect(await readCount(org)).toBe(3);
+    const invitees = ['first', 'second'];
+    for (const uid of invitees) await seedLegacyInvite(org, `${uid}@x.org`);
+    for (const uid of invitees) {
+      const email = `${uid}@x.org`;
+      await assertSucceeds(acceptInvitationTxn(as(uid, email) as any, {
+        uid, email,
+        invitation: {
+          id: email, email, orgId: org, orgName: 'Test', role: 'viewer', invitedBy: OWNER,
+          invitedByEmail: 'owner@x.org', status: 'pending', createdAt: 'x',
+        },
+      }));
+    }
+    expect(await readCount(org)).toBe(4);
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const snap = await getDoc(doc(ctx.firestore(), `organizations/${org}`));
+      expect(snap.data()).not.toHaveProperty('pendingInviteCount');
+    });
+  });
+
+  it('requires a backfill before reserving a new seat for a legacy organization', async () => {
+    const org = await seedLegacyOrg(2);
+    await assertFails(sendInvite(org, 'new@x.org'));
   });
 
   it('a legacy org still enforces the seat limit on acceptance', async () => {
@@ -373,8 +391,7 @@ describe('pendingInviteCount cannot be manipulated without a real invitation cha
     const org = await seedOrg({ plan: 'growth', members: 2 });
     await seedInvite(org, 'a@x.org');
     const db = as(OWNER);
-    // Client-side delete requires the org counter update, which has no allowing branch,
-    // so the whole transaction is refused. Revocation must go through POST /api/revoke-invitation.
+    // Revocation must go through POST /api/revoke-invitation.
     const batch = writeBatch(db);
     batch.delete(doc(db, 'invitations/a@x.org'));
     batch.update(doc(db, `organizations/${org}`), { pendingInviteCount: 0 });

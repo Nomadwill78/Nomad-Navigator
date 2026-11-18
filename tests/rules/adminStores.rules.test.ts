@@ -6,7 +6,7 @@ import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { initializeTestEnvironment, assertSucceeds, RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { doc, writeBatch } from 'firebase/firestore';
 import { beforeAll, afterAll, beforeEach, describe, it, expect } from 'vitest';
-import { createFirestoreBillingStore, removeMemberAndRecount, reconcileMemberCount, MemberError, EVENT_STALE_AFTER_MS } from '../../src/server/firestoreStores';
+import { createFirestoreBillingStore, removeMemberAndRecount, reconcileMemberCount, revokeInvitationAndRecount, MemberError, EVENT_STALE_AFTER_MS } from '../../src/server/firestoreStores';
 
 const PROJECT = 'demo-admin-stores';
 let env: RulesTestEnvironment;
@@ -152,4 +152,27 @@ describe('member removal keeps memberCount true', () => {
     ok.delete(doc(c1, 'invitations/new@x.org'));
     await assertSucceeds(ok.commit());
   });
+});
+
+
+it('revocation releases a seat only for a pending invitation belonging to the organization', async () => {
+  await seed('org1', ['owner'], 1);
+  const orgRef = db.doc('organizations/org1');
+  const pending = db.doc('invitations/pending@x.org');
+  const accepted = db.doc('invitations/accepted@x.org');
+  await orgRef.update({ pendingInviteCount: 1 });
+  await pending.set({ orgId: 'org1', status: 'pending' });
+  await accepted.set({ orgId: 'org1', status: 'accepted' });
+
+  await expect(revokeInvitationAndRecount(db, {
+    orgId: 'org1', requesterUid: 'owner', inviteEmail: 'accepted@x.org',
+  })).rejects.toMatchObject({ httpStatus: 404 });
+  expect((await accepted.get()).exists).toBe(true);
+  expect((await orgRef.get()).data()?.pendingInviteCount).toBe(1);
+
+  await expect(revokeInvitationAndRecount(db, {
+    orgId: 'org1', requesterUid: 'owner', inviteEmail: 'pending@x.org',
+  })).resolves.toEqual({ pendingInviteCount: 0 });
+  expect((await pending.get()).exists).toBe(false);
+  expect((await orgRef.get()).data()?.pendingInviteCount).toBe(0);
 });

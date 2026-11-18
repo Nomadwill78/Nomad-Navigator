@@ -41,14 +41,12 @@ service cloud.firestore {
 
     function pendingInviteCount(data) { return data.get('pendingInviteCount', 0); }
 
-    // Accepting an invitation moves one seat from pending to active. Normally the counter
-    // decrements by exactly 1. Organizations created before pendingInviteCount existed have
-    // no field yet; the first acceptance initializes it to 0 (the client's own invitation
-    // was the one pending seat). A data migration backfills the true count for all
-    // pre-existing organizations (see scripts/migrate-pending-invite-counts.mjs).
+    // Leave an unmigrated counter absent so every legacy invite can use this fallback.
     function isValidPendingDecrement(oldData, newData) {
-      return pendingInviteCount(newData) == pendingInviteCount(oldData) - 1 ||
-             (!('pendingInviteCount' in oldData) && pendingInviteCount(newData) == 0);
+      return ('pendingInviteCount' in oldData)
+        ? 'pendingInviteCount' in newData && pendingInviteCount(oldData) > 0 &&
+          pendingInviteCount(newData) == pendingInviteCount(oldData) - 1
+        : !('pendingInviteCount' in newData);
     }
 
     function isValidOrganization(data) {
@@ -114,10 +112,12 @@ service cloud.firestore {
         // Ordinary admin edits cannot manipulate either seat counter.
         (hasRole(orgId, ['admin']) && isValidOrganization(incoming()) && incoming().creatorId == existing().creatorId &&
          incoming().memberCount == existing().memberCount &&
+         ('pendingInviteCount' in incoming()) == ('pendingInviteCount' in existing()) &&
          pendingInviteCount(incoming()) == pendingInviteCount(existing()))
         ||
         // Creating an invitation reserves one seat in the same atomic commit.
         (hasRole(orgId, ['admin']) &&
+         'pendingInviteCount' in existing() &&
          incoming().diff(existing()).affectedKeys().hasOnly(['pendingInviteCount']) &&
          pendingInviteCount(incoming()) == pendingInviteCount(existing()) + 1 &&
          canHold(orgId, existing().memberCount + pendingInviteCount(incoming())))
@@ -219,10 +219,6 @@ service cloud.firestore {
       // reserved seat to membership). Admin revocation goes through the server API
       // (POST /api/revoke-invitation), which bypasses rules; there is no client-side admin delete path.
       allow delete: if
-        (hasRole(resource.data.orgId, ['admin']) &&
-         pendingInviteCount(getAfter(/databases/$(database)/documents/organizations/$(resource.data.orgId)).data) ==
-           pendingInviteCount(get(/databases/$(database)/documents/organizations/$(resource.data.orgId)).data) - 1)
-        ||
         (hasVerifiedEmail() && inviteEmail == authEmail() &&
          existsAfter(/databases/$(database)/documents/organizations/$(resource.data.orgId)/members/$(request.auth.uid)) &&
          getAfter(/databases/$(database)/documents/organizations/$(resource.data.orgId)).data.memberCount ==

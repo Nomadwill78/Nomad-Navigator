@@ -102,12 +102,12 @@ async function runAccept(db: Firestore, args: { uid: string; email: string; invi
     const plan = billingSnap.exists() ? billingSnap.data().plan : 'trial';
     const status = billingSnap.exists() ? billingSnap.data().status : 'trialing';
     const members = Number(orgSnap.data().memberCount ?? 0);
-    const pendingInviteCount = Number(orgSnap.data().pendingInviteCount ?? 1);
+    const pendingInviteCount = orgSnap.data().pendingInviteCount as number | undefined;
 
     // The invitation already holds a seat. Acceptance transfers it from pending to active without increasing occupancy.
     const seats = evaluateSeats({ plan, status, members: 0, pendingInvites: 0 });
     const limit = seatLimitForPlan(plan);
-    if (pendingInviteCount < 1 || (limit !== null && members >= limit) || seats.blockedBy) {
+    if ((pendingInviteCount !== undefined && pendingInviteCount < 1) || (limit !== null && members >= limit) || seats.blockedBy) {
       throw new SeatError(
         seats.blockedBy
           ? `${invitation.orgName} cannot add new members right now. ${seats.message}`
@@ -118,8 +118,10 @@ async function runAccept(db: Firestore, args: { uid: string; email: string; invi
     transaction.set(doc(db, `organizations/${invitation.orgId}/members`, uid), {
       userId: uid, email, role: invitation.role, joinedAt: new Date().toISOString(),
     });
-    const pendingInviteCountAfter = pendingInviteCount - 1;
-    transaction.update(orgRef, { memberCount: members + 1, pendingInviteCount: pendingInviteCountAfter });
+    transaction.update(orgRef, {
+      memberCount: members + 1,
+      ...(pendingInviteCount === undefined ? {} : { pendingInviteCount: pendingInviteCount - 1 }),
+    });
     transaction.update(doc(db, 'users', uid), { currentOrgId: invitation.orgId });
     transaction.delete(invitationRef);
   });
