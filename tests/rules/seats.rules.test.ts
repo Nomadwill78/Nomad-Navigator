@@ -276,7 +276,7 @@ describe('concurrent invitations cannot exceed capacity', () => {
   });
 
   it('memberCount always equals the real number of members after the race', async () => {
-    const org = await seedOrg({ plan: 'trial', members: 6 });
+    const org = await seedOrg({ plan: 'trial', members: 4 });
     const people = ['a', 'b', 'c', 'd'];
     for (const p of people) await seedInvite(org, `${p}@x.org`);
     await Promise.allSettled(people.map((p) => join(org, p, 4, `${p}@x.org`, 'viewer', 4)));

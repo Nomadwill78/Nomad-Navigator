@@ -73,10 +73,9 @@ async function explainRefusal(db: Firestore, invitation: Invitation): Promise<Se
     const plan = billingSnap.exists() ? billingSnap.data().plan : 'trial';
     const status = billingSnap.exists() ? billingSnap.data().status : 'trialing';
     const members = Number(orgSnap.data().memberCount ?? 0);
-    const pending = Number(orgSnap.data().pendingInviteCount ?? 1);
     const limit = seatLimitForPlan(plan);
     const statusCheck = evaluateSeats({ plan, status, members: 0, pendingInvites: 0 });
-    if (limit !== null && members + pending > limit) {
+    if (limit !== null && members >= limit) {
       return new SeatError(`${invitation.orgName} has more occupied seats than its current plan allows. Ask an administrator to review the team or upgrade the plan.`);
     }
     if (statusCheck.blockedBy) return new SeatError(`${invitation.orgName} cannot add new members right now. ${statusCheck.message}`);
@@ -108,7 +107,7 @@ async function runAccept(db: Firestore, args: { uid: string; email: string; invi
     // The invitation already holds a seat. Acceptance transfers it from pending to active without increasing occupancy.
     const seats = evaluateSeats({ plan, status, members: 0, pendingInvites: 0 });
     const limit = seatLimitForPlan(plan);
-    if (pendingInviteCount < 1 || (limit !== null && members + pendingInviteCount > limit) || seats.blockedBy) {
+    if (pendingInviteCount < 1 || (limit !== null && members >= limit) || seats.blockedBy) {
       throw new SeatError(
         seats.blockedBy
           ? `${invitation.orgName} cannot add new members right now. ${seats.message}`

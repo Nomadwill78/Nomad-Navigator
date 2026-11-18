@@ -128,6 +128,7 @@ service cloud.firestore {
         (hasPendingInvite(orgId) && incoming().diff(existing()).affectedKeys().hasOnly(['memberCount', 'pendingInviteCount']) &&
          incoming().memberCount == existing().memberCount + 1 &&
          isValidPendingDecrement(existing(), incoming()) &&
+         canHold(orgId, incoming().memberCount) &&
          !exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
          existsAfter(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
          !existsAfter(inviteRef()));
@@ -148,6 +149,7 @@ service cloud.firestore {
             (hasPendingInvite(orgId) && incoming().role == get(inviteRef()).data.role && incoming().email.lower() == authEmail() &&
              getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.memberCount ==
                get(/databases/$(database)/documents/organizations/$(orgId)).data.memberCount + 1 &&
+             canHold(orgId, getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.memberCount) &&
              isValidPendingDecrement(
                get(/databases/$(database)/documents/organizations/$(orgId)).data,
                getAfter(/databases/$(database)/documents/organizations/$(orgId)).data) &&
