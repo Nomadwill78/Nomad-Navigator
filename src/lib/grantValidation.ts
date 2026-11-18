@@ -48,7 +48,7 @@ function validateKpiDetails(kpi: GrantKPI): string | null {
     if (!Array.isArray(kpi.history) || kpi.history.length > 500) return `"${n}" has too many history entries.`;
     for (const e of kpi.history) {
       if (!isValidDate(e.date)) return `"${n}" has a history entry with an invalid date.`;
-      if (typeof e.value !== 'number' || !Number.isFinite(e.value)) return `"${n}" has a history entry with an invalid value.`;
+      if (typeof e.value !== 'number' || !Number.isFinite(e.value)) return `"${n}" has an invalid history entry.`;
     }
   }
   for (const rows of [kpi.ageBreakdown, kpi.ethnicityBreakdown]) {
@@ -132,6 +132,7 @@ export function validateGrant(input: GrantValidationInput): string | null {
   if (input.amount !== undefined) {
     if (typeof input.amount === 'number' && input.amount > MAX_MONEY) return `Award amount: ${TOO_BIG}`;
     if (!isMoney(input.amount)) return 'Award amount must be a non-negative number.';
+    if (input.amount <= 0) return 'Award amount must be greater than $0.';
   }
 
   if (input.spentAmount !== undefined) {
