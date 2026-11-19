@@ -6,7 +6,7 @@ import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { initializeTestEnvironment, assertSucceeds, RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { doc, writeBatch } from 'firebase/firestore';
 import { beforeAll, afterAll, beforeEach, describe, it, expect } from 'vitest';
-import { createFirestoreBillingStore, removeMemberAndRecount, reconcileMemberCount, MemberError, EVENT_STALE_AFTER_MS } from '../../src/server/firestoreStores';
+import { createFirestoreBillingStore, removeMemberAndRecount, reconcileMemberCount, revokeInvitationAndRecount, MemberError, EVENT_STALE_AFTER_MS } from '../../src/server/firestoreStores';
 
 const PROJECT = 'demo-admin-stores';
 let env: RulesTestEnvironment;
@@ -23,7 +23,7 @@ afterAll(async () => { await deleteApp(app); await env?.cleanup(); });
 beforeEach(() => env.clearFirestore());
 
 async function seed(orgId: string, memberIds: string[], storedCount: number, plan = 'starter') {
-  await db.doc(`organizations/${orgId}`).set({ name: 'T', creatorId: memberIds[0], createdAt: new Date(), memberCount: storedCount });
+  await db.doc(`organizations/${orgId}`).set({ name: 'T', creatorId: memberIds[0], createdAt: new Date(), memberCount: storedCount, pendingInviteCount: 0 });
   for (const id of memberIds) {
     await db.doc(`organizations/${orgId}/members/${id}`).set({ userId: id, email: `${id}@x.org`, role: id === memberIds[0] ? 'admin' : 'viewer', joinedAt: 'x' });
     await db.doc(`users/${id}`).set({ uid: id, email: `${id}@x.org`, currentOrgId: orgId });
@@ -137,17 +137,42 @@ describe('member removal keeps memberCount true', () => {
   it('a seat freed by removal can be taken by an invitee (end to end through the rules)', async () => {
     await seed('org1', ['owner', 'm1', 'm2'], 3, 'starter'); // Starter, full at 3
     await db.doc('invitations/new@x.org').set({ email: 'new@x.org', orgId: 'org1', orgName: 'T', role: 'viewer', invitedBy: 'owner', invitedByEmail: 'o@x.org', status: 'pending', createdAt: 'x' });
+    await db.doc('organizations/org1').update({ pendingInviteCount: 1 });
     // full: refused
     const c1 = env.authenticatedContext('new', { email: 'new@x.org', email_verified: true }).firestore();
     const full = writeBatch(c1);
     full.set(doc(c1, 'organizations/org1/members/new'), { userId: 'new', email: 'new@x.org', role: 'viewer', joinedAt: 'x' });
-    full.update(doc(c1, 'organizations/org1'), { memberCount: 4 });
+    full.update(doc(c1, 'organizations/org1'), { memberCount: 4, pendingInviteCount: 0 });
     await expect(full.commit()).rejects.toBeTruthy();
     // the server removes someone, freeing a seat
     await removeMemberAndRecount(db, { orgId: 'org1', userId: 'm2', requesterUid: 'owner' });
     const ok = writeBatch(c1);
     ok.set(doc(c1, 'organizations/org1/members/new'), { userId: 'new', email: 'new@x.org', role: 'viewer', joinedAt: 'x' });
-    ok.update(doc(c1, 'organizations/org1'), { memberCount: 3 });
+    ok.update(doc(c1, 'organizations/org1'), { memberCount: 3, pendingInviteCount: 0 });
+    ok.delete(doc(c1, 'invitations/new@x.org'));
     await assertSucceeds(ok.commit());
   });
+});
+
+
+it('revocation releases a seat only for a pending invitation belonging to the organization', async () => {
+  await seed('org1', ['owner'], 1);
+  const orgRef = db.doc('organizations/org1');
+  const pending = db.doc('invitations/pending@x.org');
+  const accepted = db.doc('invitations/accepted@x.org');
+  await orgRef.update({ pendingInviteCount: 1 });
+  await pending.set({ orgId: 'org1', status: 'pending' });
+  await accepted.set({ orgId: 'org1', status: 'accepted' });
+
+  await expect(revokeInvitationAndRecount(db, {
+    orgId: 'org1', requesterUid: 'owner', inviteEmail: 'accepted@x.org',
+  })).rejects.toMatchObject({ httpStatus: 404 });
+  expect((await accepted.get()).exists).toBe(true);
+  expect((await orgRef.get()).data()?.pendingInviteCount).toBe(1);
+
+  await expect(revokeInvitationAndRecount(db, {
+    orgId: 'org1', requesterUid: 'owner', inviteEmail: 'pending@x.org',
+  })).resolves.toEqual({ pendingInviteCount: 0 });
+  expect((await pending.get()).exists).toBe(false);
+  expect((await orgRef.get()).data()?.pendingInviteCount).toBe(0);
 });

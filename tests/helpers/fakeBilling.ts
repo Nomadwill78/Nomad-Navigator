@@ -67,6 +67,7 @@ export class FakeStore implements BillingStore {
   issues: { orgId: string; issue: BillingIssue }[] = [];
   events = new Map<string, { status: 'processing' | 'done' | 'failed'; outcome?: string; error?: string }>();
   memberCounts = new Map<string, number>();
+  pendingInviteCounts = new Map<string, number>();
   writes = 0;
 
   async getBilling(orgId: string) { return this.billing.get(orgId) ?? null; }
@@ -87,6 +88,7 @@ export class FakeStore implements BillingStore {
   async finishEvent(id: string, outcome: string) { this.events.set(id, { status: 'done', outcome }); }
   async failEvent(id: string, error: string) { this.events.set(id, { status: 'failed', error }); }
   async countMembers(orgId: string) { return this.memberCounts.get(orgId) ?? 1; }
+  async countPendingInvitations(orgId: string) { return this.pendingInviteCounts.get(orgId) ?? 0; }
 }
 
 export const evt = (id: string, type: string, object: any) => ({ id, type, data: { object } });

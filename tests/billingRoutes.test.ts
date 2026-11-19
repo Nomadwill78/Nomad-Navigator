@@ -100,6 +100,7 @@ describe('webhooks are signature-verified', () => {
 const ADMIN = 'Bearer admin-token';
 let removed: any[];
 let reconciled: string[];
+let revoked: any[];
 const apiDeps = (): Partial<ApiDeps> => ({
   env: ENV,
   stripe: () => stripe,
@@ -114,6 +115,11 @@ const apiDeps = (): Partial<ApiDeps> => ({
     return { memberCount: 2 };
   },
   reconcileMembers: async (orgId) => { reconciled.push(orgId); return { before: 9, after: 3 }; },
+  revokeInvitation: async (args) => {
+    revoked.push(args);
+    if (args.inviteEmail === 'gone@x.org') throw new MemberError('NOT_FOUND', 'That invitation no longer exists.', 404);
+    return { pendingInviteCount: 1 };
+  },
 });
 
 async function call(path: string, body: any, headers: Record<string, string> = {}, method = 'POST') {
@@ -124,7 +130,7 @@ async function call(path: string, body: any, headers: Record<string, string> = {
     return { status: res.status, json: await res.json().catch(() => ({})) };
   } finally { server.close(); }
 }
-beforeEach(() => { removed = []; reconciled = []; });
+beforeEach(() => { removed = []; reconciled = []; revoked = []; });
 
 describe('API routes require a signed-in admin of that organization', () => {
   const routes: [string, any][] = [
@@ -133,6 +139,7 @@ describe('API routes require a signed-in admin of that organization', () => {
     ['/api/create-portal-session', { orgId: 'org1' }],
     ['/api/remove-member', { orgId: 'org1', userId: 'm1' }],
     ['/api/reconcile-members', { orgId: 'org1' }],
+    ['/api/revoke-invitation', { orgId: 'org1', inviteEmail: 'a@x.org' }],
   ];
   for (const [path, body] of routes) {
     it(`${path}: 401 with no sign-in, 403 for a non-admin or another organization`, async () => {
@@ -177,7 +184,7 @@ describe('API routes: billing flows', () => {
     store.memberCounts.set('org1', 6);
     const r = await call('/api/change-plan', { orgId: 'org1', plan: 'starter' }, { authorization: ADMIN });
     expect(r.status).toBe(409);
-    expect(r.json.error).toMatch(/6 team members.*allows 3/);
+    expect(r.json.error).toMatch(/6 occupied seats.*allows 3/);
   });
   it('bad input is a 400, and server errors never leak internals', async () => {
     expect((await call('/api/change-plan', { orgId: 'org1' }, { authorization: ADMIN })).status).toBe(400);
@@ -215,5 +222,20 @@ describe('API routes: membership', () => {
     const r = await call('/api/reconcile-members', { orgId: 'org1' }, { authorization: ADMIN });
     expect(r.json).toEqual({ before: 9, after: 3 });
     expect(reconciled).toEqual(['org1']);
+  });
+  it('revoke-invitation passes the verified admin as the requester', async () => {
+    const r = await call('/api/revoke-invitation', { orgId: 'org1', inviteEmail: 'a@x.org' }, { authorization: ADMIN });
+    expect(r.status).toBe(200);
+    expect(r.json).toEqual({ pendingInviteCount: 1 });
+    expect(revoked[0]).toEqual({ orgId: 'org1', inviteEmail: 'a@x.org', requesterUid: 'admin_uid' });
+  });
+  it('revoking a missing invitation is a 404 with the reason', async () => {
+    const r = await call('/api/revoke-invitation', { orgId: 'org1', inviteEmail: 'gone@x.org' }, { authorization: ADMIN });
+    expect(r.status).toBe(404);
+    expect(r.json.error).toMatch(/no longer exists/);
+  });
+  it('revoke-invitation requires orgId and inviteEmail', async () => {
+    const r = await call('/api/revoke-invitation', { orgId: 'org1' }, { authorization: ADMIN });
+    expect(r.status).toBe(400);
   });
 });

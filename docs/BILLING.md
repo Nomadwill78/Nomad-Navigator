@@ -6,16 +6,18 @@ This is the one place that says what each plan allows and what happens when paym
 
 | Plan | Team members |
 |---|---|
-| Trial (free, every new organization) | 8 |
+| Trial (free, every new organization) | 5 |
 | Compass Starter ($49/mo) | 3 |
-| Compass Growth ($99/mo) | Unlimited |
-| Compass Pro ($199/mo) | Unlimited |
+| Compass Growth ($99/mo) | 10 |
+| Compass Pro ($199/mo) | 25 |
 
-A higher plan never has fewer seats than a lower one. Pro is set apart by unlimited AI reports and onboarding, not by a smaller team cap.
+Each plan has a defined capacity. Growth supports larger cross-functional teams; Pro supports up to 25 users and adds advanced reporting and onboarding.
 
 "Exactly 3" means exactly 3: the third member can join, the fourth cannot. Pending invitations count against the limit in the app, so an admin cannot over-invite. The database also refuses a join that would go over, so the limit holds even if two people accept at the same moment or someone modifies the app.
 
 **Where this lives:** `PLAN_SEAT_LIMITS` in `types.ts` is the single source. The app, the server, and `firestore.rules` all follow it, and a test fails if the rules table and `types.ts` ever disagree. To change a limit, change `types.ts` and `seatLimitOf()` in `firestore.rules` together.
+
+**Seat-reservation rollout for existing organizations.** Deploy the updated Firestore rules, then backfill with `node scripts/migrate-pending-invite-counts.mjs --fix` using the target project's `FIREBASE_SERVICE_ACCOUNT`. Run the script again without `--fix` to confirm that no organizations need repair. Legacy invitees can still accept within the plan limit while their organization's counter is absent. Sending new invitations resumes once its counter is backfilled.
 
 ## What happens when payment goes wrong
 

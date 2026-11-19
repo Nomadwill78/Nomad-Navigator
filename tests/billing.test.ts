@@ -82,11 +82,11 @@ describe('cancellation and failed-payment policy (status by status)', () => {
 });
 
 describe('deriveBillingPatch', () => {
-  it('maps prices to plans and uses unlimited for Growth and Pro', () => {
+  it('maps prices to the exact seat limits for all paid plans', () => {
     const g = deriveBillingPatch(sub({ id: 's', items: { data: [{ id: 'i', price: { id: 'price_growth' } }] } }), ENV) as any;
-    expect(g.patch).toMatchObject({ plan: 'growth', seatLimit: null, status: 'active', stripeSubscriptionId: 's' });
+    expect(g.patch).toMatchObject({ plan: 'growth', seatLimit: 10, status: 'active', stripeSubscriptionId: 's' });
     const p = deriveBillingPatch(sub({ id: 's', items: { data: [{ id: 'i', price: { id: 'price_pro' } }] } }), ENV) as any;
-    expect(p.patch).toMatchObject({ plan: 'pro', seatLimit: null });
+    expect(p.patch).toMatchObject({ plan: 'pro', seatLimit: 25 });
     const s = deriveBillingPatch(sub({ id: 's' }), ENV) as any;
     expect(s.patch).toMatchObject({ plan: 'starter', seatLimit: 3 });
   });
@@ -245,7 +245,7 @@ describe('upgrades and downgrades update the existing subscription', () => {
     const update = stripe.calls.find((c) => c.method === 'update')!;
     expect(update.args[0]).toBe('sub_1');
     expect(update.args[1]).toMatchObject({ items: [{ id: 'si_1', price: 'price_growth' }], proration_behavior: 'create_prorations' });
-    expect(store.billing.get('org1')).toMatchObject({ plan: 'growth', seatLimit: null, stripeSubscriptionId: 'sub_1' });
+    expect(store.billing.get('org1')).toMatchObject({ plan: 'growth', seatLimit: 10, stripeSubscriptionId: 'sub_1' });
   });
   it('downgrade Pro to Growth to Starter works when the team fits', async () => {
     store.billing.set('org1', { plan: 'pro', status: 'active', stripeSubscriptionId: 'sub_1' });
@@ -263,7 +263,7 @@ describe('upgrades and downgrades update the existing subscription', () => {
     const err = await changePlan(deps(), { orgId: 'org1', plan: 'starter' }).catch((e) => e);
     expect(err).toBeInstanceOf(BillingError);
     expect(err.code).toBe('TOO_MANY_MEMBERS');
-    expect(err.message).toMatch(/5 team members.*allows 3.*Remove 2 members/);
+    expect(err.message).toMatch(/5 occupied seats.*allows 3.*Remove 2 members or revoke invitations/);
     expect(stripe.count('update')).toBe(0);
   });
   it('exactly 3 members can downgrade to Starter; 4 cannot', async () => {
@@ -273,6 +273,18 @@ describe('upgrades and downgrades update the existing subscription', () => {
     await expect(changePlan(deps(), { orgId: 'org1', plan: 'starter' })).rejects.toMatchObject({ code: 'TOO_MANY_MEMBERS' });
     store.memberCounts.set('org1', 3);
     await expect(changePlan(deps(), { orgId: 'org1', plan: 'starter' })).resolves.toBeTruthy();
+  });
+
+  it('a downgrade counts pending invitations as reserved seats', async () => {
+    store.billing.set('org1', { plan: 'growth', status: 'active', stripeSubscriptionId: 'sub_1' });
+    stripe.subs.get('sub_1')!.items.data[0].price = { id: 'price_growth' };
+    store.memberCounts.set('org1', 2);
+    store.pendingInviteCounts.set('org1', 2);
+    const err = await changePlan(deps(), { orgId: 'org1', plan: 'starter' }).catch((e) => e);
+    expect(err).toBeInstanceOf(BillingError);
+    expect(err.code).toBe('TOO_MANY_MEMBERS');
+    expect(err.message).toMatch(/4 occupied seats.*pending invitations.*allows 3/);
+    expect(stripe.count('update')).toBe(0);
   });
   it('a refused change leaves everything as it was', async () => {
     store.billing.set('org1', { plan: 'growth', status: 'active', stripeSubscriptionId: 'sub_1' });
